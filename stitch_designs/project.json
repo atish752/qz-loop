@@ -1,0 +1,226 @@
+{
+  "name": "projects/16035930815286586265",
+  "title": "Qz Loop Quiz App",
+  "visibility": "PRIVATE",
+  "createTime": "2026-10-11T07:33:44.380058Z",
+  "updateTime": "2026-10-11T08:00:09.829607Z",
+  "projectType": "TEXT_TO_UI_PRO",
+  "thumbnailScreenshot": {
+    "name": "projects/16035930815286586265/screens/6f9b8c5d41ee4d5d945e0b6b5e8f8418/fileEntries/screenshot",
+    "downloadUrl": "https://lh3.googleusercontent.com/aida/AEtjO1VyuJvBAzysKdZNRC6ksrKI-9qIJhV59lNYqtWL_0g5H_PFg00rzZvNfz70fmCsM9r4eSJVC-MaH19LjJjjSo-EW6vFf84WXyUJLUq-OTJDwBKqeSvAUTD_ryzOnA9ZcE_eAkDnhpmwZyEmnsdTB-nCtGXoqvF92E_KOijp2h1bOdMnZ35D2jO8KhvM3bXI7McaHn_-yqGGHZP5yQiuQccO8bGjKW092NQu6kucvV9W6DubGpoyXpDOZTUH"
+  },
+  "origin": "STITCH",
+  "deviceType": "MOBILE",
+  "designTheme": {
+    "colorMode": "LIGHT",
+    "font": "INTER",
+    "roundness": "ROUND_EIGHT",
+    "customColor": "#6d28d9",
+    "headlineFont": "INTER",
+    "bodyFont": "INTER",
+    "labelFont": "INTER",
+    "namedColors": {
+      "secondary_container": "#e1e3e4",
+      "on_surface_variant": "#4a4455",
+      "on_secondary_container": "#626566",
+      "on_tertiary": "#ffffff",
+      "surface_container_high": "#e1e8fd",
+      "on_tertiary_fixed": "#002113",
+      "on_secondary": "#ffffff",
+      "tertiary": "#004b31",
+      "on_primary_fixed_variant": "#5b00c5",
+      "surface": "#f9f9ff",
+      "primary_container": "#6d28d9",
+      "on_primary_container": "#dac5ff",
+      "inverse_on_surface": "#edf0ff",
+      "inverse_surface": "#293040",
+      "on_tertiary_container": "#58e7ab",
+      "surface_dim": "#d3daef",
+      "surface_tint": "#7331df",
+      "surface_variant": "#dce2f7",
+      "on_tertiary_fixed_variant": "#005236",
+      "outline_variant": "#ccc3d7",
+      "on_surface": "#141b2b",
+      "primary": "#5300b7",
+      "on_error": "#ffffff",
+      "surface_container": "#e9edff",
+      "tertiary_fixed_dim": "#4edea3",
+      "tertiary_container": "#006544",
+      "background": "#f9f9ff",
+      "primary_fixed_dim": "#d3bbff",
+      "surface_bright": "#f9f9ff",
+      "tertiary_fixed": "#6ffbbe",
+      "outline": "#7b7486",
+      "on_secondary_fixed_variant": "#454748",
+      "secondary_fixed": "#e1e3e4",
+      "primary_fixed": "#ebddff",
+      "on_background": "#141b2b",
+      "on_primary_fixed": "#250059",
+      "error": "#ba1a1a",
+      "on_error_container": "#93000a",
+      "inverse_primary": "#d3bbff",
+      "surface_container_lowest": "#ffffff",
+      "secondary": "#5c5f60",
+      "secondary_fixed_dim": "#c5c7c8",
+      "on_primary": "#ffffff",
+      "surface_container_highest": "#dce2f7",
+      "surface_container_low": "#f1f3ff",
+      "error_container": "#ffdad6",
+      "on_secondary_fixed": "#191c1d"
+    },
+    "designMd": "---\nname: Monastic Clarity\ncolors:\n  surface: '#f9f9ff'\n  surface-dim: '#d3daef'\n  surface-bright: '#f9f9ff'\n  surface-container-lowest: '#ffffff'\n  surface-container-low: '#f1f3ff'\n  surface-container: '#e9edff'\n  surface-container-high: '#e1e8fd'\n  surface-container-highest: '#dce2f7'\n  on-surface: '#141b2b'\n  on-surface-variant: '#4a4455'\n  inverse-surface: '#293040'\n  inverse-on-surface: '#edf0ff'\n  outline: '#7b7486'\n  outline-variant: '#ccc3d7'\n  surface-tint: '#7331df'\n  primary: '#5300b7'\n  on-primary: '#ffffff'\n  primary-container: '#6d28d9'\n  on-primary-container: '#dac5ff'\n  inverse-primary: '#d3bbff'\n  secondary: '#5c5f60'\n  on-secondary: '#ffffff'\n  secondary-container: '#e1e3e4'\n  on-secondary-container: '#626566'\n  tertiary: '#004b31'\n  on-tertiary: '#ffffff'\n  tertiary-container: '#006544'\n  on-tertiary-container: '#58e7ab'\n  error: '#ba1a1a'\n  on-error: '#ffffff'\n  error-container: '#ffdad6'\n  on-error-container: '#93000a'\n  primary-fixed: '#ebddff'\n  primary-fixed-dim: '#d3bbff'\n  on-primary-fixed: '#250059'\n  on-primary-fixed-variant: '#5b00c5'\n  secondary-fixed: '#e1e3e4'\n  secondary-fixed-dim: '#c5c7c8'\n  on-secondary-fixed: '#191c1d'\n  on-secondary-fixed-variant: '#454748'\n  tertiary-fixed: '#6ffbbe'\n  tertiary-fixed-dim: '#4edea3'\n  on-tertiary-fixed: '#002113'\n  on-tertiary-fixed-variant: '#005236'\n  background: '#f9f9ff'\n  on-background: '#141b2b'\n  surface-variant: '#dce2f7'\ntypography:\n  headline-lg:\n    fontFamily: Inter\n    fontSize: 28px\n    fontWeight: '700'\n    lineHeight: 36px\n    letterSpacing: -0.02em\n  headline-lg-mobile:\n    fontFamily: Inter\n    fontSize: 24px\n    fontWeight: '700'\n    lineHeight: 32px\n    letterSpacing: -0.02em\n  headline-md:\n    fontFamily: Inter\n    fontSize: 20px\n    fontWeight: '600'\n    lineHeight: 28px\n    letterSpacing: -0.01em\n  headline-sm:\n    fontFamily: Inter\n    fontSize: 18px\n    fontWeight: '600'\n    lineHeight: 24px\n  body-lg:\n    fontFamily: Inter\n    fontSize: 17px\n    fontWeight: '500'\n    lineHeight: 24px\n  body-md:\n    fontFamily: Inter\n    fontSize: 15px\n    fontWeight: '400'\n    lineHeight: 22px\n  body-sm:\n    fontFamily: Inter\n    fontSize: 13px\n    fontWeight: '400'\n    lineHeight: 18px\n  label-lg:\n    fontFamily: Inter\n    fontSize: 16px\n    fontWeight: '700'\n    lineHeight: 20px\n  label-md:\n    fontFamily: Inter\n    fontSize: 13px\n    fontWeight: '600'\n    lineHeight: 16px\n    letterSpacing: 0.02em\n  label-sm:\n    fontFamily: Inter\n    fontSize: 11px\n    fontWeight: '600'\n    lineHeight: 14px\n    letterSpacing: 0.04em\nrounded:\n  sm: 0.25rem\n  DEFAULT: 0.5rem\n  md: 0.75rem\n  lg: 1rem\n  xl: 1.5rem\n  full: 9999px\nspacing:\n  gutter: 1rem\n  margin: 1rem\n  space-xs: 0.25rem\n  space-sm: 0.5rem\n  space-md: 0.75rem\n  space-lg: 1rem\n  space-xl: 1.5rem\n---\n\n## Brand & Style\n\nThe design system is engineered for intense academic focus, eliminating cognitive fatigue for competitive exam aspirants across Tier-1 to Tier-4 regions. The brand persona is disciplined, direct, and distraction-free—analogous to a precision calculation tool or an early-generation digital audio player. \n\nThe aesthetic is grounded in **Functional Minimalism**:\n- Zero ornamental graphics, character avatars, confetti, or extraneous visual noise.\n- Every pixel directly serves reading comprehension, rapid recall, and decisive interaction.\n- Radical visual hierarchy: High-contrast typography commands the viewport, while chrome, boundaries, and metadata recede into near-monochrome neutrality.\n- Immediate, unequivocal feedback states communicate correctness without gamified theatrics.\n\n## Colors\n\nThe palette enforces high legibility under harsh sunlight and low-cost mobile displays alike.\n\n- **Primary Canvas**: Pure White (`#FFFFFF`) ensures maximum contrast ratio for uninterrupted text scanning.\n- **Surface & Containers**: Subdued Cool Grey (`#F9FAFB`) with hair-thin structural dividers (`#E5E7EB`) distinguishes interactable question containers without visual heaviness.\n- **Typography**:\n  - `Text Primary` (`#111827`): Near-black for maximum contrast against white backdrops.\n  - `Text Muted` (`#6B7280`): Mid-tone grey reserved for exam category tags, question indices, and explanatory captions.\n- **Action & Accent**: Deep Violet (`#6D28D9`) acts strictly as the focal driver for primary actions, active navigation states, and the central operational trigger.\n- **Validation Signals**:\n  - `Correct / Success`: Emerald Green (`#10B981`) text and border on an ultra-soft tint (`#ECFDF5`).\n  - `Incorrect / Error`: Bright Red (`#EF4444`) text and border on an ultra-soft tint (`#FEF2F2`).\n\n## Typography\n\nThe type system prioritizes immediate structural recognition across both English and Devanagari scripts (falling back to Noto Sans Devanagari seamlessly).\n\n- **Question Display (`headline-lg-mobile`)**: Set at 24px/32px leading with bold weight to capture instant focus in a vertical feed.\n- **Option Text (`body-lg`)**: Set at 17px with medium weight (`500`) to guarantee high scanning velocity during timed test drills.\n- **Affordance & Badges (`label-md`, `label-sm`)**: High tabular legibility, slight positive tracking on uppercase labels for exam categories (e.g., `SSC CGL`, `RRB NTPC`).\n- **Strict Hierarchy Rule**: Never place more than two type sizes within a single quiz card surface.\n\n## Layout & Spacing\n\nThe layout is built around a single-column vertical feed optimized for one-handed thumb interaction.\n\n- **Grid Model**: A constrained single-column fluid layout with a maximum reading width of 480px on desktop and tablet views, centered horizontally.\n- **Screen Margins**: Uniform 16px (`1rem`) on mobile viewports; increases to 24px (`1.5rem`) on viewports wider than 640px.\n- **Rhythm & Stacking**:\n  - Vertical stack rhythm between question and options is strictly `space-lg` (16px).\n  - Internal option card padding uses `space-md` (12px) vertical by `space-lg` (16px) horizontal.\n  - Option card separation is strictly `space-sm` (8px) to fit all 4 options within standard mobile vertical viewports above the bottom bar.\n\n## Elevation & Depth\n\nThis design system avoids multi-tier dropshadows, blurs, and skeuomorphic lighting. Depth is flattened and structural:\n\n- **Flat Baseline**: The main feed lives at base level (`#FFFFFF`) with cards resting on tonal difference (`#F9FAFB`) framed by 1px solid borders (`#E5E7EB`).\n- **Low-Contrast Outlines**: Cards, option tiles, and pills employ crisp, razor-thin outlines to define boundary limits without creating heaviness.\n- **Elevated Modals / Bottom Bar**: Floating components use a clean 1px top border separator (`#E5E7EB`) and an ultra-subtle, non-diffused micro-tint (`0px -1px 3px rgba(0, 0, 0, 0.03)`).\n- **Active / Pressed Elevation**: Pressing an option eliminates borders in favor of high-contrast state fills. No physical depress shadows are permitted.\n\n## Shapes\n\nThe geometry balances clean architectural structure with welcoming touch contours:\n\n- **Option Cards & Containers**: Rounded with a 16px (`rounded-2xl` equivalent) radius, providing soft corners that clearly outline hit surfaces.\n- **Badges & Micro Pills**: Fully circular/pill-shaped radii for status chips, exam labels, and numerical tags.\n- **Action Triggers**: Bottom navigation items use pill indicators on active selection; the central creation button is a pure 56px circle.\n\n## Components\n\n### 1. Option Cards (A, B, C, D)\n- **Dimensions**: Full width, minimum height of 56px to guarantee comfortable touch ergonomics.\n- **Resting State**: Background `#F9FAFB`, border 1.5px solid `#E5E7EB`, text `#111827`.\n- **Option Label Anchor**: Circular or squared pill badge on the left (`A`, `B`, `C`, `D`) with bold typography (`label-lg`), separated from option copy.\n- **Selected State**: Background `#F3F4F6`, border 2px solid `#6D28D9`.\n- **Success State**: Background `#ECFDF5`, border 2px solid `#10B981`, label and text `#065F46`.\n- **Error State**: Background `#FEF2F2`, border 2px solid `#EF4444`, label and text `#991B1B`.\n\n### 2. Bottom Navigation Bar\n- **Configuration**: 5-column layout anchored to bottom safe area. Height: 64px.\n- **Background**: Solid `#FFFFFF` with 1px top border `#E5E7EB`.\n- **Items**: Home, Stats, Central Action (`+`), Ranking, Me.\n- **Icons & Text**: Monoline, minimalist iconography with tiny labels below. Inactive `#6B7280`, active `#6D28D9`.\n- **Central Action Button**: 52px floating circle tinted in primary Purple (`#6D28D9`) with a white 24px icon. Positioned centrally with no overflow gap.\n\n### 3. Question Feed Card\n- **Structure**:\n  - Header: Category Pill (e.g., \"SSC CGL • Quantitative\") + Question Counter (e.g., \"#1,420\") in `#6B7280`.\n  - Body: Uncluttered question statement (24px bold, `#111827`).\n  - Options stack: Vertical list of 4 option cards with 8px gaps.\n  - Footer: Clean inline explanation drawer appearing immediately upon answer submission.\n\n### 4. Status Badges & Number Callouts\n- **Badges**: Minimal pill with `#F3F4F6` fill, `#374151` text, zero border.\n- **Accuracy Counters**: Large tabular numbers (e.g., `84% Accuracy`) displayed using `headline-md` alongside minimal text labels.\n- **Timer / Speed Indicator**: Mono-spaced numerical pill positioned top-right of quiz cards for speed drill modes.\n\n### 5. Input Fields & Form Controls\n- **Inputs**: Flat surface `#F9FAFB`, border 1px solid `#E5E7EB`, focus ring 2px `#6D28D9`.\n- **Radio / Checkbox**: Discarded in favor of full-bleed option card tapping.",
+    "colorVariant": "FIDELITY",
+    "overridePrimaryColor": "#6d28d9",
+    "overrideSecondaryColor": "#f9fafb",
+    "overrideTertiaryColor": "#10b981",
+    "overrideNeutralColor": "#111827",
+    "spacingScale": 2,
+    "typography": {
+      "headline-lg": {
+        "fontFamily": "Inter",
+        "fontSize": "28px",
+        "fontWeight": "700",
+        "lineHeight": "36px",
+        "letterSpacing": "-0.02em"
+      },
+      "headline-lg-mobile": {
+        "fontFamily": "Inter",
+        "fontSize": "24px",
+        "fontWeight": "700",
+        "lineHeight": "32px",
+        "letterSpacing": "-0.02em"
+      },
+      "body-lg": {
+        "fontFamily": "Inter",
+        "fontSize": "17px",
+        "fontWeight": "500",
+        "lineHeight": "24px"
+      },
+      "label-sm": {
+        "fontFamily": "Inter",
+        "fontSize": "11px",
+        "fontWeight": "600",
+        "lineHeight": "14px",
+        "letterSpacing": "0.04em"
+      },
+      "label-lg": {
+        "fontFamily": "Inter",
+        "fontSize": "16px",
+        "fontWeight": "700",
+        "lineHeight": "20px"
+      },
+      "label-md": {
+        "fontFamily": "Inter",
+        "fontSize": "13px",
+        "fontWeight": "600",
+        "lineHeight": "16px",
+        "letterSpacing": "0.02em"
+      },
+      "headline-sm": {
+        "fontFamily": "Inter",
+        "fontSize": "18px",
+        "fontWeight": "600",
+        "lineHeight": "24px"
+      },
+      "body-sm": {
+        "fontFamily": "Inter",
+        "fontSize": "13px",
+        "fontWeight": "400",
+        "lineHeight": "18px"
+      },
+      "body-md": {
+        "fontFamily": "Inter",
+        "fontSize": "15px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      },
+      "headline-md": {
+        "fontFamily": "Inter",
+        "fontSize": "20px",
+        "fontWeight": "600",
+        "lineHeight": "28px",
+        "letterSpacing": "-0.01em"
+      }
+    },
+    "spacing": {
+      "space-xl": "1.5rem",
+      "space-sm": "0.5rem",
+      "margin": "1rem",
+      "space-lg": "1rem",
+      "space-xs": "0.25rem",
+      "space-md": "0.75rem",
+      "gutter": "1rem"
+    },
+    "headlineFontFamily": "Inter",
+    "bodyFontFamily": "Inter",
+    "labelFontFamily": "Inter"
+  },
+  "screenInstances": [
+    {
+      "id": "374d8ecc691e457b8c78db89343244a7",
+      "sourceScreen": "projects/16035930815286586265/screens/374d8ecc691e457b8c78db89343244a7",
+      "x": 3748,
+      "width": 390,
+      "height": 884,
+      "label": "Qz Loop Exam Prep"
+    },
+    {
+      "id": "51ef08cf09e34987bdd70aa5937e0c6c",
+      "sourceScreen": "projects/16035930815286586265/screens/51ef08cf09e34987bdd70aa5937e0c6c",
+      "x": 1932,
+      "width": 390,
+      "height": 884,
+      "label": "Generating Screen..."
+    },
+    {
+      "id": "5f37d3051c524de4b44b0a433dbe86e6",
+      "sourceScreen": "projects/16035930815286586265/screens/5f37d3051c524de4b44b0a433dbe86e6",
+      "x": 1024,
+      "width": 390,
+      "height": 1061,
+      "label": "Generating Screen..."
+    },
+    {
+      "id": "6f9b8c5d41ee4d5d945e0b6b5e8f8418",
+      "sourceScreen": "projects/16035930815286586265/screens/6f9b8c5d41ee4d5d945e0b6b5e8f8418",
+      "x": 1478,
+      "width": 390,
+      "height": 884,
+      "label": "Generating Screen..."
+    },
+    {
+      "id": "87d7e1ba7ffd49f5ba119e1c9e397f01",
+      "sourceScreen": "projects/16035930815286586265/screens/87d7e1ba7ffd49f5ba119e1c9e397f01",
+      "x": 3294,
+      "width": 390,
+      "height": 944,
+      "label": "Generating Screen..."
+    },
+    {
+      "id": "assets_93e7bcc0ae024ecfbc5249124e38b310",
+      "width": 960,
+      "height": 540,
+      "sourceAsset": "assets/93e7bcc0ae024ecfbc5249124e38b310",
+      "type": "DESIGN_SYSTEM_INSTANCE"
+    },
+    {
+      "id": "c3cd76036b2748cc8f2f7253030ebcd2",
+      "sourceScreen": "projects/16035930815286586265/screens/c3cd76036b2748cc8f2f7253030ebcd2",
+      "x": 2386,
+      "width": 390,
+      "height": 934,
+      "label": "Generating Screen..."
+    },
+    {
+      "id": "f7b951516fc0422b8729febd9ed5133e",
+      "sourceScreen": "projects/16035930815286586265/screens/f7b951516fc0422b8729febd9ed5133e",
+      "x": 2840,
+      "width": 390,
+      "height": 884,
+      "label": "Generating Screen..."
+    }
+  ],
+  "metadata": {
+    "userRole": "OWNER"
+  }
+}

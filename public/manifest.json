@@ -1,0 +1,17 @@
+{
+  "name": "Qz Loop — Competitive Quiz App",
+  "short_name": "Qz Loop",
+  "description": "Mobile-First, Infinite-Scroll Competitive Practice for Indian Students",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9f9ff",
+  "theme_color": "#5300b7",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
