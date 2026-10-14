@@ -222,8 +222,97 @@ async function runTests() {
   assert(qualifiedOnly.every((e) => e.total_attempts >= 20), "All ranked AIR participants have at least 20 attempts");
   assert(qualifiedOnly.every((e) => e.rank > 0), "All qualified participants have valid positive ranks");
 
+  // Scenario 19: Multi-subject flow in feed (Maths + English or Reasoning + GK)
+  console.log("\n[Scenario 19] Multi-subject flow in feed (e.g. Maths + English)");
+  const multiFeed1 = db.getFeedQuestions({
+    examId: "exam-ssc-cgl",
+    subjectSlug: "maths,english",
+  });
+  assert(multiFeed1.length > 0, "Multi-subject filter returned questions");
+  assert(
+    multiFeed1.every((q) => q.subject_slug === "maths" || q.subject_slug === "english"),
+    "All items belong strictly to chosen subjects 'maths' or 'english'"
+  );
+
+  const multiFeed2 = db.getFeedQuestions({
+    examId: "exam-ssc-cgl",
+    subjectSlugs: ["reasoning", "gk"],
+  });
+  assert(multiFeed2.length > 0, "Array subjectSlugs filter returned questions");
+  assert(
+    multiFeed2.every((q) => q.subject_slug === "reasoning" || q.subject_slug === "gk"),
+    "All items belong strictly to chosen subjects 'reasoning' or 'gk'"
+  );
+
+  // Scenario 20: Spaced Repetition custom repeat interval (< 1 Day, < 1 Week, < 1 Month, Never)
+  console.log("\n[Scenario 20] Spaced Repetition repeat interval recording and scheduling");
+  const targetQ = initialFeed[3];
+  // 1. Set repeat interval 'never'
+  const neverPref = db.setQuestionRepeatInterval("user-current", targetQ.id, "never");
+  assert(neverPref.interval === "never", "Repeat interval 'never' successfully recorded");
+  assert(db.getQuestionRepeatInterval("user-current", targetQ.id) === "never", "Retrieved repeat interval matches 'never'");
+
+  // Verify 'never' question excluded from revision feed
+  const feedAfterNever = db.getFeedQuestions({
+    userId: "user-current",
+    examId: "exam-ssc-cgl",
+    subjectSlug: "all",
+  });
+  assert(!feedAfterNever.some((q) => q.id === targetQ.id), "Question marked 'never' excluded from future revision feed");
+
+  // 2. Set repeat interval 'day'
+  const dayPref = db.setQuestionRepeatInterval("user-current", targetQ.id, "day");
+  assert(dayPref.interval === "day", "Repeat interval '< 1 Day' successfully updated");
+  assert(Boolean(dayPref.next_review_at), "Next review timestamp scheduled within hours");
+
+  // Scenario 21: Reel Question Likes (Fire button)
+  console.log("\n[Scenario 21] Like / Fire interactions on reel questions");
+  const likeStatusBefore = db.getQuestionLikeStatus("user-current", targetQ.id);
+  const toggleRes1 = db.toggleLikeQuestion("user-current", targetQ.id);
+  assert(toggleRes1.liked !== likeStatusBefore.liked, "Like toggle flipped user like state");
+  const toggleRes2 = db.toggleLikeQuestion("user-current", targetQ.id);
+  assert(toggleRes2.liked === likeStatusBefore.liked, "Second like toggle reverted user like state");
+
+  // Scenario 22: Question Playlists and Collections
+  console.log("\n[Scenario 22] Question Playlists and Collections");
+  const createdCol = db.createCollection("user-current", "Tricky Quant Shortcuts", "Tricky formulas to revise");
+  assert(createdCol.name === "Tricky Quant Shortcuts", "Playlist collection created");
+  const saveRes = db.saveQuestionToCollection("user-current", targetQ.id, "Tricky Quant Shortcuts");
+  assert(saveRes.saved === true, "Question saved to playlist");
+  const savedCols = db.getQuestionCollections("user-current", targetQ.id);
+  assert(savedCols.includes("Tricky Quant Shortcuts"), "Question listed in playlist collections");
+  db.removeQuestionFromCollection("user-current", targetQ.id, "Tricky Quant Shortcuts");
+  const savedColsAfter = db.getQuestionCollections("user-current", targetQ.id);
+  assert(!savedColsAfter.includes("Tricky Quant Shortcuts"), "Question successfully removed from playlist");
+
+  // Scenario 23: Study Friends and Direct Chat with Question Sharing
+  console.log("\n[Scenario 23] Friends, Study Connections, and Direct Chat with Question Sharing");
+  const friends = db.getFriends("user-current");
+  assert(friends.length >= 4, "User has initial study partners");
+  const friendReq = db.sendFriendRequest("user-current", "Rohan Verma");
+  assert(friendReq.success === true, "Friend request accepted / connected");
+  
+  // Send study message sharing question
+  const sentMsg = db.sendMessage({
+    fromUserId: "user-current",
+    toUserId: "user-priya",
+    text: "Can you beat my time on this question?",
+    questionId: targetQ.id,
+  });
+  assert(sentMsg.question_id === targetQ.id, "Direct message links shared question ID");
+  const thread = db.getMessages("user-current", "user-priya");
+  assert(thread.some((m) => m.id === sentMsg.id), "Message visible in direct study chat thread");
+
+  // Scenario 24: Habit engine settings (/goal, /schedule, /boost)
+  console.log("\n[Scenario 24] Habit engine settings (/goal, /schedule, /boost)");
+  const habit = db.getHabitSettings("user-current");
+  assert(typeof habit.daily_goal === "number", "Daily question practice goal exists");
+  assert(habit.schedule_slots.length >= 3, "Study revision schedule slots exist");
+  const updatedHabit = db.updateDailyGoal("user-current", 35);
+  assert(updatedHabit.daily_goal === 35, "Daily practice goal updated successfully to 35");
+
   console.log("\n=================================================");
-  console.log("   ALL 18 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 24 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 
@@ -231,3 +320,4 @@ runTests().catch((err) => {
   console.error("Test failed:", err);
   process.exit(1);
 });
+

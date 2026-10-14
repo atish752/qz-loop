@@ -1,0 +1,257 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Question, FriendUser } from "@/types/database";
+
+interface ShareFriendModalProps {
+  question: Question;
+  isOpen: boolean;
+  onClose: () => void;
+  onOpenChatWithFriend?: (friend: FriendUser) => void;
+}
+
+export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
+  question,
+  isOpen,
+  onClose,
+  onOpenChatWithFriend,
+}) => {
+  const [friends, setFriends] = useState<FriendUser[]>([]);
+  const [sentMap, setSentMap] = useState<Record<string, boolean>>({});
+  const [copied, setCopied] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [addFriendInput, setAddFriendInput] = useState("");
+  const [addStatusMsg, setAddStatusMsg] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/friends")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.friends) {
+            setFriends(data.friends);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSendToFriend = async (friend: FriendUser) => {
+    try {
+      setSentMap((prev) => ({ ...prev, [friend.id]: true }));
+      await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          toUserId: friend.id,
+          text: `Check out this ${question.subject_name || "General"} question on Qz Loop: "${question.question_text.substring(0, 60)}..."`,
+          questionId: question.id,
+        }),
+      });
+    } catch {
+      // Sent optimistic
+    }
+  };
+
+  const handleSendFriendRequest = async () => {
+    if (!addFriendInput.trim()) return;
+    setIsAdding(true);
+    setAddStatusMsg(null);
+    try {
+      const res = await fetch("/api/friends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: addFriendInput }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAddStatusMsg(data.message || "Friend added!");
+        setAddFriendInput("");
+        if (data.friend) {
+          setFriends((prev) => [data.friend, ...prev.filter((f) => f.id !== data.friend.id)]);
+        }
+      } else {
+        setAddStatusMsg(data.error || "Could not add user");
+      }
+    } catch {
+      setAddStatusMsg("Network error");
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    const url = typeof window !== "undefined" ? `${window.location.origin}/q/${question.id}` : "";
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const filteredFriends = friends.filter(
+    (f) =>
+      f.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      f.target_exam.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+      <div className="w-full max-w-md bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-200">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-[24px]">send</span>
+            <div>
+              <h3 className="font-bold text-on-surface text-base">Share Question</h3>
+              <p className="text-xs text-secondary">Direct study share to peers & chat</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full text-secondary hover:text-on-surface hover:bg-surface-container"
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+
+        {/* Question Preview Snippet */}
+        <div className="my-3 p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container-highest text-secondary">
+              {question.subject_name || "Question"}
+            </span>
+            <p className="text-xs text-on-surface font-medium truncate mt-1">
+              {question.question_text}
+            </p>
+          </div>
+          <button
+            onClick={handleCopyLink}
+            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-surface-container text-xs font-bold text-primary hover:bg-surface-container-high transition-colors flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-[14px]">link</span>
+            <span>{copied ? "Copied!" : "Copy Link"}</span>
+          </button>
+        </div>
+
+        {/* Friend Search Bar */}
+        <div className="relative mb-3">
+          <span className="material-symbols-outlined absolute left-3 top-2.5 text-secondary text-[18px]">
+            search
+          </span>
+          <input
+            type="text"
+            placeholder="Search study friends..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
+          />
+        </div>
+
+        {/* Friends List with Direct Send */}
+        <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2 min-h-[160px] max-h-[240px]">
+          {filteredFriends.length > 0 ? (
+            filteredFriends.map((friend) => {
+              const isSent = sentMap[friend.id];
+              return (
+                <div
+                  key={friend.id}
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-low border border-surface-container-high/30 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-primary-fixed shrink-0 border border-surface-container-high">
+                      {friend.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={friend.avatar_url}
+                          alt={friend.display_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
+                          {friend.display_name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-on-surface text-xs truncate">
+                          {friend.display_name}
+                        </span>
+                        <span className="text-[10px] text-tertiary font-semibold">
+                          🔥 {friend.streak_days}d
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-secondary truncate">
+                        {friend.target_exam}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                    <button
+                      onClick={() => handleSendToFriend(friend)}
+                      disabled={isSent}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        isSent
+                          ? "bg-tertiary-fixed text-on-tertiary-fixed"
+                          : "bg-primary text-on-primary hover:bg-primary-container active:scale-95 shadow-xs"
+                      }`}
+                    >
+                      {isSent ? "Sent ✓" : "Send"}
+                    </button>
+                    {onOpenChatWithFriend && (
+                      <button
+                        onClick={() => {
+                          onClose();
+                          onOpenChatWithFriend(friend);
+                        }}
+                        className="p-1.5 rounded-lg bg-surface-container text-secondary hover:text-primary transition-colors"
+                        title="Open study chat"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">chat</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="py-6 text-center text-xs text-secondary">
+              No matching study partners found
+            </div>
+          )}
+        </div>
+
+        {/* Add Friend / Connect Aspirant */}
+        <div className="mt-3 pt-3 border-t border-surface-container-high/40">
+          <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
+            Send Friend Request
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Enter aspirant username or name..."
+              value={addFriendInput}
+              onChange={(e) => setAddFriendInput(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
+            />
+            <button
+              onClick={handleSendFriendRequest}
+              disabled={isAdding || !addFriendInput.trim()}
+              className="px-3.5 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs disabled:opacity-40 hover:bg-primary-container active:scale-95 transition-all shrink-0"
+            >
+              {isAdding ? "Adding..." : "Add"}
+            </button>
+          </div>
+          {addStatusMsg && (
+            <p className="text-[11px] text-primary font-medium mt-1">{addStatusMsg}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -9,6 +9,14 @@ import {
   MatrixStats,
   LeaderboardEntry,
   DuplicateCheckResult,
+  RepeatInterval,
+  QuestionRepeatPreference,
+  QuestionCollection,
+  FriendUser,
+  DirectMessage,
+  QuestionComment,
+  HabitSettings,
+  HabitScheduleSlot,
 } from "@/types/database";
 import {
   SEED_EXAMS,
@@ -30,9 +38,20 @@ class DataStore {
   private reports: QuestionReport[] = [];
   private currentUserId: string = "user-current";
 
+  // New Reel & Study Habit Features
+  private repeatPreferences: Map<string, QuestionRepeatPreference> = new Map();
+  private likes: Map<string, Set<string>> = new Map();
+  private collections: QuestionCollection[] = [];
+  private friends: FriendUser[] = [];
+  private messages: DirectMessage[] = [];
+  private comments: QuestionComment[] = [];
+  private habitSettings: Map<string, HabitSettings> = new Map();
+
   constructor() {
     this.seedInitialAttempts();
+    this.seedInitialSocialAndHabitData();
   }
+
 
   // Pre-seed some realistic historical attempts for rich initial stats
   private seedInitialAttempts() {
@@ -106,6 +125,154 @@ class DataStore {
     });
   }
 
+  // Pre-seed social, playlist, friend and habit data
+  private seedInitialSocialAndHabitData() {
+    // 1. Likes for questions
+    this.questions.forEach((q, idx) => {
+      const likers = new Set<string>();
+      // Random mock likes between 18 and 64
+      const seedLikerIds = ["user-amit", "user-priya", "user-vikram", "user-ananya"];
+      seedLikerIds.slice(0, (idx % 4) + 1).forEach((id) => likers.add(id));
+      if (idx % 2 === 0) {
+        likers.add(this.currentUserId);
+      }
+      this.likes.set(q.id, likers);
+    });
+
+    // 2. Playlists / Collections
+    const defaultPlaylists: { name: string; qIds: string[]; desc: string }[] = [
+      { name: "Saved Questions", qIds: ["q-math-1", "q-reas-1"], desc: "General bookmarked questions" },
+      { name: "Maths Tricks", qIds: ["q-math-1", "q-math-3", "q-math-hi-1"], desc: "High-yield calculation and shortcut proofs" },
+      { name: "Reasoning Logic", qIds: ["q-reas-1", "q-reas-2"], desc: "Syllogisms and pattern mastery" },
+      { name: "High-Yield English", qIds: ["q-eng-1", "q-eng-3"], desc: "Vocabulary and critical grammar rules" },
+      { name: "GK Rapid Recall", qIds: ["q-gk-1", "q-gk-hi-1", "q-gk-3"], desc: "Static GK and recurring PYQs" },
+    ];
+
+    this.collections = defaultPlaylists.map((p, idx) => ({
+      id: `col-${idx + 1}`,
+      user_id: this.currentUserId,
+      name: p.name,
+      description: p.desc,
+      question_ids: p.qIds,
+      created_at: new Date(Date.now() - (idx + 1) * 86400000).toISOString(),
+    }));
+
+    // 3. Friends
+    this.friends = [
+      {
+        id: "user-amit",
+        display_name: "Amit Kumar",
+        avatar_url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
+        streak_days: 18,
+        target_exam: "SSC CGL (AIR #1 Aim)",
+        status: "friend",
+        last_active: "Active 5m ago",
+      },
+      {
+        id: "user-priya",
+        display_name: "Priya Sharma",
+        avatar_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
+        streak_days: 14,
+        target_exam: "SSC CGL (Quant Specialist)",
+        status: "friend",
+        last_active: "Active now",
+      },
+      {
+        id: "user-vikram",
+        display_name: "Vikram Singh",
+        avatar_url: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80",
+        streak_days: 22,
+        target_exam: "SSC CGL & CHSL",
+        status: "friend",
+        last_active: "Active 2h ago",
+      },
+      {
+        id: "user-ananya",
+        display_name: "Ananya Roy",
+        avatar_url: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&auto=format&fit=crop&q=80",
+        streak_days: 9,
+        target_exam: "SSC CGL (GK & English)",
+        status: "friend",
+        last_active: "Active yesterday",
+      },
+    ];
+
+    // 4. Initial study chat messages
+    this.messages = [
+      {
+        id: "msg-1",
+        from_user_id: "user-priya",
+        to_user_id: this.currentUserId,
+        text: "Hey! Try this question, the formula trick saved me so much time!",
+        question_id: "q-math-1",
+        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+      },
+      {
+        id: "msg-2",
+        from_user_id: this.currentUserId,
+        to_user_id: "user-priya",
+        text: "Thanks! Solved it in 8.2s!",
+        created_at: new Date(Date.now() - 3600000 * 1.5).toISOString(),
+      },
+      {
+        id: "msg-3",
+        from_user_id: "user-amit",
+        to_user_id: this.currentUserId,
+        text: "Are you practicing reasoning loop today? Let's hit the 50 goal together!",
+        question_id: "q-reas-1",
+        created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+      },
+    ];
+
+    // 5. Initial Discussion Comments on questions
+    this.comments = [
+      {
+        id: "cmt-1",
+        question_id: "q-math-1",
+        user_id: "user-priya",
+        user_name: "Priya Sharma",
+        user_avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
+        comment_text: "Shortcut: When radius is doubled, area scales by square of radius factor (2² = 4). Hence 4:1 instantly without writing π!",
+        likes_count: 34,
+        created_at: new Date(Date.now() - 86400000).toISOString(),
+      },
+      {
+        id: "cmt-2",
+        question_id: "q-math-1",
+        user_id: "user-amit",
+        user_name: "Amit Kumar",
+        user_avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
+        comment_text: "Very classic SSC question. Frequently asked in Tier-1. Master the scaling ratio rule.",
+        likes_count: 19,
+        created_at: new Date(Date.now() - 43200000).toISOString(),
+      },
+      {
+        id: "cmt-3",
+        question_id: "q-eng-1",
+        user_id: "user-ananya",
+        user_name: "Ananya Roy",
+        user_avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&auto=format&fit=crop&q=80",
+        comment_text: "Rule: 'Neither of' takes a singular verb ('is' not 'are'). Always spot the subject-verb agreement first!",
+        likes_count: 27,
+        created_at: new Date(Date.now() - 72000000).toISOString(),
+      },
+    ];
+
+    // 6. Habit & Study Settings
+    this.habitSettings.set(this.currentUserId, {
+      daily_goal: 25,
+      solved_today: 6,
+      combo_streak: 4,
+      boost_multiplier: 2.0,
+      boost_expires_at: new Date(Date.now() + 1800000).toISOString(), // 30 mins boost
+      schedule_slots: [
+        { id: "slot-1", time: "08:00 AM", label: "Morning Warmup Drill", active: true },
+        { id: "slot-2", time: "02:00 PM", label: "Speed & Accuracy Sprint", active: true },
+        { id: "slot-3", time: "09:00 PM", label: "Night Spaced Revision Loop", active: true },
+      ],
+    });
+  }
+
   // --- Profile & User Management ---
   public getUserLifetimeSummary(userId: string): { totalSolved: number; overallAccuracy: number } {
     const userAttempts = this.attempts.filter((a) => a.user_id === userId);
@@ -165,6 +332,7 @@ class DataStore {
     userId?: string;
     examId?: string;
     subjectSlug?: string;
+    subjectSlugs?: string[];
     sessionExcludedIds?: string[];
     limit?: number;
   }): Question[] {
@@ -179,16 +347,29 @@ class DataStore {
       this.hiddenQuestions.filter((h) => h.user_id === userId).map((h) => h.question_id)
     );
 
+    // Multi-subject resolution (supports "maths,reasoning", ["maths", "gk"], or "all")
+    let targetSlugs: string[] = [];
+    if (options.subjectSlugs && options.subjectSlugs.length > 0) {
+      targetSlugs = options.subjectSlugs.map((s) => s.trim().toLowerCase());
+    } else if (subjectSlug && subjectSlug !== "all") {
+      targetSlugs = subjectSlug.split(",").map((s) => s.trim().toLowerCase());
+    }
+    const filterAll = targetSlugs.length === 0 || targetSlugs.includes("all");
+
     // Filter by exam and subject
     let pool = this.questions.filter((q) => {
       if (q.examination_id !== examId) return false;
       if (q.publication_status !== "published" || q.moderation_status !== "active") return false;
       if (userHiddenIds.has(q.id)) return false;
       if (sessionExcludedIds.has(q.id)) return false;
+      const repeatPref = this.repeatPreferences.get(`${userId}:${q.id}`);
+      if (repeatPref?.interval === "never") return false;
 
-      if (subjectSlug !== "all") {
-        const subj = this.subjects.find((s) => s.slug === subjectSlug);
-        if (subj && q.subject_id !== subj.id) return false;
+      if (!filterAll) {
+        const matchingSubjIds = new Set(
+          this.subjects.filter((s) => targetSlugs.includes(s.slug.toLowerCase())).map((s) => s.id)
+        );
+        if (!matchingSubjIds.has(q.subject_id)) return false;
       }
       return true;
     });
@@ -211,28 +392,57 @@ class DataStore {
     const eligibleForRevision: Question[] = [];
 
     for (const q of pool) {
+      // Check user's explicit repeat preference for this question
+      const prefKey = `${userId}:${q.id}`;
+      const repeatPref = this.repeatPreferences.get(prefKey);
+      if (repeatPref?.interval === "never") {
+        // Explicitly set to NEVER repeat
+        continue;
+      }
+
       const last = lastAttemptByQ.get(q.id);
       if (!last) {
         neverAnswered.push(q);
       } else {
         const timeSinceAttempt = now - new Date(last.created_at).getTime();
-        if (!last.is_correct) {
-          // Rule 5: Incorrect question eligible after ~24 hours
-          if (timeSinceAttempt >= 24 * MS_PER_HOUR) {
-            eligibleForRevision.push(q);
+
+        if (repeatPref) {
+          if (repeatPref.interval === "day") {
+            // Repeat quickly: reappears within a few hours / same day (e.g. 4 hours)
+            if (timeSinceAttempt >= 4 * MS_PER_HOUR) {
+              eligibleForRevision.push(q);
+            }
+          } else if (repeatPref.interval === "week") {
+            // Repeat within a week (7 days)
+            if (timeSinceAttempt >= 7 * MS_PER_DAY) {
+              eligibleForRevision.push(q);
+            }
+          } else if (repeatPref.interval === "month") {
+            // Repeat within a month (30 days)
+            if (timeSinceAttempt >= 30 * MS_PER_DAY) {
+              eligibleForRevision.push(q);
+            }
           }
         } else {
-          // Rule 6: Correct answer
-          const avgTime = q.total_attempts > 0 ? q.total_time_ms / q.total_attempts : 15000;
-          if (last.response_time_ms > avgTime * 1.3) {
-            // Unusually slow correct answer: eligible after ~3 days
-            if (timeSinceAttempt >= 3 * MS_PER_DAY) {
+          // Default heuristic spaced repetition
+          if (!last.is_correct) {
+            // Rule 5: Incorrect question eligible after ~24 hours
+            if (timeSinceAttempt >= 24 * MS_PER_HOUR) {
               eligibleForRevision.push(q);
             }
           } else {
-            // Consistently correct: eligible after ~7 days
-            if (timeSinceAttempt >= 7 * MS_PER_DAY) {
-              eligibleForRevision.push(q);
+            // Rule 6: Correct answer
+            const avgTime = q.total_attempts > 0 ? q.total_time_ms / q.total_attempts : 15000;
+            if (last.response_time_ms > avgTime * 1.3) {
+              // Unusually slow correct answer: eligible after ~3 days
+              if (timeSinceAttempt >= 3 * MS_PER_DAY) {
+                eligibleForRevision.push(q);
+              }
+            } else {
+              // Consistently correct: eligible after ~7 days
+              if (timeSinceAttempt >= 7 * MS_PER_DAY) {
+                eligibleForRevision.push(q);
+              }
             }
           }
         }
@@ -267,6 +477,7 @@ class DataStore {
       return safeQuestion as Question;
     });
   }
+
 
   // --- Submit Question Attempt ---
   public submitAttempt(params: {
@@ -792,6 +1003,249 @@ class DataStore {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { correct_option_id, ...safeQuestion } = q;
     return safeQuestion as Question;
+  }
+
+  // --- Spaced Repetition System ---
+  public setQuestionRepeatInterval(
+    userId: string,
+    questionId: string,
+    interval: RepeatInterval
+  ): QuestionRepeatPreference {
+    const key = `${userId}:${questionId}`;
+    const now = new Date();
+    let nextReviewMs = now.getTime();
+    if (interval === "day") {
+      nextReviewMs += 4 * 3600 * 1000; // 4 hours / same day
+    } else if (interval === "week") {
+      nextReviewMs += 7 * 86400 * 1000;
+    } else if (interval === "month") {
+      nextReviewMs += 30 * 86400 * 1000;
+    }
+
+    const pref: QuestionRepeatPreference = {
+      user_id: userId,
+      question_id: questionId,
+      interval,
+      next_review_at: interval === "never" ? undefined : new Date(nextReviewMs).toISOString(),
+      updated_at: now.toISOString(),
+    };
+
+    this.repeatPreferences.set(key, pref);
+    return pref;
+  }
+
+  public getQuestionRepeatInterval(userId: string, questionId: string): RepeatInterval | undefined {
+    const key = `${userId}:${questionId}`;
+    return this.repeatPreferences.get(key)?.interval;
+  }
+
+  // --- Likes & Interactions ---
+  public toggleLikeQuestion(userId: string, questionId: string): { liked: boolean; totalLikes: number } {
+    if (!this.likes.has(questionId)) {
+      this.likes.set(questionId, new Set<string>());
+    }
+    const set = this.likes.get(questionId)!;
+    const isLiked = set.has(userId);
+    if (isLiked) {
+      set.delete(userId);
+    } else {
+      set.add(userId);
+    }
+    return {
+      liked: !isLiked,
+      totalLikes: set.size,
+    };
+  }
+
+  public getQuestionLikeStatus(userId: string, questionId: string): { liked: boolean; totalLikes: number } {
+    const set = this.likes.get(questionId) || new Set<string>();
+    return {
+      liked: set.has(userId),
+      totalLikes: set.size,
+    };
+  }
+
+  // --- Playlists / Collections System ---
+  public getUserCollections(userId: string): QuestionCollection[] {
+    return this.collections.filter((c) => c.user_id === userId);
+  }
+
+  public getQuestionCollections(userId: string, questionId: string): string[] {
+    return this.collections
+      .filter((c) => c.user_id === userId && c.question_ids.includes(questionId))
+      .map((c) => c.name);
+  }
+
+  public saveQuestionToCollection(
+    userId: string,
+    questionId: string,
+    collectionName: string
+  ): { saved: boolean; collection: string } {
+    let col = this.collections.find((c) => c.user_id === userId && c.name.toLowerCase() === collectionName.trim().toLowerCase());
+    if (!col) {
+      col = {
+        id: `col-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        user_id: userId,
+        name: collectionName.trim(),
+        question_ids: [],
+        created_at: new Date().toISOString(),
+      };
+      this.collections.push(col);
+    }
+
+    if (!col.question_ids.includes(questionId)) {
+      col.question_ids.push(questionId);
+      col.updated_at = new Date().toISOString();
+    }
+
+    return { saved: true, collection: col.name };
+  }
+
+  public removeQuestionFromCollection(
+    userId: string,
+    questionId: string,
+    collectionName: string
+  ): boolean {
+    const col = this.collections.find((c) => c.user_id === userId && c.name.toLowerCase() === collectionName.trim().toLowerCase());
+    if (!col) return false;
+    col.question_ids = col.question_ids.filter((id) => id !== questionId);
+    col.updated_at = new Date().toISOString();
+    return true;
+  }
+
+  public createCollection(userId: string, name: string, description?: string): QuestionCollection {
+    const existing = this.collections.find((c) => c.user_id === userId && c.name.toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing;
+
+    const newCol: QuestionCollection = {
+      id: `col-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      user_id: userId,
+      name: name.trim(),
+      description,
+      question_ids: [],
+      created_at: new Date().toISOString(),
+    };
+    this.collections.push(newCol);
+    return newCol;
+  }
+
+  // --- Friends System ---
+  public getFriends(userId: string): FriendUser[] {
+    return this.friends;
+  }
+
+  public sendFriendRequest(
+    userId: string,
+    targetUserIdOrName: string
+  ): { success: boolean; message: string; friend?: FriendUser } {
+    const query = targetUserIdOrName.trim().toLowerCase();
+    const existing = this.friends.find((f) => f.id === targetUserIdOrName || f.display_name.toLowerCase().includes(query));
+    if (existing) {
+      if (existing.status === "friend") {
+        return { success: true, message: `${existing.display_name} is already your study partner!`, friend: existing };
+      }
+      existing.status = "friend";
+      return { success: true, message: `Connected with ${existing.display_name}!`, friend: existing };
+    }
+
+    const newFriend: FriendUser = {
+      id: `usr-fr-${Date.now()}`,
+      display_name: targetUserIdOrName.trim(),
+      streak_days: Math.floor(Math.random() * 15) + 3,
+      target_exam: "SSC CGL Aspirant",
+      status: "friend",
+      last_active: "Active just now",
+    };
+    this.friends.unshift(newFriend);
+    return { success: true, message: `Friend request accepted! Now studying with ${newFriend.display_name}`, friend: newFriend };
+  }
+
+  // --- Direct Study Chat Messages ---
+  public getMessages(userId: string, friendId: string): DirectMessage[] {
+    return this.messages.filter(
+      (m) =>
+        (m.from_user_id === userId && m.to_user_id === friendId) ||
+        (m.from_user_id === friendId && m.to_user_id === userId)
+    );
+  }
+
+  public sendMessage(params: {
+    fromUserId: string;
+    toUserId: string;
+    text?: string;
+    questionId?: string;
+  }): DirectMessage {
+    const newMsg: DirectMessage = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      from_user_id: params.fromUserId,
+      to_user_id: params.toUserId,
+      text: params.text,
+      question_id: params.questionId,
+      created_at: new Date().toISOString(),
+    };
+    this.messages.push(newMsg);
+    return newMsg;
+  }
+
+  // --- Comments & Tricks Discussion ---
+  public getComments(questionId: string): QuestionComment[] {
+    return this.comments.filter((c) => c.question_id === questionId);
+  }
+
+  public addComment(params: {
+    questionId: string;
+    userId: string;
+    text: string;
+  }): QuestionComment {
+    const user = this.getCurrentUser();
+    const newCmt: QuestionComment = {
+      id: `cmt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      question_id: params.questionId,
+      user_id: user.id,
+      user_name: user.display_name,
+      user_avatar: user.avatar_url,
+      comment_text: params.text.trim(),
+      likes_count: 1,
+      created_at: new Date().toISOString(),
+    };
+    this.comments.unshift(newCmt);
+    return newCmt;
+  }
+
+  // --- Habit Formation, Goals & Boosts ---
+  public getHabitSettings(userId: string): HabitSettings {
+    let settings = this.habitSettings.get(userId);
+    const user = this.getCurrentUser();
+    if (!settings) {
+      settings = {
+        daily_goal: user.daily_goal || 25,
+        solved_today: user.today_solved_count || 0,
+        combo_streak: 0,
+        boost_multiplier: 1.5,
+        schedule_slots: [
+          { id: "slot-1", time: "08:00 AM", label: "Morning Warmup Drill", active: true },
+          { id: "slot-2", time: "02:00 PM", label: "Speed & Accuracy Sprint", active: true },
+          { id: "slot-3", time: "09:00 PM", label: "Night Spaced Revision Loop", active: true },
+        ],
+      };
+      this.habitSettings.set(userId, settings);
+    }
+    settings.solved_today = user.today_solved_count || 0;
+    return settings;
+  }
+
+  public updateDailyGoal(userId: string, goal: number): HabitSettings {
+    const settings = this.getHabitSettings(userId);
+    settings.daily_goal = Math.max(5, Math.min(goal, 200));
+    const user = this.getCurrentUser();
+    user.daily_goal = settings.daily_goal;
+    return settings;
+  }
+
+  public updateHabitSchedule(userId: string, slots: HabitScheduleSlot[]): HabitSettings {
+    const settings = this.getHabitSettings(userId);
+    settings.schedule_slots = slots;
+    return settings;
   }
 }
 

@@ -7,8 +7,8 @@ import { usePathname } from "next/navigation";
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
 
-  const isHome = pathname === "/" || pathname === "/feed";
-  const isMatrix = pathname === "/matrix" || pathname === "/stats";
+  const isHome = pathname === "/" || pathname === "/home";
+  const isLoop = pathname === "/loop" || pathname === "/qzloop" || pathname === "/feed";
   const isCreate = pathname === "/create" || pathname === "/add";
   const isLeaderboard = pathname === "/leaderboard" || pathname === "/ranking";
   const isProfile = pathname === "/profile" || pathname === "/me";
@@ -17,7 +17,7 @@ export const BottomNav: React.FC = () => {
     <nav className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none flex justify-center pb-safe">
       <div className="w-full max-w-[480px] bg-surface-container-lowest/95 backdrop-blur-xl border-t border-surface-container-high/60 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] pointer-events-auto">
         <div className="h-16 px-2 flex items-center justify-around">
-          {/* 1. Home */}
+          {/* 1. Home (Performance Matrix & Daily Study Dashboard) */}
           <Link
             href="/"
             className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 ${
@@ -33,20 +33,20 @@ export const BottomNav: React.FC = () => {
             <span className="font-label-sm text-label-sm">Home</span>
           </Link>
 
-          {/* 2. Matrix (Personal Performance) */}
+          {/* 2. Qz Loop (Swipeable Reel Quiz Feed) */}
           <Link
-            href="/matrix"
+            href="/loop"
             className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 ${
-              isMatrix ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
+              isLoop ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
             }`}
           >
             <span
               className="material-symbols-outlined text-[24px]"
-              style={isMatrix ? { fontVariationSettings: "'FILL' 1" } : {}}
+              style={isLoop ? { fontVariationSettings: "'FILL' 1" } : {}}
             >
-              bar_chart
+              all_inclusive
             </span>
-            <span className="font-label-sm text-label-sm">Matrix</span>
+            <span className="font-label-sm text-label-sm">qz loop</span>
           </Link>
 
           {/* 3. Add Question (+) Prominent Center Action */}

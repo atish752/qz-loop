@@ -141,3 +141,70 @@ export interface DuplicateCheckResult {
     accuracy_percentage: number;
   };
 }
+
+export type RepeatInterval = 'day' | 'week' | 'month' | 'never';
+
+export interface QuestionRepeatPreference {
+  user_id: string;
+  question_id: string;
+  interval: RepeatInterval;
+  next_review_at?: string;
+  updated_at: string;
+}
+
+export interface QuestionCollection {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  question_ids: string[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface FriendUser {
+  id: string;
+  display_name: string;
+  avatar_url?: string;
+  streak_days: number;
+  target_exam: string;
+  status: 'friend' | 'request_sent' | 'request_received';
+  last_active?: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  text?: string;
+  question_id?: string;
+  created_at: string;
+}
+
+export interface QuestionComment {
+  id: string;
+  question_id: string;
+  user_id: string;
+  user_name: string;
+  user_avatar?: string;
+  comment_text: string;
+  likes_count: number;
+  created_at: string;
+}
+
+export interface HabitScheduleSlot {
+  id: string;
+  time: string; // e.g. "08:00 AM"
+  label: string; // e.g. "Morning Boost"
+  active: boolean;
+}
+
+export interface HabitSettings {
+  daily_goal: number;
+  solved_today: number;
+  combo_streak: number;
+  boost_multiplier: number;
+  boost_expires_at?: string;
+  schedule_slots: HabitScheduleSlot[];
+}
+

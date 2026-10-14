@@ -28,6 +28,8 @@ export const CreateQuestionView: React.FC = () => {
   ]);
   const [correctOptionId, setCorrectOptionId] = useState<string>("A");
   const [explanation, setExplanation] = useState<string>("");
+  const [targetTopic, setTargetTopic] = useState<string>("Arithmetic & Profit");
+  const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
 
   // Duplicate check state
   const [duplicateResult, setDuplicateResult] = useState<DuplicateCheckResult | null>(null);
@@ -38,6 +40,15 @@ export const CreateQuestionView: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState<boolean>(false);
+
+  // Quality & Dopamine score calculation
+  const calculateQualityScore = () => {
+    let score = 40;
+    if (questionText.trim().length >= 25) score += 20;
+    if (options.every((o) => o.trim().length > 0)) score += 20;
+    if (explanation.trim().length >= 15) score += 20;
+    return Math.min(100, score);
+  };
 
   // Debounced duplicate detection
   const checkDuplicateQuestion = useCallback(async (text: string) => {
@@ -171,39 +182,156 @@ export const CreateQuestionView: React.FC = () => {
             </div>
           </div>
         ) : (
-          <form onSubmit={handlePublish} className="flex flex-col gap-4">
-            {/* Subject Selector Filter Row */}
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-                  Target Domain
-                </span>
-                <span className="font-label-sm text-label-sm text-primary flex items-center gap-1 font-bold">
-                  <span className="material-symbols-outlined text-[14px]">bolt</span>
-                  +25 Rep Points
-                </span>
+          <div className="flex flex-col gap-4">
+            {/* Editor vs Reel Preview Mode Tabs */}
+            <div className="flex items-center justify-between bg-surface-container rounded-xl p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab("edit")}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === "edit"
+                    ? "bg-primary text-on-primary shadow-xs"
+                    : "text-secondary hover:text-on-surface"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">edit</span>
+                <span>Question Editor</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("preview")}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === "preview"
+                    ? "bg-primary text-on-primary shadow-xs"
+                    : "text-secondary hover:text-on-surface"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">all_inclusive</span>
+                <span>Live Reel Preview</span>
+              </button>
+            </div>
+
+            {/* Quality & Engagement Score Meter */}
+            <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center font-bold text-xs">
+                  {calculateQualityScore()}%
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-on-surface">Reel Engagement Score</div>
+                  <div className="text-[10px] text-secondary">
+                    {calculateQualityScore() >= 80 ? "🔥 High-yield feed quality" : "Add proof trick for max reach"}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-                {SUBJECTS.map((s) => {
-                  const isSelected = selectedSubjectId === s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setSelectedSubjectId(s.id)}
-                      className={`px-3.5 py-2 rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 shrink-0 ${
-                        isSelected
-                          ? "bg-primary-container text-on-primary shadow-sm font-bold scale-[1.02]"
-                          : "bg-surface-container text-secondary hover:text-on-surface"
+              <span className="text-[11px] font-bold text-primary px-2 py-0.5 rounded-full bg-primary-fixed/50">
+                Trending Ready
+              </span>
+            </div>
+
+            {activeTab === "preview" ? (
+              /* Live Reel Preview Card */
+              <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-md flex flex-col gap-3 relative">
+                <div className="flex items-center justify-between pb-2 border-b border-surface-container-high/40">
+                  <span className="px-2.5 py-0.5 rounded-full bg-primary-fixed text-primary text-xs font-bold uppercase">
+                    {SUBJECTS.find((s) => s.id === selectedSubjectId)?.name || "Subject"} · {targetTopic}
+                  </span>
+                  <span className="text-xs text-secondary font-mono">Reel Preview</span>
+                </div>
+                <h3 className="text-base font-bold text-on-surface leading-snug">
+                  {questionText.trim() || "Type your question statement in the editor to preview..."}
+                </h3>
+                <div className="flex flex-col gap-2 my-1">
+                  {(["A", "B", "C", "D"] as const).map((letter, idx) => (
+                    <div
+                      key={letter}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-medium ${
+                        correctOptionId === letter
+                          ? "bg-emerald-500/20 border-emerald-600 text-emerald-950 dark:text-emerald-100 font-bold"
+                          : "bg-surface-container-low border-surface-container-high/40 text-on-surface"
                       }`}
                     >
-                      <span className="material-symbols-outlined text-[16px]">{s.icon}</span>
-                      <span>{s.name}</span>
-                    </button>
-                  );
-                })}
+                      <div className="flex items-center gap-2">
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          correctOptionId === letter ? "bg-emerald-600 text-white" : "bg-surface-container text-secondary"
+                        }`}>
+                          {letter}
+                        </span>
+                        <span>{options[idx] || `Option ${letter}`}</span>
+                      </div>
+                      {correctOptionId === letter && <span className="text-emerald-600 font-bold">✓ Correct</span>}
+                    </div>
+                  ))}
+                </div>
+                {explanation.trim() && (
+                  <div className="p-2.5 rounded-xl bg-surface-container-low text-xs text-on-surface border border-surface-container-high/40">
+                    <strong className="text-primary font-bold">Quick Proof: </strong>
+                    {explanation}
+                  </div>
+                )}
+                <div className="pt-2 flex justify-end">
+                  <button
+                    onClick={() => setActiveTab("edit")}
+                    className="px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-sm"
+                  >
+                    Back to Edit
+                  </button>
+                </div>
               </div>
-            </section>
+            ) : (
+              <form onSubmit={handlePublish} className="flex flex-col gap-4">
+                {/* Subject Selector Filter Row */}
+                <section>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
+                      Target Domain
+                    </span>
+                    <span className="font-label-sm text-label-sm text-primary flex items-center gap-1 font-bold">
+                      <span className="material-symbols-outlined text-[14px]">bolt</span>
+                      +25 Rep Points
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                    {SUBJECTS.map((s) => {
+                      const isSelected = selectedSubjectId === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setSelectedSubjectId(s.id)}
+                          className={`px-3.5 py-2 rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 shrink-0 ${
+                            isSelected
+                              ? "bg-primary-container text-on-primary shadow-sm font-bold scale-[1.02]"
+                              : "bg-surface-container text-secondary hover:text-on-surface"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">{s.icon}</span>
+                          <span>{s.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* Subtopic Targeting */}
+                <section className="bg-surface-container-low rounded-xl p-3 border border-surface-container-high/40">
+                  <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1.5">
+                    Topic / Subtopic Target
+                  </label>
+                  <select
+                    value={targetTopic}
+                    onChange={(e) => setTargetTopic(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-semibold focus:outline-none focus:border-primary"
+                  >
+                    <option value="Arithmetic & Profit">Arithmetic & Profit & Loss</option>
+                    <option value="Geometry & Trigonometry">Geometry & Trigonometry</option>
+                    <option value="Syllogisms & Logic">Syllogisms & Analytical Logic</option>
+                    <option value="Grammar & Spotting Errors">Grammar & Spotting Errors</option>
+                    <option value="Vocabulary & Idioms">Vocabulary & Idioms</option>
+                    <option value="Indian Polity & History">Indian Polity & Modern History</option>
+                    <option value="Current Affairs & Science">Current Affairs & Science</option>
+                  </select>
+                </section>
 
             {/* Language & Difficulty Row */}
             <div className="flex items-center justify-between gap-2">
@@ -442,6 +570,8 @@ export const CreateQuestionView: React.FC = () => {
           </form>
         )}
       </div>
+    )}
+  </div>
 
       {/* Duplicate Details Modal */}
       {showDuplicateModal && duplicateResult?.matched_question && (

@@ -4,7 +4,7 @@ import { db } from "@/lib/data/store";
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const subjectSlug = searchParams.get("subject") || "all";
+    const subjectSlug = searchParams.get("subjects") || searchParams.get("subject") || "all";
     const examId = searchParams.get("examId") || "exam-ssc-cgl";
     const excludedParam = searchParams.get("excludedIds");
     const sessionExcludedIds = excludedParam ? excludedParam.split(",") : [];

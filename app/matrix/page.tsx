@@ -1,11 +1,5 @@
-import { MatrixView } from "@/components/matrix/MatrixView";
-import { BottomNav } from "@/components/layout/BottomNav";
+import { redirect } from "next/navigation";
 
-export default function MatrixPage() {
-  return (
-    <main className="w-full flex-1 flex flex-col relative min-h-screen">
-      <MatrixView />
-      <BottomNav />
-    </main>
-  );
+export default function MatrixRedirectPage() {
+  redirect("/");
 }
