@@ -10,12 +10,14 @@ export async function GET(request: NextRequest) {
       ? (periodParam as (typeof validPeriods)[number])
       : "week";
 
-    const currentUser = db.getCurrentUser();
-    const stats = db.getMatrixStats(currentUser.id, period);
+    const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id");
+    const targetUserId = requestedUserId && requestedUserId !== "guest" ? requestedUserId : "guest";
+    const stats = db.getMatrixStats(targetUserId, period);
 
     return NextResponse.json({
       success: true,
       stats,
+      isGuest: targetUserId === "guest",
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to calculate stats";

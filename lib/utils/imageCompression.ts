@@ -17,7 +17,7 @@ export async function compressImageClientSide(
   quality = 0.7
 ): Promise<CompressionResult> {
   return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) {
+    if (!file.type.startsWith("image/") && !file.name.match(/\.(jpe?g|png|webp|gif|bmp|heic|jfif|svg)$/i)) {
       reject(new Error("Selected file is not an image"));
       return;
     }
@@ -61,12 +61,26 @@ export async function compressImageClientSide(
         // Draw resized image
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Export as JPEG at 0.7 quality (~15-25 KB)
-        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        // Export as JPEG at initial quality (~15-25 KB)
+        let activeQuality = quality;
+        let dataUrl = canvas.toDataURL("image/jpeg", activeQuality);
+        let base64Data = dataUrl.split(",")[1] || "";
+        let sizeBytes = Math.round((base64Data.length * 3) / 4);
 
-        // Calculate approximate size in KB
-        const base64Data = dataUrl.split(",")[1] || "";
-        const sizeBytes = Math.round((base64Data.length * 3) / 4);
+        // If file exceeds 25 KB, step down quality to maintain ~20 KB target
+        if (sizeBytes > 25 * 1024) {
+          activeQuality = 0.5;
+          dataUrl = canvas.toDataURL("image/jpeg", activeQuality);
+          base64Data = dataUrl.split(",")[1] || "";
+          sizeBytes = Math.round((base64Data.length * 3) / 4);
+        }
+        if (sizeBytes > 25 * 1024) {
+          activeQuality = 0.35;
+          dataUrl = canvas.toDataURL("image/jpeg", activeQuality);
+          base64Data = dataUrl.split(",")[1] || "";
+          sizeBytes = Math.round((base64Data.length * 3) / 4);
+        }
+
         const sizeKb = Math.round((sizeBytes / 1024) * 10) / 10;
 
         resolve({

@@ -65,16 +65,26 @@ export const SocialView: React.FC = () => {
         const uid = localStorage.getItem("qz_user_id");
         setIsLoggedIn(Boolean(uid));
 
-        const url = uid ? `/api/profile?userId=${encodeURIComponent(uid)}` : "/api/profile";
-        fetch(url)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.success) {
-              setUser(data.user);
-              setExams(data.exams || []);
-            }
-          })
-          .catch(() => {});
+        if (uid) {
+          fetch(`/api/profile?userId=${encodeURIComponent(uid)}`)
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.success && data.user) {
+                setUser(data.user);
+                setExams(data.exams || []);
+              }
+            })
+            .catch(() => {});
+        } else {
+          setUser(null);
+          fetch("/api/profile")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.success && data.exams) setExams(data.exams);
+            })
+            .catch(() => {});
+        }
+        loadFriendsAndMessages(uid);
       }
     };
 
@@ -84,9 +94,17 @@ export const SocialView: React.FC = () => {
   }, []);
 
   // Load Friends List & All Messages
-  const loadFriendsAndMessages = () => {
+  const loadFriendsAndMessages = (uid?: string | null) => {
+    const currentUid = uid !== undefined ? uid : (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
+    if (!currentUid) {
+      setFriends([]);
+      setAllMessages([]);
+      setIsLoadingFriends(false);
+      return;
+    }
+
     setIsLoadingFriends(true);
-    fetch("/api/friends")
+    fetch(`/api/friends?userId=${encodeURIComponent(currentUid)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.friends) {
@@ -96,7 +114,7 @@ export const SocialView: React.FC = () => {
       .catch(() => {})
       .finally(() => setIsLoadingFriends(false));
 
-    fetch("/api/messages")
+    fetch(`/api/messages?userId=${encodeURIComponent(currentUid)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.messages) {
@@ -105,10 +123,6 @@ export const SocialView: React.FC = () => {
       })
       .catch(() => {});
   };
-
-  useEffect(() => {
-    loadFriendsAndMessages();
-  }, []);
 
   // Load Chat thread when a friend is selected
   useEffect(() => {

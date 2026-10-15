@@ -460,8 +460,102 @@ async function runTests() {
   const defaultFeed = db.getFeedQuestions({ examId: "exam-railway-ntpc" });
   assert(defaultFeed.length === 10, "Default 10 clean GK/baseline questions are available for new user to browse immediately");
 
+  // Scenario 31: Per-User Practice Increment & Multi-User Isolation
+  console.log("\n[Scenario 31] Per-User Practice Increment & Multi-User Isolation");
+  const preRahulStreak = db.getProfileById("user-current")?.current_streak || 0;
+  const preRahulSolved = db.getProfileById("user-current")?.today_solved_count || 0;
+  const preFreshAttempts = db.getAttemptsByUser(freshUser.id).length;
+
+  const attemptResult = db.submitAttempt({
+    userId: freshUser.id,
+    questionId: "q-gk-1",
+    selectedOptionId: "B", // Correct answer
+    responseTimeMs: 4200,
+  });
+  assert(attemptResult.isCorrect === true, "Fresh user answered correctly");
+  
+  // Verify fresh user's stats incremented
+  const updatedFreshUser = db.getProfileById(freshUser.id)!;
+  assert(updatedFreshUser.current_streak === 1, "Fresh user streak incremented to 1");
+  assert(updatedFreshUser.today_solved_count === 1, "Fresh user today solved incremented to 1");
+  assert(updatedFreshUser.total_questions_answered === 1, "Fresh user total questions answered is 1");
+  assert(updatedFreshUser.overall_accuracy === 100, "Fresh user overall accuracy updated to 100%");
+  assert(db.getAttemptsByUser(freshUser.id).length === preFreshAttempts + 1, "Attempt recorded under fresh user ID");
+
+  // Verify other users (Rahul) remained completely unaffected
+  const postRahul = db.getProfileById("user-current")!;
+  assert(postRahul.current_streak === preRahulStreak, "Unrelated user streak untouched");
+  assert(postRahul.today_solved_count === preRahulSolved, "Unrelated user solved count untouched");
+
+  // Scenario 32: Multi-Exam Authentic Subject Matrix (NEET UG, JEE Main, UPSC)
+  console.log("\n[Scenario 32] Multi-Exam Authentic Subject Matrix (NEET UG, JEE Main, UPSC)");
+  // A. NEET UG Student
+  const neetUser = db.signUpUser({
+    display_name: "NEET Aspirant",
+    username: "neet_aspirant_2026",
+    target_exam: "NEET UG (Medical Entrance)",
+    preferred_examination_id: "exam-neet-ug",
+  });
+  const neetMatrix = db.getMatrixStats(neetUser.id, "lifetime");
+  assert(neetMatrix.subjects.length === 3, "NEET matrix correctly evaluates exactly 3 NEET subjects");
+  const neetSubjectSlugs = neetMatrix.subjects.map((s) => s.subject_slug || (s as any).slug);
+  assert(neetSubjectSlugs.includes("biology"), "NEET matrix includes Biology");
+  assert(neetSubjectSlugs.includes("chemistry"), "NEET matrix includes Chemistry");
+  assert(neetSubjectSlugs.includes("physics"), "NEET matrix includes Physics");
+
+  // B. JEE Main Student
+  const jeeUser = db.signUpUser({
+    display_name: "JEE Aspirant",
+    username: "jee_topper_2026",
+    target_exam: "JEE Main (Engineering Entrance)",
+    preferred_examination_id: "exam-jee-main",
+  });
+  const jeeMatrix = db.getMatrixStats(jeeUser.id, "lifetime");
+  assert(jeeMatrix.subjects.length === 3, "JEE Main matrix correctly evaluates exactly 3 JEE subjects");
+  const jeeSubjectSlugs = jeeMatrix.subjects.map((s) => s.subject_slug || (s as any).slug);
+  assert(jeeSubjectSlugs.includes("maths"), "JEE Main matrix includes Mathematics");
+  assert(jeeSubjectSlugs.includes("physics"), "JEE Main matrix includes Physics");
+  assert(jeeSubjectSlugs.includes("chemistry"), "JEE Main matrix includes Chemistry");
+
+  // C. UPSC Student
+  const upscUser = db.signUpUser({
+    display_name: "UPSC Aspirant",
+    username: "upsc_ias_2026",
+    target_exam: "UPSC Civil Services (IAS / IPS Prelims)",
+    preferred_examination_id: "exam-upsc-csat",
+  });
+  const upscMatrix = db.getMatrixStats(upscUser.id, "lifetime");
+  assert(upscMatrix.subjects.length === 3, "UPSC matrix correctly evaluates exactly 3 UPSC subjects");
+  const upscSubjectSlugs = upscMatrix.subjects.map((s) => s.subject_slug || (s as any).slug);
+  assert(upscSubjectSlugs.includes("gk"), "UPSC matrix includes General Studies Paper-I");
+  assert(upscSubjectSlugs.includes("reasoning"), "UPSC matrix includes CSAT Paper-II");
+  assert(upscSubjectSlugs.includes("current-affairs"), "UPSC matrix includes Current Affairs");
+
+  // Scenario 33: Guest Zero Matrix & Safe Fallback
+  console.log("\n[Scenario 33] Guest Zero Matrix & Safe Fallback");
+  const guestMatrix = db.getMatrixStats("guest", "today");
+  assert(guestMatrix.total_solved === 0, "Guest matrix total solved is 0");
+  assert(guestMatrix.accuracy_percentage === 0, "Guest matrix accuracy is 0%");
+  assert(guestMatrix.fastest_correct_seconds === null, "Guest matrix fastest time is null");
+  assert(guestMatrix.weekly_activity.every((w) => w.count === 0), "Guest weekly activity has 0 counts");
+
+  // Scenario 34: Username Availability Strictness & Conflict Block
+  console.log("\n[Scenario 34] Username Availability Strictness & Conflict Block");
+  assert(db.isUsernameAvailable("fresh_aspirant_01") === false, "Taken username correctly reported unavailable");
+  assert(db.isUsernameAvailable("fresh_aspirant_01", freshUser.id) === true, "Self username update allowed");
+  let collisionBlocked = false;
+  try {
+    db.signUpUser({
+      display_name: "Collision Imposter",
+      username: "fresh_aspirant_01",
+    });
+  } catch {
+    collisionBlocked = true;
+  }
+  assert(collisionBlocked, "Duplicate signup strictly blocked with collision rejection");
+
   console.log("\n=================================================");
-  console.log("   ALL 30 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 34 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

@@ -261,9 +261,10 @@ export const ProfileView: React.FC = () => {
 
   const handleWhatsAppProfileShare = () => {
     const examName = activeExam?.name || "SSC CGL";
+    const streak = isLoggedIn ? (user?.current_streak ?? 0) : 0;
     const text =
       `🎯 *${user?.display_name || "Aspirant"} on Qz Loop*\n` +
-      `🔥 *${user?.current_streak || 14} Day Streak* | 📚 *${user?.total_questions_answered || 0} Questions Solved* | 🎯 *${user?.overall_accuracy || 0}% Accuracy*\n` +
+      `🔥 *${streak} Day Streak* | 📚 *${user?.total_questions_answered || 0} Questions Solved* | 🎯 *${user?.overall_accuracy || 0}% Accuracy*\n` +
       `🏆 Target Exam: *${examName}*\n\n` +
       `Study and compete with me on Qz Loop: ${typeof window !== "undefined" ? window.location.origin : "https://qzloop.app"}`;
     openWhatsAppShare(text);
@@ -507,7 +508,7 @@ export const ProfileView: React.FC = () => {
               <div className="flex items-center gap-1 text-primary">
                 <span className="text-lg">🔥</span>
                 <span className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                  {user?.current_streak || 14}
+                  {isLoggedIn ? (user?.current_streak ?? 0) : 0}
                 </span>
               </div>
               <span className="font-label-sm text-label-sm text-secondary mt-0.5 font-medium">
@@ -520,7 +521,7 @@ export const ProfileView: React.FC = () => {
               <div className="flex items-center gap-1 text-primary">
                 <span className="material-symbols-outlined text-[20px]">fact_check</span>
                 <span className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                  {user?.total_questions_answered ?? 0}
+                  {isLoggedIn ? (user?.total_questions_answered ?? 0) : 0}
                 </span>
               </div>
               <span className="font-label-sm text-label-sm text-secondary mt-0.5 font-medium">
@@ -533,7 +534,7 @@ export const ProfileView: React.FC = () => {
               <div className="flex items-center gap-1 text-tertiary">
                 <span className="material-symbols-outlined text-[20px]">target</span>
                 <span className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                  {user?.overall_accuracy ?? 0}%
+                  {isLoggedIn ? (user?.overall_accuracy ?? 0) : 0}%
                 </span>
               </div>
               <span className="font-label-sm text-label-sm text-secondary mt-0.5 font-medium">

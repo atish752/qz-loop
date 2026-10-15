@@ -341,8 +341,11 @@ class DataStore {
     return true;
   }
 
-  public updateProfile(updates: Partial<UserProfile>): UserProfile {
-    const user = this.getCurrentUser();
+  public updateProfile(updates: Partial<UserProfile>, targetUserId?: string): UserProfile {
+    const user =
+      (targetUserId ? this.profiles.find((p) => p.id === targetUserId) : null) ||
+      (updates.id ? this.profiles.find((p) => p.id === updates.id) : null) ||
+      this.getCurrentUser();
 
     if (updates.username !== undefined) {
       const cleanUsername = updates.username.trim().toLowerCase().replace(/^@+/, "");
@@ -402,7 +405,7 @@ class DataStore {
       targetExam = ex ? ex.name : "SSC CGL / CHSL / MTS";
     }
 
-    const newUserId = `user-${Date.now()}`;
+    const newUserId = `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const newProfile: UserProfile = {
       id: newUserId,
       display_name: data.display_name.trim(),
@@ -412,7 +415,7 @@ class DataStore {
       avatar_url: data.avatar_url || "",
       role: "student",
       current_streak: 0, // Starts at zero scratch!
-      last_active_date: new Date().toISOString().split("T")[0],
+      last_active_date: undefined, // undefined until first practice attempt
       daily_goal: 10,
       today_solved_count: 0, // 0 solved
       total_questions_answered: 0, // 0 total answered
@@ -457,6 +460,7 @@ class DataStore {
       profile.today_solved_count = 0;
       profile.total_questions_answered = 0;
       profile.overall_accuracy = 0;
+      profile.last_active_date = undefined;
     }
 
     const habit = this.habitSettings.get(userId);
@@ -532,6 +536,13 @@ class DataStore {
       }
       return true;
     });
+
+    // If pool is empty for chosen specific subject, fallback to all active published questions so anyone can browse
+    if (pool.length === 0) {
+      pool = this.questions.filter(
+        (q) => q.publication_status === "published" && q.moderation_status === "active" && !userHiddenIds.has(q.id)
+      );
+    }
 
     // 2. Classify by attempt history and Spaced Repetition Rules
     const userAttempts = this.attempts.filter((a) => a.user_id === userId);
@@ -710,9 +721,12 @@ class DataStore {
     q.total_time_ms += validTime;
 
     // Update User Streak (Asia/Kolkata check)
-    const user = this.getCurrentUser();
+    const user = this.profiles.find((p) => p.id === userId) || this.getCurrentUser();
     const todayStr = this.getAsiaKolkataDateString(new Date());
-    if (user.last_active_date !== todayStr) {
+    if (!user.current_streak || user.current_streak === 0) {
+      user.current_streak = 1;
+      user.last_active_date = todayStr;
+    } else if (user.last_active_date !== todayStr) {
       if (user.last_active_date) {
         const lastDate = new Date(user.last_active_date + "T00:00:00Z");
         const currDate = new Date(todayStr + "T00:00:00Z");
@@ -1006,11 +1020,11 @@ class DataStore {
       });
     }
 
-    // Subject breakdown (Target exam 4-subject matrix)
+    // Subject breakdown (Target exam subject matrix)
     const user = this.profiles.find((p) => p.id === userId) || this.getCurrentUser();
     const targetExamId = user?.preferred_examination_id || "exam-ssc-cgl";
     let relevantSubjects = this.subjects.filter((s) => s.examination_id === targetExamId);
-    if (relevantSubjects.length !== 4) {
+    if (relevantSubjects.length === 0) {
       relevantSubjects = this.subjects.filter((s) => s.examination_id === "exam-ssc-cgl");
     }
 
@@ -1058,6 +1072,7 @@ class DataStore {
         subject_id: s.id,
         subject_name: s.name,
         subject_slug: s.slug,
+        slug: s.slug,
         attempts,
         correct,
         accuracy: acc,

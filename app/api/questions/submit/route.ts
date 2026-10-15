@@ -4,7 +4,7 @@ import { db } from "@/lib/data/store";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { questionId, selectedOptionId, responseTimeMs } = body;
+    const { questionId, selectedOptionId, responseTimeMs, userId } = body;
 
     if (!questionId || !selectedOptionId) {
       return NextResponse.json(
@@ -13,7 +13,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const resolvedUserId = userId || request.headers.get("x-user-id") || undefined;
+
     const result = db.submitAttempt({
+      userId: resolvedUserId,
       questionId,
       selectedOptionId,
       responseTimeMs: typeof responseTimeMs === "number" ? responseTimeMs : 10000,

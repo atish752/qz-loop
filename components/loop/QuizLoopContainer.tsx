@@ -70,21 +70,44 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
   // Load user profile & saved preferences on mount
   useEffect(() => {
-    fetch("/api/profile")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setUser(data.user);
-          if (data.exams?.length > 0) {
-            setExams(data.exams);
-          }
-          if (data.user?.preferred_examination_id) {
-            setCurrentExamId(data.user.preferred_examination_id);
-          }
+    const checkAuthAndLoad = () => {
+      if (typeof window !== "undefined") {
+        const uid = localStorage.getItem("qz_user_id");
+        if (uid) {
+          fetch(`/api/profile?userId=${encodeURIComponent(uid)}`)
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.success && data.user) {
+                setUser(data.user);
+                if (data.exams?.length > 0) {
+                  setExams(data.exams);
+                }
+                if (data.user?.preferred_examination_id) {
+                  setCurrentExamId(data.user.preferred_examination_id);
+                }
+              }
+            })
+            .catch(() => {});
+        } else {
+          setUser(null);
+          fetch("/api/profile")
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.success && data.exams?.length > 0) {
+                setExams(data.exams);
+              }
+            })
+            .catch(() => {});
         }
-      })
-      .catch(() => {});
+      }
+    };
 
+    checkAuthAndLoad();
+    window.addEventListener("qz_auth_changed", checkAuthAndLoad);
+    return () => window.removeEventListener("qz_auth_changed", checkAuthAndLoad);
+  }, []);
+
+  useEffect(() => {
     // Deep link directly to a shared quiz question: /loop?q=...
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -411,9 +434,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     return (
       <div className="flex flex-col min-h-screen pb-24">
         <TopHeader
-          currentTab="home"
-          streakDays={user?.current_streak || 14}
-          activeExamName={activeExam?.name || "SSC CGL"}
+          currentTab="loop"
+          streakDays={user?.current_streak ?? 0}
+          activeExamName={activeExam?.name || "Railways RRB"}
           user={user}
           onSelectExam={() => setShowExamModal(true)}
         />
@@ -495,13 +518,13 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40">
               <span className="text-secondary text-[11px] font-semibold uppercase">Practice Streak</span>
               <div className="text-base font-bold text-on-surface mt-0.5">
-                🔥 {user?.current_streak || 14} Days
+                🔥 {user?.current_streak ?? 0} Days
               </div>
             </div>
             <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40">
               <span className="text-secondary text-[11px] font-semibold uppercase">Daily Goal</span>
               <div className="text-base font-bold text-primary mt-0.5">
-                {user?.today_solved_count || 6} / {user?.daily_goal || 25} Solved
+                {user?.today_solved_count ?? 0} / {user?.daily_goal ?? 10} Solved
               </div>
             </div>
           </div>

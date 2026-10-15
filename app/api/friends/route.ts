@@ -5,14 +5,17 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
-    const currentUser = db.getCurrentUser();
+    const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id");
+    if (!requestedUserId || requestedUserId === "guest") {
+      return NextResponse.json({ success: true, friends: [], isGuest: true });
+    }
 
     if (search) {
-      const searchResults = db.searchUsers(search, currentUser.id);
+      const searchResults = db.searchUsers(search, requestedUserId);
       return NextResponse.json({ success: true, users: searchResults });
     }
 
-    const friends = db.getFriends(currentUser.id);
+    const friends = db.getFriends(requestedUserId);
     return NextResponse.json({ success: true, friends });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to load friends";

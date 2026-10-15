@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TopHeader } from "../layout/TopHeader";
-import { DuplicateCheckResult, Question } from "@/types/database";
+import { DuplicateCheckResult, Question, UserProfile } from "@/types/database";
 import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
 import { getExamScoringRule } from "@/lib/utils/examScoring";
 
@@ -88,6 +88,32 @@ export const CreateQuestionView: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams ? searchParams.get("edit") : null;
+
+  // User & Auth State
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkAuth = () => {
+      if (typeof window !== "undefined") {
+        const uid = localStorage.getItem("qz_user_id");
+        setIsLoggedIn(Boolean(uid));
+        if (uid) {
+          fetch(`/api/profile?userId=${encodeURIComponent(uid)}`)
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.success && d.user) setUser(d.user);
+            })
+            .catch(() => {});
+        } else {
+          setUser(null);
+        }
+      }
+    };
+    checkAuth();
+    window.addEventListener("qz_auth_changed", checkAuth);
+    return () => window.removeEventListener("qz_auth_changed", checkAuth);
+  }, []);
 
   // Form states
   const [selectedExamId, setSelectedExamId] = useState<string>("exam-ssc-cgl");
@@ -481,7 +507,12 @@ export const CreateQuestionView: React.FC = () => {
   if (isLoadingEdit) {
     return (
       <div className="flex flex-col min-h-screen">
-        <TopHeader currentTab="create" streakDays={14} activeExamName="SSC CGL" />
+        <TopHeader
+          currentTab="create"
+          streakDays={isLoggedIn ? (user?.current_streak ?? 0) : 0}
+          activeExamName={user?.target_exam || "Railways RRB"}
+          user={isLoggedIn ? user : null}
+        />
         <div className="flex-1 flex items-center justify-center p-8 text-secondary">
           <span className="material-symbols-outlined animate-spin text-[32px] text-primary">sync</span>
           <span className="ml-2 font-medium">Loading question details...</span>
@@ -492,9 +523,46 @@ export const CreateQuestionView: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen pb-24">
-      <TopHeader currentTab="create" streakDays={14} activeExamName="SSC CGL" />
+      <TopHeader
+        currentTab="create"
+        streakDays={isLoggedIn ? (user?.current_streak ?? 0) : 0}
+        activeExamName={user?.target_exam || "Railways RRB"}
+        user={isLoggedIn ? user : null}
+      />
 
       <div className="flex flex-col w-full px-4 pt-3 pb-8">
+        {/* Guest Visitor Banner if not logged in */}
+        {!isLoggedIn && (
+          <div className="rounded-2xl p-4 bg-surface-container-low border border-primary/20 shadow-xs mb-4 flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[22px]">edit_note</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <h3 className="font-bold text-on-surface text-base">Creator Studio</h3>
+                <p className="text-xs text-secondary mt-0.5 leading-relaxed">
+                  Sign in or create your free account to publish verified MCQs, share shortcut tricks, and contribute to the community feed.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("open_auth_modal", {
+                      detail: { reason: "Sign in to publish questions & earn community badges", mode: "signup" },
+                    })
+                  );
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary-container active:scale-95 transition-all"
+              >
+                <span className="material-symbols-outlined text-[16px]">login</span>
+                <span>Sign In / Sign Up to Publish</span>
+              </button>
+            </div>
+          </div>
+        )}
         {publishSuccess ? (
           <div className="py-8 flex flex-col items-center justify-center text-center gap-4 animate-in fade-in max-w-md mx-auto">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center shadow-md">

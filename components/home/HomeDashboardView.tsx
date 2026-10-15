@@ -62,7 +62,11 @@ export const HomeDashboardView: React.FC = () => {
 
   useEffect(() => {
     setIsLoading(true);
-    fetch(`/api/matrix?period=${period}`)
+    const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const url = uid
+      ? `/api/matrix?period=${period}&userId=${encodeURIComponent(uid)}`
+      : `/api/matrix?period=${period}&userId=guest`;
+    fetch(url)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -71,7 +75,7 @@ export const HomeDashboardView: React.FC = () => {
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, [period]);
+  }, [period, isLoggedIn]);
 
   const handleShare = async () => {
     if (!stats) return;
@@ -159,7 +163,7 @@ export const HomeDashboardView: React.FC = () => {
       correctCount: stats.correct_count,
       incorrectCount: stats.incorrect_count,
       avgTimeSec: stats.avg_time_seconds,
-      streakDays: user?.current_streak || 14,
+      streakDays: isLoggedIn ? (user?.current_streak ?? 0) : 0,
       periodLabel:
         period === "today"
           ? "Today"
@@ -309,7 +313,7 @@ export const HomeDashboardView: React.FC = () => {
             </div>
             <div>
               <div className="text-sm font-bold text-on-surface flex items-center gap-1">
-                <span>🔥 {user?.current_streak || 14}d Streak</span>
+                <span>🔥 {isLoggedIn ? (user?.current_streak ?? 0) : 0}d Streak</span>
               </div>
               <p className="text-[11px] text-secondary mt-0.5">
                 Speed streak bonus active
@@ -330,7 +334,7 @@ export const HomeDashboardView: React.FC = () => {
           </div>
           <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface font-semibold text-label-sm">
             <span className="material-symbols-outlined text-[16px] text-tertiary">military_tech</span>
-            <span>TOP 5%</span>
+            <span>{isLoggedIn && (stats?.total_solved || 0) > 0 ? "TOP 5%" : "FRESH 0"}</span>
           </div>
         </div>
 

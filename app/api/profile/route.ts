@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
     const checkUsername = searchParams.get("checkUsername");
 
     if (checkUsername) {
-      const user = db.getCurrentUser();
-      const isAvailable = db.isUsernameAvailable(checkUsername, user.id);
+      const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id");
+      const isAvailable = db.isUsernameAvailable(checkUsername, requestedUserId || undefined);
       return NextResponse.json({
         success: true,
         username: checkUsername.trim().toLowerCase().replace(/^@/, ""),
@@ -17,14 +17,16 @@ export async function GET(request: NextRequest) {
     }
 
     const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id");
-    const user = (requestedUserId ? db.getProfileById(requestedUserId) : null) || db.getCurrentUser();
+    const user = requestedUserId ? db.getProfileById(requestedUserId) || null : null;
     const exams = db.getExaminations();
-    const subjects = db.getSubjects(user.preferred_examination_id);
-    const hiddenCount = db.getHiddenQuestions(user.id).length;
+    const activeExamId = user?.preferred_examination_id || exams[0]?.id || "exam-railway-ntpc";
+    const subjects = db.getSubjects(activeExamId);
+    const hiddenCount = user ? db.getHiddenQuestions(user.id).length : 0;
 
     return NextResponse.json({
       success: true,
       user,
+      isGuest: !user,
       exams,
       subjects,
       hiddenCount,
@@ -39,13 +41,14 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
+    const requestedUserId = body.userId || body.id || request.headers.get("x-user-id");
     const payload = {
       ...body,
       preferred_examination_id: body.preferred_examination_id || body.preferredExaminationId,
       target_exam: body.target_exam || body.targetExam,
       display_name: body.display_name || body.displayName,
     };
-    const updated = db.updateProfile(payload);
+    const updated = db.updateProfile(payload, requestedUserId || undefined);
     return NextResponse.json({
       success: true,
       user: updated,

@@ -246,14 +246,20 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
     setSubmitError(null);
     setIsSubmitting(true);
 
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+
     try {
       const res = await fetch("/api/questions/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
         body: JSON.stringify({
           questionId: question.id,
           selectedOptionId: optionId,
           responseTimeMs: finalElapsedMs,
+          userId: currentUid,
         }),
       });
 
@@ -830,7 +836,17 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               )}
             </button>
             <button
-              onClick={() => setIsFollowing((prev) => !prev)}
+              onClick={() => {
+                if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+                  window.dispatchEvent(
+                    new CustomEvent("open_auth_modal", {
+                      detail: { reason: "Sign in required to follow question authors", mode: "signup" },
+                    })
+                  );
+                  return;
+                }
+                setIsFollowing((prev) => !prev);
+              }}
               className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full flex items-center justify-center text-[11px] font-bold shadow-xs transition-colors ${
                 isFollowing ? "bg-tertiary text-on-tertiary" : "bg-primary text-on-primary"
               }`}
@@ -930,6 +946,17 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             onClick={handleQuickSave}
             onContextMenu={(e) => {
               e.preventDefault();
+              if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+                window.dispatchEvent(
+                  new CustomEvent("open_auth_modal", {
+                    detail: {
+                      reason: "Sign in required to create & manage question playlists",
+                      mode: "signup",
+                    },
+                  })
+                );
+                return;
+              }
               setShowSaveModal(true);
             }}
             className="flex flex-col items-center group active:scale-90 transition-transform"
