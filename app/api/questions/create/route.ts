@@ -4,7 +4,20 @@ import { db } from "@/lib/data/store";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { examinationId, subjectId, questionText, language, options, correctOptionId, explanation, difficulty } = body;
+    const {
+      examinationId,
+      subjectId,
+      questionText,
+      hindiQuestionText,
+      language,
+      options,
+      correctOptionId,
+      explanation,
+      hindiExplanation,
+      difficulty,
+      syllabusTag,
+      pyqInfo,
+    } = body;
 
     if (!subjectId || !questionText || !options || !correctOptionId) {
       return NextResponse.json(
@@ -17,11 +30,15 @@ export async function POST(request: NextRequest) {
       examinationId,
       subjectId,
       questionText,
+      hindiQuestionText,
       language: language === "hi" ? "hi" : "en",
       options,
       correctOptionId,
       explanation,
+      hindiExplanation,
       difficulty,
+      syllabusTag,
+      pyqInfo,
     });
 
     return NextResponse.json({

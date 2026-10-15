@@ -38,7 +38,13 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const updated = db.updateProfile(body);
+    const payload = {
+      ...body,
+      preferred_examination_id: body.preferred_examination_id || body.preferredExaminationId,
+      target_exam: body.target_exam || body.targetExam,
+      display_name: body.display_name || body.displayName,
+    };
+    const updated = db.updateProfile(payload);
     return NextResponse.json({
       success: true,
       user: updated,
@@ -51,16 +57,25 @@ export async function PATCH(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Switch active user profile (useful for testing different competitors)
     const body = await request.json();
     const { userId } = body;
     if (userId) {
       const switched = db.setCurrentUser(userId);
       return NextResponse.json({ success: true, user: switched });
     }
-    return NextResponse.json({ success: false, error: "User ID required" }, { status: 400 });
+
+    const examId = body.preferred_examination_id || body.preferredExaminationId;
+    if (examId) {
+      const updated = db.updateProfile({
+        preferred_examination_id: examId,
+        target_exam: body.target_exam || body.targetExam,
+      });
+      return NextResponse.json({ success: true, user: updated });
+    }
+
+    return NextResponse.json({ success: false, error: "User ID or Examination ID required" }, { status: 400 });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to switch user";
+    const message = error instanceof Error ? error.message : "Failed to switch user or update exam";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

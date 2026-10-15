@@ -386,6 +386,24 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const activeQuestion = questions[currentIndex];
   const activeExam = exams.find((e) => e.id === currentExamId);
 
+  const handleSelectExam = async (exam: Examination) => {
+    setCurrentExamId(exam.id);
+    setShowExamModal(false);
+    try {
+      await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preferred_examination_id: exam.id,
+          target_exam: exam.name,
+        }),
+      });
+      loadFeedQuestions(selectedSubjects, exam.id, true);
+    } catch {
+      // optimistic
+    }
+  };
+
   // ==========================================
   // VIEW 1: START SCREEN (Before Loop Begins)
   // ==========================================
@@ -506,7 +524,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           currentExamId={currentExamId}
           isOpen={showExamModal}
           onClose={() => setShowExamModal(false)}
-          onSelectExam={(exam) => setCurrentExamId(exam.id)}
+          onSelectExam={handleSelectExam}
         />
       </div>
     );

@@ -3,6 +3,9 @@ export interface Examination {
   name: string;
   slug: string;
   description?: string;
+  category?: string;
+  marks_per_question?: number;
+  negative_marks?: number;
   is_active: boolean;
   created_at: string;
 }
@@ -20,6 +23,7 @@ export interface Subject {
 export interface QuestionOption {
   id: string; // 'A' | 'B' | 'C' | 'D'
   text: string;
+  hindi_text?: string;
 }
 
 export interface Question {
@@ -32,11 +36,17 @@ export interface Question {
   subject_name?: string;
   subject_slug?: string;
   question_text: string;
+  hindi_question_text?: string; // Bilingual Hindi translation / alternate
   language: 'en' | 'hi';
   options: QuestionOption[];
   correct_option_id?: string; // Hidden in public feed until submitted!
   explanation?: string;
+  hindi_explanation?: string; // Bilingual Hindi explanation
   difficulty?: 'easy' | 'medium' | 'hard';
+  syllabus_tag?: string; // e.g. "Quant · Speed & Distance", "Polity · Article 17"
+  pyq_info?: string; // e.g. "SSC CGL 2024 Tier-1 Shift-2"
+  quality_upvotes?: number; // Peer verification upvotes
+  quality_downvotes?: number; // Peer verification downvotes
   normalized_fingerprint: string;
   publication_status: 'draft' | 'published' | 'archived';
   moderation_status: 'active' | 'flagged' | 'hidden';
@@ -46,6 +56,24 @@ export interface Question {
   fastest_correct_ms?: number;
   created_at: string;
   updated_at?: string;
+}
+
+export interface QuestionDraft {
+  id: string;
+  subject_id: string;
+  examination_id?: string;
+  question_text: string;
+  hindi_question_text?: string;
+  language: 'en' | 'hi';
+  options: [string, string, string, string];
+  hindi_options?: [string, string, string, string];
+  correct_option_id: string;
+  explanation?: string;
+  hindi_explanation?: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  syllabus_tag?: string;
+  pyq_info?: string;
+  updated_at: string;
 }
 
 export interface QuestionAttempt {

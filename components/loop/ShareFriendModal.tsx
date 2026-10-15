@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Question, FriendUser } from "@/types/database";
+import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
 
 interface ShareFriendModalProps {
   question: Question;
@@ -19,6 +20,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
   const [friends, setFriends] = useState<FriendUser[]>([]);
   const [sentMap, setSentMap] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [addFriendInput, setAddFriendInput] = useState("");
   const [addStatusMsg, setAddStatusMsg] = useState<string | null>(null);
@@ -92,6 +94,30 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
     }
   };
 
+  const handleWhatsAppShare = () => {
+    const challengeText = formatWhatsAppChallenge({
+      question,
+      authorUsername: question.author_name?.toLowerCase().replace(/\s+/g, "_"),
+      targetExam: question.subject_name || "Competitive Exam",
+      language: question.language,
+    });
+    openWhatsAppShare(challengeText);
+  };
+
+  const handleCopyFormattedText = () => {
+    const challengeText = formatWhatsAppChallenge({
+      question,
+      authorUsername: question.author_name?.toLowerCase().replace(/\s+/g, "_"),
+      targetExam: question.subject_name || "Competitive Exam",
+      language: question.language,
+    });
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(challengeText);
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+    }
+  };
+
   const filteredFriends = friends.filter(
     (f) =>
       f.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -101,14 +127,14 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-md bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-200">
+      <div className="w-full max-w-md bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col max-h-[88vh] animate-in slide-in-from-bottom duration-200">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[24px]">send</span>
             <div>
               <h3 className="font-bold text-on-surface text-base">Share Question</h3>
-              <p className="text-xs text-secondary">Direct study share to peers & chat</p>
+              <p className="text-xs text-secondary">Challenge peers & post to study groups</p>
             </div>
           </div>
           <button
@@ -119,12 +145,54 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
           </button>
         </div>
 
+        {/* 1-Click WhatsApp Viral Challenge Card (Top Priority for Indian Students) */}
+        <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-emerald-600/5 to-surface-container-low border border-emerald-500/30 flex flex-col gap-2.5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-xs">
+                <span className="material-symbols-outlined text-[18px]">chat</span>
+              </div>
+              <div>
+                <span className="text-xs font-bold text-on-surface flex items-center gap-1">
+                  <span>WhatsApp Study Group Challenge</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold">VIRAL</span>
+                </span>
+                <p className="text-[11px] text-secondary">Pre-formatted MCQ text with speed hook & instant link</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleWhatsAppShare}
+              className="py-2.5 px-3 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all"
+            >
+              <span className="material-symbols-outlined text-[17px]">share</span>
+              <span>Send to WhatsApp</span>
+            </button>
+            <button
+              onClick={handleCopyFormattedText}
+              className="py-2.5 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high active:scale-95 text-on-surface font-semibold text-xs border border-surface-container-high/60 flex items-center justify-center gap-1.5 transition-all"
+            >
+              <span className="material-symbols-outlined text-[17px] text-primary">content_copy</span>
+              <span>{copiedText ? "Copied Text!" : "Copy Post Text"}</span>
+            </button>
+          </div>
+        </div>
+
         {/* Question Preview Snippet */}
-        <div className="my-3 p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-2">
+        <div className="my-2.5 p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container-highest text-secondary">
-              {question.subject_name || "Question"}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container-highest text-secondary">
+                {question.subject_name || "Question"}
+              </span>
+              {question.pyq_info && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-tertiary-fixed/30 text-tertiary">
+                  {question.pyq_info}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-on-surface font-medium truncate mt-1">
               {question.question_text}
             </p>

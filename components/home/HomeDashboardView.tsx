@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { MatrixStats, UserProfile, HabitSettings } from "@/types/database";
+import { MatrixStats, UserProfile, HabitSettings, Examination } from "@/types/database";
 import { TopHeader } from "../layout/TopHeader";
 import { ExamSwitchModal } from "../feed/ExamSwitchModal";
+import { calculateNetScore, getExamScoringRule } from "@/lib/utils/examScoring";
+import { formatWhatsAppScorecard, openWhatsAppShare } from "@/lib/utils/whatsapp";
 
 export const HomeDashboardView: React.FC = () => {
   const [period, setPeriod] = useState<"today" | "week" | "month" | "lifetime">("today");
@@ -16,6 +18,7 @@ export const HomeDashboardView: React.FC = () => {
   const [showExamModal, setShowExamModal] = useState<boolean>(false);
   const [showGoalModal, setShowGoalModal] = useState<boolean>(false);
   const [newGoalInput, setNewGoalInput] = useState<number>(25);
+  const [targetExamId, setTargetExamId] = useState<string>("exam-ssc-cgl");
 
   // Load user profile & matrix stats
   useEffect(() => {
@@ -24,6 +27,9 @@ export const HomeDashboardView: React.FC = () => {
       .then((data) => {
         if (data.success) {
           setUser(data.user);
+          if (data.user?.preferred_examination_id) {
+            setTargetExamId(data.user.preferred_examination_id);
+          }
           if (data.user?.daily_goal) {
             setNewGoalInput(data.user.daily_goal);
           }
@@ -97,6 +103,61 @@ export const HomeDashboardView: React.FC = () => {
     }
   };
 
+  const scoring = calculateNetScore(
+    targetExamId,
+    stats?.correct_count || 0,
+    stats?.incorrect_count || 0
+  );
+
+  const handleSelectExam = async (examOrId: Examination | string) => {
+    const examId = typeof examOrId === "string" ? examOrId : examOrId.id;
+    const examName = typeof examOrId === "object" ? examOrId.name : undefined;
+    setTargetExamId(examId);
+    setShowExamModal(false);
+    try {
+      await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preferred_examination_id: examId,
+          target_exam: examName,
+        }),
+      });
+      const res = await fetch(`/api/matrix?period=${period}`);
+      const data = await res.json();
+      if (data.success) {
+        setStats(data.stats);
+      }
+    } catch {
+      // optimistic
+    }
+  };
+
+  const handleWhatsAppScorecard = () => {
+    if (!stats) return;
+    const cardText = formatWhatsAppScorecard({
+      displayName: user?.display_name || "Aspirant",
+      username: user?.username || "aspirant",
+      targetExam: scoring.scoringRule.shortName,
+      solvedCount: stats.total_solved,
+      accuracy: stats.accuracy_percentage,
+      correctCount: stats.correct_count,
+      incorrectCount: stats.incorrect_count,
+      avgTimeSec: stats.avg_time_seconds,
+      streakDays: user?.current_streak || 14,
+      periodLabel:
+        period === "today"
+          ? "Today"
+          : period === "week"
+          ? "This Week"
+          : period === "month"
+          ? "This Month"
+          : "Overall",
+      netMarks: scoring.netScore,
+    });
+    openWhatsAppShare(cardText);
+  };
+
   const subjectIcons: Record<string, string> = {
     maths: "calculate",
     reasoning: "psychology",
@@ -114,7 +175,7 @@ export const HomeDashboardView: React.FC = () => {
       <TopHeader
         currentTab="home"
         streakDays={user?.current_streak || 14}
-        activeExamName="SSC CGL"
+        activeExamName={scoring.scoringRule.shortName}
         user={user}
         onSelectExam={() => setShowExamModal(true)}
       />
@@ -353,6 +414,55 @@ export const HomeDashboardView: React.FC = () => {
           </div>
         </div>
 
+        {/* Negative Marking & Net Score Impact Card */}
+        <div className="bg-gradient-to-br from-surface-container-low to-surface-container rounded-2xl p-4 mb-4 border border-surface-container-high/60 shadow-xs">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-[20px]">calculate</span>
+              <span className="font-label-md text-label-md font-bold text-on-surface">
+                Exam Scoring & Negative Marking Impact
+              </span>
+            </div>
+            <button
+              onClick={() => setShowExamModal(true)}
+              className="text-xs font-bold text-primary hover:underline flex items-center gap-0.5"
+            >
+              <span>{scoring.scoringRule.shortName}</span>
+              <span className="material-symbols-outlined text-[14px]">expand_more</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 my-2 text-center">
+            <div className="bg-surface-container-lowest/80 p-2.5 rounded-xl border border-surface-container-high/30">
+              <div className="text-[10px] uppercase font-bold text-secondary">Gross Earned</div>
+              <div className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                +{scoring.grossMarks}
+              </div>
+              <div className="text-[10px] text-secondary">+{scoring.scoringRule.marksPerCorrect} / correct</div>
+            </div>
+
+            <div className="bg-surface-container-lowest/80 p-2.5 rounded-xl border border-surface-container-high/30">
+              <div className="text-[10px] uppercase font-bold text-secondary">Penalty Cut</div>
+              <div className="text-base font-bold text-rose-600 dark:text-rose-400 mt-0.5">
+                -{scoring.penaltyDeducted}
+              </div>
+              <div className="text-[10px] text-secondary">-{scoring.scoringRule.penaltyPerWrong} / wrong</div>
+            </div>
+
+            <div className="bg-surface-container-lowest/80 p-2.5 rounded-xl border border-primary/30 bg-primary/5">
+              <div className="text-[10px] uppercase font-bold text-primary">Net Score</div>
+              <div className="text-lg font-bold text-primary mt-0.5">
+                {scoring.netScore}
+              </div>
+              <div className="text-[10px] text-secondary">out of {scoring.maxPossibleMarks}</div>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-secondary mt-1">
+            Official formula: {scoring.scoringRule.description}
+          </p>
+        </div>
+
         {/* Weekly Consistency Visualizer */}
         <div className="bg-surface-container-low rounded-xl p-3.5 mb-4 shadow-xs border border-surface-container-high/40">
           <div className="flex items-center justify-between mb-2">
@@ -454,14 +564,22 @@ export const HomeDashboardView: React.FC = () => {
           </span>
         </div>
 
-        {/* Share Achievements Action */}
-        <div className="mt-1">
+        {/* Share Achievements Actions */}
+        <div className="flex flex-col gap-2 mt-1">
+          <button
+            onClick={handleWhatsAppScorecard}
+            className="w-full h-12 rounded-xl bg-[#25D366] text-white font-label-lg text-label-lg font-bold hover:bg-[#20ba59] transition-all flex items-center justify-center gap-2 active:scale-98 shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[20px]">chat</span>
+            <span>Share Scorecard on WhatsApp</span>
+          </button>
+
           <button
             onClick={handleShare}
-            className="w-full h-12 rounded-xl bg-primary-fixed text-primary font-label-lg text-label-lg font-bold hover:bg-primary-fixed-dim transition-all flex items-center justify-center gap-2 active:scale-98 shadow-xs"
+            className="w-full h-11 rounded-xl bg-surface-container text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-container-high transition-all flex items-center justify-center gap-2 active:scale-98"
           >
-            <span className="material-symbols-outlined text-[20px]">share</span>
-            <span>{shareSuccess ? "Summary Copied to Clipboard!" : "Share Practice Record"}</span>
+            <span className="material-symbols-outlined text-[18px]">share</span>
+            <span>{shareSuccess ? "Summary Copied to Clipboard!" : "Copy Practice Record"}</span>
           </button>
         </div>
       </div>
@@ -469,10 +587,10 @@ export const HomeDashboardView: React.FC = () => {
       {/* Target Exam Switcher Modal */}
       <ExamSwitchModal
         exams={[]}
-        currentExamId="exam-ssc-cgl"
+        currentExamId={targetExamId}
         isOpen={showExamModal}
         onClose={() => setShowExamModal(false)}
-        onSelectExam={() => setShowExamModal(false)}
+        onSelectExam={handleSelectExam}
       />
 
       {/* Edit Daily Goal Modal (/goal) */}

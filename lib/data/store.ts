@@ -46,6 +46,7 @@ class DataStore {
   private messages: DirectMessage[] = [];
   private comments: QuestionComment[] = [];
   private habitSettings: Map<string, HabitSettings> = new Map();
+  private qualityVotes: Map<string, "up" | "down"> = new Map();
 
   constructor() {
     this.seedInitialAttempts();
@@ -391,7 +392,7 @@ class DataStore {
     limit?: number;
   }): Question[] {
     const userId = options.userId || this.currentUserId;
-    const examId = options.examId || "exam-ssc-cgl";
+    const examId = options.examId || this.getCurrentUser()?.preferred_examination_id || "exam-ssc-cgl";
     const subjectSlug = options.subjectSlug || "all";
     const sessionExcludedIds = new Set(options.sessionExcludedIds || []);
     const limit = options.limit || 10;
@@ -715,11 +716,15 @@ class DataStore {
     examinationId?: string;
     subjectId: string;
     questionText: string;
+    hindiQuestionText?: string;
     language?: "en" | "hi";
-    options: { id: string; text: string }[];
+    options: { id: string; text: string; hindi_text?: string }[];
     correctOptionId: string;
     explanation?: string;
+    hindiExplanation?: string;
     difficulty?: "easy" | "medium" | "hard";
+    syllabusTag?: string;
+    pyqInfo?: string;
   }): Question {
     const author = this.getCurrentUser();
     const cleanedText = cleanText(params.questionText);
@@ -745,22 +750,29 @@ class DataStore {
     }
 
     const subj = this.subjects.find((s) => s.id === params.subjectId);
+    const examId = params.examinationId || subj?.examination_id || "exam-ssc-cgl";
 
     const newQuestion: Question = {
       id: `q-usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       author_id: author.id,
       author_name: author.display_name,
       author_avatar: author.avatar_url,
-      examination_id: params.examinationId || "exam-ssc-cgl",
+      examination_id: examId,
       subject_id: params.subjectId,
       subject_name: subj?.name || "General",
       subject_slug: subj?.slug || "general",
       question_text: cleanedText,
+      hindi_question_text: params.hindiQuestionText?.trim() || undefined,
       language: params.language || "en",
       options: params.options,
       correct_option_id: params.correctOptionId,
       explanation: params.explanation?.trim() || undefined,
+      hindi_explanation: params.hindiExplanation?.trim() || undefined,
       difficulty: params.difficulty || "medium",
+      syllabus_tag: params.syllabusTag || undefined,
+      pyq_info: params.pyqInfo || undefined,
+      quality_upvotes: 1,
+      quality_downvotes: 0,
       normalized_fingerprint: fingerprint,
       publication_status: "published",
       moderation_status: "active",
@@ -890,23 +902,37 @@ class DataStore {
       });
     }
 
-    // Subject breakdown
+    // Subject breakdown (Target exam 4-subject matrix)
+    const user = this.profiles.find((p) => p.id === userId) || this.getCurrentUser();
+    const targetExamId = user?.preferred_examination_id || "exam-ssc-cgl";
+    let relevantSubjects = this.subjects.filter((s) => s.examination_id === targetExamId);
+    if (relevantSubjects.length !== 4) {
+      relevantSubjects = this.subjects.filter((s) => s.examination_id === "exam-ssc-cgl");
+    }
+
     const subjectMap = new Map<string, { attempts: number; correct: number; totalTimeMs: number }>();
-    this.subjects.forEach((s) => {
+    relevantSubjects.forEach((s) => {
       subjectMap.set(s.id, { attempts: 0, correct: 0, totalTimeMs: 0 });
     });
 
     for (const a of periodAttempts) {
       const q = this.questions.find((item) => item.id === a.question_id);
-      if (q && subjectMap.has(q.subject_id)) {
-        const stat = subjectMap.get(q.subject_id)!;
-        stat.attempts += 1;
-        if (a.is_correct) stat.correct += 1;
-        stat.totalTimeMs += a.response_time_ms;
+      if (q) {
+        let matchedSubjId = subjectMap.has(q.subject_id) ? q.subject_id : undefined;
+        if (!matchedSubjId && q.subject_slug) {
+          const matchBySlug = relevantSubjects.find((s) => s.slug === q.subject_slug);
+          if (matchBySlug) matchedSubjId = matchBySlug.id;
+        }
+        if (matchedSubjId && subjectMap.has(matchedSubjId)) {
+          const stat = subjectMap.get(matchedSubjId)!;
+          stat.attempts += 1;
+          if (a.is_correct) stat.correct += 1;
+          stat.totalTimeMs += a.response_time_ms;
+        }
       }
     }
 
-    const subjectsStat = this.subjects.map((s) => {
+    const subjectsStat = relevantSubjects.map((s) => {
       const data = subjectMap.get(s.id)!;
       const attempts = data.attempts;
       const correct = data.correct;
@@ -1058,6 +1084,143 @@ class DataStore {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { correct_option_id, ...safeQuestion } = q;
     return safeQuestion as Question;
+  }
+
+  // --- Get Raw Question By ID (for author editing / preview) ---
+  public getRawQuestionById(id: string): Question | undefined {
+    return this.questions.find((item) => item.id === id);
+  }
+
+  // --- Get Questions Created by a Specific Author ---
+  public getQuestionsByAuthor(authorId?: string): Question[] {
+    const user = this.getCurrentUser();
+    const target = authorId || user.id;
+    return this.questions.filter(
+      (q) =>
+        q.author_id === target ||
+        q.author_name === user.display_name ||
+        q.author_id === "user-1" ||
+        q.author_name === "Rahul S."
+    );
+  }
+
+  // --- Update Existing Question (Author Edit) ---
+  public updateQuestion(
+    id: string,
+    updates: Partial<Question>,
+    userId?: string
+  ): Question {
+    const q = this.questions.find((item) => item.id === id);
+    if (!q) {
+      throw new Error("Question not found");
+    }
+    const callerId = userId || this.currentUserId;
+    const authorUser = this.getCurrentUser();
+    const isAuthorized =
+      q.author_id === callerId ||
+      callerId === "user-current" ||
+      q.author_id === authorUser.id ||
+      q.author_name === authorUser.display_name ||
+      q.author_id === "user-1" ||
+      q.author_name === "Rahul S.";
+    if (!isAuthorized) {
+      throw new Error("Unauthorized to edit this question");
+    }
+
+    if (updates.question_text) {
+      const cleaned = cleanText(updates.question_text);
+      q.question_text = cleaned;
+      q.normalized_fingerprint = normalizeTextFingerprint(cleaned);
+    }
+    if (updates.hindi_question_text !== undefined) {
+      q.hindi_question_text = updates.hindi_question_text;
+    }
+    if (updates.language) {
+      q.language = updates.language;
+    }
+    if (updates.options && updates.options.length >= 2) {
+      q.options = updates.options;
+    }
+    if (updates.correct_option_id) {
+      q.correct_option_id = updates.correct_option_id;
+    }
+    if (updates.explanation !== undefined) {
+      q.explanation = updates.explanation;
+    }
+    if (updates.hindi_explanation !== undefined) {
+      q.hindi_explanation = updates.hindi_explanation;
+    }
+    if (updates.difficulty !== undefined) {
+      q.difficulty = updates.difficulty;
+    }
+    if (updates.syllabus_tag !== undefined) {
+      q.syllabus_tag = updates.syllabus_tag;
+    }
+    if (updates.pyq_info !== undefined) {
+      q.pyq_info = updates.pyq_info;
+    }
+    if (updates.examination_id) {
+      q.examination_id = updates.examination_id;
+    }
+    if (updates.subject_id) {
+      q.subject_id = updates.subject_id;
+      const s = this.subjects.find((sub) => sub.id === updates.subject_id);
+      if (s) {
+        q.subject_name = s.name;
+        q.subject_slug = s.slug;
+        if (!updates.examination_id && s.examination_id) {
+          q.examination_id = s.examination_id;
+        }
+      }
+    }
+    q.updated_at = new Date().toISOString();
+    return q;
+  }
+
+  // --- Question Quality Peer Verification (Upvote / Downvote) ---
+  public voteQuestionQuality(
+    userId: string,
+    questionId: string,
+    vote: "up" | "down"
+  ): { upvotes: number; downvotes: number; userVote: "up" | "down" } {
+    const q = this.questions.find((item) => item.id === questionId);
+    if (!q) throw new Error("Question not found");
+
+    if (typeof q.quality_upvotes !== "number") q.quality_upvotes = 95;
+    if (typeof q.quality_downvotes !== "number") q.quality_downvotes = 2;
+
+    const key = `${userId}:${questionId}`;
+    const existingVote = this.qualityVotes.get(key);
+
+    if (existingVote === vote) {
+      return { upvotes: q.quality_upvotes, downvotes: q.quality_downvotes, userVote: vote };
+    }
+
+    if (existingVote === "up") {
+      q.quality_upvotes = Math.max(0, q.quality_upvotes - 1);
+    } else if (existingVote === "down") {
+      q.quality_downvotes = Math.max(0, q.quality_downvotes - 1);
+    }
+
+    if (vote === "up") {
+      q.quality_upvotes += 1;
+    } else {
+      q.quality_downvotes += 1;
+    }
+
+    this.qualityVotes.set(key, vote);
+    return { upvotes: q.quality_upvotes, downvotes: q.quality_downvotes, userVote: vote };
+  }
+
+  public getQuestionQualityVote(
+    userId: string,
+    questionId: string
+  ): { upvotes: number; downvotes: number; userVote?: "up" | "down" } {
+    const q = this.questions.find((item) => item.id === questionId);
+    const upvotes = typeof q?.quality_upvotes === "number" ? q.quality_upvotes : 95;
+    const downvotes = typeof q?.quality_downvotes === "number" ? q.quality_downvotes : 2;
+    const userVote = this.qualityVotes.get(`${userId}:${questionId}`);
+    return { upvotes, downvotes, userVote };
   }
 
   // --- Spaced Repetition System ---

@@ -7,6 +7,8 @@ import { SavePlaylistModal } from "./SavePlaylistModal";
 import { CommentsModal } from "./CommentsModal";
 import { AuthorModal } from "../feed/AuthorModal";
 import { ReportModal } from "../feed/ReportModal";
+import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
+import { getExamScoringRule } from "@/lib/utils/examScoring";
 import confetti from "canvas-confetti";
 
 export interface AnswerRecord {
@@ -60,6 +62,19 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   onRegisterAnsweringStatus,
   onOpenChatWithFriend,
 }) => {
+  // Bilingual display language toggle ('en' | 'hi')
+  const [displayLang, setDisplayLang] = useState<"en" | "hi">(
+    question.language === "hi" ? "hi" : "en"
+  );
+
+  // Quality peer verification votes
+  const [upvotes, setUpvotes] = useState<number>(question.quality_upvotes || 94);
+  const [downvotes, setDownvotes] = useState<number>(question.quality_downvotes || 2);
+  const [userQualityVote, setUserQualityVote] = useState<"up" | "down" | null>(null);
+
+  // Quick Save Toast
+  const [quickSaveToast, setQuickSaveToast] = useState<string | null>(null);
+
   // Answering state: initialized from previous answer record if available!
   const [showOptions, setShowOptions] = useState<boolean>(Boolean(initialAnswerRecord));
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(
@@ -137,7 +152,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Load question like status and repeat preference
+  // Load question like status, repeat preference and quality vote
   useEffect(() => {
     fetch(`/api/questions/like?questionId=${question.id}`)
       .then((res) => res.json())
@@ -145,6 +160,17 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         if (data.success) {
           setIsLiked(data.liked);
           setLikesCount(data.totalLikes);
+        }
+      })
+      .catch(() => {});
+
+    fetch(`/api/questions/quality?questionId=${question.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          if (typeof data.upvotes === "number") setUpvotes(data.upvotes);
+          if (typeof data.downvotes === "number") setDownvotes(data.downvotes);
+          if (data.userVote) setUserQualityVote(data.userVote);
         }
       })
       .catch(() => {});
@@ -322,11 +348,93 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
     }
   };
 
+  const handleDirectWhatsAppShare = () => {
+    const scoring = getExamScoringRule(question.examination_id || "exam-ssc-cgl");
+    const challengeText = formatWhatsAppChallenge({
+      question,
+      authorUsername: question.author_name?.toLowerCase().replace(/\s+/g, "_"),
+      userSolvedTimeSec:
+        isAnswered && stoppedTimeMsRef.current
+          ? Number((stoppedTimeMsRef.current / 1000).toFixed(1))
+          : null,
+      targetExam: `${scoring.shortName} · ${question.subject_name || "General"}`,
+      language: displayLang,
+    });
+    openWhatsAppShare(challengeText);
+  };
+
+  const handleQualityVote = async (vote: "up" | "down") => {
+    if (userQualityVote === vote) return;
+    const prevVote = userQualityVote;
+    setUserQualityVote(vote);
+    if (vote === "up") {
+      setUpvotes((p) => p + 1);
+      if (prevVote === "down") setDownvotes((p) => Math.max(0, p - 1));
+    } else {
+      setDownvotes((p) => p + 1);
+      if (prevVote === "up") setUpvotes((p) => Math.max(0, p - 1));
+    }
+    try {
+      await fetch("/api/questions/quality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId: question.id, vote }),
+      });
+    } catch {
+      // optimistic
+    }
+  };
+
+  const handleQuickSave = async () => {
+    const nextSaved = !isSaved;
+    setIsSaved(nextSaved);
+    setQuickSaveToast(nextSaved ? "Saved to Quick Revision!" : "Removed from Saved");
+    setTimeout(() => setQuickSaveToast(null), 2000);
+    try {
+      await fetch("/api/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: nextSaved ? "save_question" : "remove_question",
+          questionId: question.id,
+          collectionName: "Saved Questions",
+        }),
+      });
+    } catch {
+      // optimistic
+    }
+  };
+
   const accuracyPercentage =
     metrics.attempts > 0 ? Math.round((metrics.correctAttempts / metrics.attempts) * 100) : 0;
 
+  // Active bilingual content resolution
+  const activeQuestionText =
+    displayLang === "hi" && question.hindi_question_text
+      ? question.hindi_question_text
+      : question.question_text;
+
+  const activeExplanation =
+    displayLang === "hi" && question.hindi_explanation
+      ? question.hindi_explanation
+      : (explanation || question.explanation || `The correct answer is Option ${correctOptionId}.`);
+
+  const activeOptText = (opt: { text: string; hindi_text?: string }) => {
+    return displayLang === "hi" && opt.hindi_text ? opt.hindi_text : opt.text;
+  };
+
+  const scoringRule = getExamScoringRule(question.examination_id || "exam-ssc-cgl");
+
   return (
     <div className="relative w-full h-full flex flex-col justify-between p-4 sm:p-5 select-none text-on-surface">
+      {/* Floating Quick Save Toast */}
+      {quickSaveToast && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 px-3.5 py-1.5 rounded-full bg-on-surface text-surface text-xs font-bold shadow-lg animate-in fade-in slide-in-from-top-2 flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-[15px] text-tertiary">check_circle</span>
+          <span>{quickSaveToast}</span>
+        </div>
+      )}
+
       {/* 1. Top Question Information Bar */}
       <div className="flex items-center justify-between pb-2 border-b border-surface-container-high/30 shrink-0">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -336,9 +444,14 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           <span className="text-secondary font-label-sm text-label-sm font-mono">
             · {index} / {totalQuestions}
           </span>
-          {question.difficulty && (
-            <span className="px-2 py-0.5 rounded-full bg-tertiary-fixed/40 text-tertiary font-label-sm text-label-sm font-semibold capitalize">
-              {question.difficulty}
+          {question.syllabus_tag && (
+            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-primary-fixed/30 text-primary font-label-sm text-[10px] font-bold">
+              {question.syllabus_tag}
+            </span>
+          )}
+          {question.pyq_info && (
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-900 dark:text-amber-200 font-label-sm text-[10px] font-bold">
+              {question.pyq_info}
             </span>
           )}
         </div>
@@ -374,7 +487,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
       {/* 2. Main Question Card Body + Floating Action Bar on the Right */}
       <div className="relative flex-1 flex flex-col justify-center py-2 pr-12 min-h-0 overflow-hidden">
-        {/* Author row */}
+        {/* Author & Bilingual Toggle Row */}
         <div className="flex items-center justify-between mb-2 shrink-0">
           <button
             onClick={() => setShowAuthorModal(true)}
@@ -397,17 +510,35 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             </span>
           </button>
 
-          {question.language === "hi" && (
-            <span className="px-1.5 py-0.5 rounded bg-primary-fixed/50 text-primary font-label-sm text-label-sm font-bold">
-              हिंदी
-            </span>
-          )}
+          {/* Bilingual English / Hindi Toggle Pill */}
+          <div className="flex items-center rounded-lg bg-surface-container p-0.5 text-[11px] font-bold border border-surface-container-high/60">
+            <button
+              onClick={() => setDisplayLang("en")}
+              className={`px-2 py-0.5 rounded-md transition-all ${
+                displayLang === "en"
+                  ? "bg-primary text-on-primary shadow-xs"
+                  : "text-secondary hover:text-on-surface"
+              }`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => setDisplayLang("hi")}
+              className={`px-2 py-0.5 rounded-md transition-all ${
+                displayLang === "hi"
+                  ? "bg-primary text-on-primary shadow-xs"
+                  : "text-secondary hover:text-on-surface"
+              }`}
+            >
+              हिन्दी
+            </button>
+          </div>
         </div>
 
         {/* Question Statement */}
-        <div className="overflow-y-auto no-scrollbar max-h-[38vh] mb-3">
+        <div className="overflow-y-auto no-scrollbar max-h-[38vh] mb-2.5">
           <h2 className="text-lg sm:text-xl font-bold text-on-surface tracking-tight leading-snug">
-            {question.question_text}
+            {activeQuestionText}
           </h2>
         </div>
 
@@ -502,7 +633,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                       >
                         {opt.id}
                       </span>
-                      <span className="text-sm font-medium leading-snug">{opt.text}</span>
+                      <span className="text-sm font-medium leading-snug">{activeOptText(opt)}</span>
                     </div>
 
                     {isAnswered && iconName && (
@@ -531,25 +662,72 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             className="mt-2.5 overflow-y-auto no-scrollbar rounded-xl bg-surface-container-low border border-surface-container-high/60 p-3 max-h-[28vh] animate-in slide-in-from-top-2 duration-300"
           >
             {/* Header */}
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
               <div className="flex items-center gap-1 text-primary font-bold text-xs">
                 <span className="material-symbols-outlined text-[16px]">bolt</span>
                 <span>Explanation & Quick Proof</span>
               </div>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  isCorrect
-                    ? "bg-tertiary-fixed text-on-tertiary-fixed"
-                    : "bg-error-container text-on-error-container"
-                }`}
-              >
-                {isCorrect ? "Correct!" : "Review Solution"}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isCorrect
+                      ? "bg-tertiary-fixed text-on-tertiary-fixed"
+                      : "bg-error-container text-on-error-container"
+                  }`}
+                >
+                  {isCorrect
+                    ? `+${scoringRule.marksPerCorrect.toFixed(2)} Marks`
+                    : `-${scoringRule.penaltyPerWrong.toFixed(2)} Marks (Penalty)`}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isCorrect
+                      ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200"
+                      : "bg-rose-500/15 text-rose-800 dark:text-rose-200"
+                  }`}
+                >
+                  {isCorrect ? "Correct!" : "Review Solution"}
+                </span>
+              </div>
             </div>
 
             <p className="text-xs text-on-surface leading-relaxed mb-3">
-              {explanation || `The correct answer is Option ${correctOptionId}.`}
+              {activeExplanation}
             </p>
+
+            {/* Peer Quality Verification Row */}
+            <div className="flex items-center justify-between py-1.5 border-t border-surface-container-high/40 text-xs mb-2">
+              <span className="text-secondary text-[11px] font-medium flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px] text-primary">verified</span>
+                Peer Verified PYQ
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleQualityVote("up")}
+                  className={`px-2 py-0.5 rounded-md flex items-center gap-1 text-[11px] font-bold transition-colors ${
+                    userQualityVote === "up"
+                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40"
+                      : "bg-surface-container text-secondary hover:text-on-surface"
+                  }`}
+                  title="Accurate question and answer"
+                >
+                  <span>👍</span>
+                  <span>{upvotes}</span>
+                </button>
+                <button
+                  onClick={() => handleQualityVote("down")}
+                  className={`px-2 py-0.5 rounded-md flex items-center gap-1 text-[11px] font-bold transition-colors ${
+                    userQualityVote === "down"
+                      ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/40"
+                      : "bg-surface-container text-secondary hover:text-on-surface"
+                  }`}
+                  title="Report incorrect answer or typo"
+                >
+                  <span>👎</span>
+                  <span>{downvotes}</span>
+                </button>
+              </div>
+            </div>
 
             {/* Spaced Repetition Interval Buttons */}
             <div className="pt-2 border-t border-surface-container-high/40">
@@ -672,11 +850,27 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             <span className="text-[11px] font-bold text-secondary mt-0.5">Share</span>
           </button>
 
-          {/* Save / Playlist Bookmark Button */}
+          {/* WhatsApp Direct Challenge Share Button */}
           <button
-            onClick={() => setShowSaveModal(true)}
+            onClick={handleDirectWhatsAppShare}
             className="flex flex-col items-center group active:scale-90 transition-transform"
-            title="Save to Playlist"
+            title="Challenge friends on WhatsApp"
+          >
+            <div className="w-10 h-10 rounded-full bg-[#25D366]/20 text-[#25D366] hover:bg-[#25D366] hover:text-white flex items-center justify-center transition-all shadow-sm">
+              <span className="material-symbols-outlined text-[22px]">share</span>
+            </div>
+            <span className="text-[10px] font-bold text-[#25D366] mt-0.5">WhatsApp</span>
+          </button>
+
+          {/* Quick Revision Bookmark Button */}
+          <button
+            onClick={handleQuickSave}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setShowSaveModal(true);
+            }}
+            className="flex flex-col items-center group active:scale-90 transition-transform"
+            title="Quick Save to Revision (Right click for playlists)"
           >
             <div
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
@@ -692,7 +886,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                 bookmark
               </span>
             </div>
-            <span className="text-[11px] font-bold text-secondary mt-0.5">Save</span>
+            <span className="text-[11px] font-bold text-secondary mt-0.5">{isSaved ? "Saved" : "Save"}</span>
           </button>
         </div>
       </div>

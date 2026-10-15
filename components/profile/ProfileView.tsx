@@ -5,6 +5,7 @@ import Link from "next/link";
 import { UserProfile, Question, Examination } from "@/types/database";
 import { TopHeader } from "../layout/TopHeader";
 import { ExamSwitchModal } from "../feed/ExamSwitchModal";
+import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -22,7 +23,7 @@ export const ProfileView: React.FC = () => {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState<boolean>(false);
 
-  // Edit Profile / Username Setup Modal
+  const [authoredQuestions, setAuthoredQuestions] = useState<Question[]>([]);
   const [showEditProfileModal, setShowEditProfileModal] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>("");
   const [editUsername, setEditUsername] = useState<string>("");
@@ -52,6 +53,16 @@ export const ProfileView: React.FC = () => {
           if (!data.user.username) {
             setShowEditProfileModal(true);
           }
+        }
+      })
+      .catch(() => {});
+
+    // Fetch authored questions
+    fetch("/api/questions/author")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.questions) {
+          setAuthoredQuestions(data.questions);
         }
       })
       .catch(() => {});
@@ -230,6 +241,48 @@ export const ProfileView: React.FC = () => {
     navigator.clipboard.writeText(window.location.origin);
     setShareSuccess(true);
     setTimeout(() => setShareSuccess(false), 2500);
+  };
+
+  const handleWhatsAppProfileShare = () => {
+    const examName = activeExam?.name || "SSC CGL";
+    const text =
+      `🎯 *${user?.display_name || "Aspirant"} on Qz Loop*\n` +
+      `🔥 *${user?.current_streak || 14} Day Streak* | 📚 *${user?.total_questions_answered || 0} Questions Solved* | 🎯 *${user?.overall_accuracy || 0}% Accuracy*\n` +
+      `🏆 Target Exam: *${examName}*\n\n` +
+      `Study and compete with me on Qz Loop: ${typeof window !== "undefined" ? window.location.origin : "https://qzloop.app"}`;
+    openWhatsAppShare(text);
+  };
+
+  const handleShareQuestionToWhatsApp = (q: Question) => {
+    const text = formatWhatsAppChallenge({
+      question: q,
+      authorUsername: user?.username || user?.display_name?.toLowerCase().replace(/\s+/g, "_"),
+      targetExam: q.subject_name || "General",
+      language: q.language,
+    });
+    openWhatsAppShare(text);
+  };
+
+  const handleSelectExam = async (examOrId: Examination | string) => {
+    const examId = typeof examOrId === "string" ? examOrId : examOrId.id;
+    const examName = typeof examOrId === "object" ? examOrId.name : exams.find((e) => e.id === examId)?.name;
+    setShowExamModal(false);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preferred_examination_id: examId,
+          target_exam: examName,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        setUser(data.user);
+      }
+    } catch {
+      // optimistic
+    }
   };
 
   const handleInstallApp = async () => {
@@ -411,6 +464,96 @@ export const ProfileView: React.FC = () => {
           </p>
         </div>
 
+        {/* My Created Questions Studio Section */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between pb-2 px-1">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-[20px]">edit_document</span>
+              <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">
+                My Created Questions
+              </h2>
+            </div>
+            <Link
+              href="/create"
+              className="px-2.5 py-1 rounded-lg bg-primary-fixed text-primary font-bold text-xs hover:bg-primary-fixed-dim transition-colors flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-[14px]">add</span>
+              <span>New</span>
+            </Link>
+          </div>
+
+          {authoredQuestions.length === 0 ? (
+            <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high/40 text-center text-secondary text-xs">
+              You haven&apos;t created any practice questions yet. Tap &apos;New&apos; above to publish your first challenge!
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {authoredQuestions.slice(0, 5).map((q) => (
+                <div
+                  key={q.id}
+                  className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 flex flex-col gap-2 shadow-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface text-[10px] font-bold uppercase">
+                        {q.subject_name || "General"}
+                      </span>
+                      {q.syllabus_tag && (
+                        <span className="px-2 py-0.5 rounded-full bg-primary-fixed/40 text-primary text-[10px] font-bold">
+                          {q.syllabus_tag}
+                        </span>
+                      )}
+                      {q.pyq_info && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-900 dark:text-amber-200 text-[10px] font-bold">
+                          {q.pyq_info}
+                        </span>
+                      )}
+                      {q.hindi_question_text && (
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 text-[9px] font-bold">
+                          Bilingual
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 text-[11px] text-secondary">
+                      <span>{q.total_attempts} attempts</span>
+                      <span>·</span>
+                      <span className="font-bold text-tertiary">
+                        {q.total_attempts > 0 ? Math.round((q.correct_attempts / q.total_attempts) * 100) : 0}% acc
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs font-medium text-on-surface line-clamp-2 leading-relaxed">
+                    {q.question_text}
+                  </p>
+
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-surface-container-high/30">
+                    <button
+                      type="button"
+                      onClick={() => handleShareQuestionToWhatsApp(q)}
+                      className="px-2.5 py-1 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] font-bold text-xs flex items-center gap-1 transition-colors"
+                      title="Share to WhatsApp study group"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">chat</span>
+                      <span>WhatsApp Challenge</span>
+                    </button>
+
+                    <Link
+                      href={`/create?edit=${q.id}`}
+                      className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 transition-colors"
+                      title="Edit question statement, options or solution"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">edit</span>
+                      <span>Edit</span>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Section Label */}
         <div className="px-1 pb-1">
           <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider font-bold">
@@ -509,6 +652,27 @@ export const ProfileView: React.FC = () => {
               </div>
             </div>
             <span className="material-symbols-outlined text-[20px] text-secondary">chevron_right</span>
+          </button>
+
+          {/* Share Profile on WhatsApp */}
+          <button
+            onClick={handleWhatsAppProfileShare}
+            className="w-full flex items-center justify-between p-3.5 hover:bg-surface-container transition-colors text-left"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-[#25D366]/20 flex items-center justify-center text-[#25D366] shrink-0">
+                <span className="material-symbols-outlined text-[20px]">chat</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-body-lg text-body-lg text-[#25D366] font-bold truncate">
+                  Share Profile on WhatsApp
+                </span>
+                <span className="font-body-sm text-body-sm text-secondary truncate">
+                  Showcase your streak, questions solved & accuracy
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-[20px] text-[#25D366]">chevron_right</span>
           </button>
 
           {/* PWA Install Button */}

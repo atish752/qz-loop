@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Question } from "@/types/database";
 import { ReportModal } from "./ReportModal";
 import { AuthorModal } from "./AuthorModal";
+import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
+import { getExamScoringRule } from "@/lib/utils/examScoring";
 
 interface QuestionCardProps {
   question: Question;
@@ -51,11 +53,34 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   const [showReportModal, setShowReportModal] = useState(false);
   const [showAuthorModal, setShowAuthorModal] = useState(false);
 
+  // Bilingual language toggle
+  const [displayLang, setDisplayLang] = useState<"en" | "hi">(
+    question.language === "hi" ? "hi" : "en"
+  );
+  // Quality votes
+  const [upvotes, setUpvotes] = useState<number>(question.quality_upvotes || 94);
+  const [downvotes, setDownvotes] = useState<number>(question.quality_downvotes || 2);
+  const [userQualityVote, setUserQualityVote] = useState<"up" | "down" | null>(null);
+
   // Hiding state
   const [isHiding, setIsHiding] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+
+  // Fetch question quality vote on mount
+  useEffect(() => {
+    fetch(`/api/questions/quality?questionId=${question.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          if (typeof data.upvotes === "number") setUpvotes(data.upvotes);
+          if (typeof data.downvotes === "number") setDownvotes(data.downvotes);
+          if (data.userVote) setUserQualityVote(data.userVote);
+        }
+      })
+      .catch(() => {});
+  }, [question.id]);
 
   // Start timer ONLY when active and not yet answered
   useEffect(() => {
@@ -188,7 +213,59 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     }, 250);
   };
 
-  // Community accuracy calculation
+  const handleQualityVote = async (vote: "up" | "down") => {
+    if (userQualityVote === vote) return;
+    const prevVote = userQualityVote;
+    setUserQualityVote(vote);
+    if (vote === "up") {
+      setUpvotes((p) => p + 1);
+      if (prevVote === "down") setDownvotes((p) => Math.max(0, p - 1));
+    } else {
+      setDownvotes((p) => p + 1);
+      if (prevVote === "up") setUpvotes((p) => Math.max(0, p - 1));
+    }
+    try {
+      await fetch("/api/questions/quality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId: question.id, vote }),
+      });
+    } catch {
+      // optimistic
+    }
+  };
+
+  const handleDirectWhatsAppShare = () => {
+    const scoring = getExamScoringRule(question.examination_id || "exam-ssc-cgl");
+    const challengeText = formatWhatsAppChallenge({
+      question,
+      authorUsername: question.author_name?.toLowerCase().replace(/\s+/g, "_"),
+      userSolvedTimeSec:
+        isAnswered && stoppedTimeMsRef.current
+          ? Number((stoppedTimeMsRef.current / 1000).toFixed(1))
+          : null,
+      targetExam: `${scoring.shortName} · ${question.subject_name || "General"}`,
+      language: displayLang,
+    });
+    openWhatsAppShare(challengeText);
+  };
+
+  const activeQuestionText =
+    displayLang === "hi" && question.hindi_question_text
+      ? question.hindi_question_text
+      : question.question_text;
+
+  const activeExplanation =
+    displayLang === "hi" && question.hindi_explanation
+      ? question.hindi_explanation
+      : (explanation || "The correct option is " + correctOptionId + ".");
+
+  const activeOptText = (opt: { text: string; hindi_text?: string }) => {
+    return displayLang === "hi" && opt.hindi_text ? opt.hindi_text : opt.text;
+  };
+
+  const scoringRule = getExamScoringRule(question.examination_id || "exam-ssc-cgl");
+
   const accuracyPercentage =
     metrics.attempts > 0 ? Math.round((metrics.correctAttempts / metrics.attempts) * 100) : 0;
 
@@ -208,6 +285,16 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             <span className="text-secondary font-label-sm text-label-sm font-mono">
               · Q.{1400 + index}
             </span>
+            {question.syllabus_tag && (
+              <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-primary-fixed/30 text-primary font-label-sm text-[10px] font-bold">
+                {question.syllabus_tag}
+              </span>
+            )}
+            {question.pyq_info && (
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-900 dark:text-amber-200 font-label-sm text-[10px] font-bold">
+                {question.pyq_info}
+              </span>
+            )}
             {question.difficulty && (
               <span className="px-2 py-0.5 rounded-full bg-tertiary-fixed/40 text-tertiary font-label-sm text-label-sm font-semibold capitalize">
                 {question.difficulty}
@@ -233,13 +320,22 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               </span>
             </div>
 
+            {/* WhatsApp Direct Share */}
+            <button
+              onClick={handleDirectWhatsAppShare}
+              className="p-1 rounded-full text-[#25D366] hover:bg-[#25D366]/15 transition-colors"
+              title="Challenge friends on WhatsApp"
+            >
+              <span className="material-symbols-outlined text-[18px]">share</span>
+            </button>
+
             {/* Share Question */}
             <button
               onClick={handleShareQuestion}
               className="p-1 rounded-full text-secondary hover:text-primary hover:bg-surface-container transition-colors relative"
               title="Share question link"
             >
-              <span className="material-symbols-outlined text-[18px]">share</span>
+              <span className="material-symbols-outlined text-[18px]">link</span>
               {shareCopied && (
                 <span className="absolute -bottom-7 right-0 text-[10px] bg-on-surface text-surface px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-20">
                   Link copied!
@@ -258,7 +354,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           </div>
         </div>
 
-        {/* B. Question Author */}
+        {/* B. Question Author & Bilingual Toggle */}
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => setShowAuthorModal(true)}
@@ -281,16 +377,34 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             </span>
           </button>
 
-          {question.language === "hi" && (
-            <span className="px-1.5 py-0.5 rounded bg-primary-fixed/50 text-primary font-label-sm text-label-sm font-bold">
-              हिंदी
-            </span>
-          )}
+          {/* Bilingual English / Hindi Toggle Pill */}
+          <div className="flex items-center rounded-lg bg-surface-container p-0.5 text-[11px] font-bold border border-surface-container-high/60">
+            <button
+              onClick={() => setDisplayLang("en")}
+              className={`px-2 py-0.5 rounded-md transition-all ${
+                displayLang === "en"
+                  ? "bg-primary text-on-primary shadow-xs"
+                  : "text-secondary hover:text-on-surface"
+              }`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => setDisplayLang("hi")}
+              className={`px-2 py-0.5 rounded-md transition-all ${
+                displayLang === "hi"
+                  ? "bg-primary text-on-primary shadow-xs"
+                  : "text-secondary hover:text-on-surface"
+              }`}
+            >
+              हिन्दी
+            </button>
+          </div>
         </div>
 
         {/* C. Question Text */}
         <h2 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface tracking-tight mb-4 leading-snug">
-          {question.question_text}
+          {activeQuestionText}
         </h2>
 
         {/* D. Community Performance Metrics Row (Visible BEFORE answering!) */}
@@ -386,7 +500,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                     >
                       {opt.id}
                     </span>
-                    <span className="font-body-lg text-body-lg leading-snug">{opt.text}</span>
+                    <span className="font-body-lg text-body-lg leading-snug">{activeOptText(opt)}</span>
                   </div>
 
                   {isAnswered && iconName && (
@@ -421,25 +535,72 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         {/* Immediate Explanation Drawer Card ("Quick Proof") */}
         {isAnswered && (
           <div className="mt-3 overflow-hidden rounded-xl bg-surface-container-low border border-surface-container-high/60 p-4 animate-in slide-in-from-top-2 duration-300">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
               <div className="flex items-center gap-1.5 text-primary font-label-md text-label-md font-bold">
                 <span className="material-symbols-outlined text-[18px]">bolt</span>
                 <span>Explanation & Quick Proof</span>
               </div>
-              <span
-                className={`px-2 py-0.5 rounded-full font-label-sm text-label-sm font-bold ${
-                  isCorrect
-                    ? "bg-tertiary-fixed text-on-tertiary-fixed"
-                    : "bg-error-container text-on-error-container"
-                }`}
-              >
-                {isCorrect ? "Correct!" : "Review Solution"}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`px-2 py-0.5 rounded-full font-label-sm text-label-sm font-bold ${
+                    isCorrect
+                      ? "bg-tertiary-fixed text-on-tertiary-fixed"
+                      : "bg-error-container text-on-error-container"
+                  }`}
+                >
+                  {isCorrect
+                    ? `+${scoringRule.marksPerCorrect.toFixed(2)} Marks`
+                    : `-${scoringRule.penaltyPerWrong.toFixed(2)} Marks (Penalty)`}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full font-label-sm text-label-sm font-bold ${
+                    isCorrect
+                      ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200"
+                      : "bg-rose-500/15 text-rose-800 dark:text-rose-200"
+                  }`}
+                >
+                  {isCorrect ? "Correct!" : "Review Solution"}
+                </span>
+              </div>
             </div>
 
-            <p className="font-body-md text-body-md text-on-surface leading-relaxed">
-              {explanation || "The correct option is " + correctOptionId + "."}
+            <p className="font-body-md text-body-md text-on-surface leading-relaxed mb-3">
+              {activeExplanation}
             </p>
+
+            {/* Peer Quality Verification Row */}
+            <div className="flex items-center justify-between py-2 border-t border-surface-container-high/40 text-xs">
+              <span className="text-secondary text-[11px] font-medium flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px] text-primary">verified</span>
+                Peer Verified PYQ
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleQualityVote("up")}
+                  className={`px-2.5 py-1 rounded-md flex items-center gap-1 text-[11px] font-bold transition-colors ${
+                    userQualityVote === "up"
+                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40"
+                      : "bg-surface-container text-secondary hover:text-on-surface"
+                  }`}
+                  title="Accurate question and answer"
+                >
+                  <span>👍</span>
+                  <span>{upvotes}</span>
+                </button>
+                <button
+                  onClick={() => handleQualityVote("down")}
+                  className={`px-2.5 py-1 rounded-md flex items-center gap-1 text-[11px] font-bold transition-colors ${
+                    userQualityVote === "down"
+                      ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/40"
+                      : "bg-surface-container text-secondary hover:text-on-surface"
+                  }`}
+                  title="Report incorrect answer or typo"
+                >
+                  <span>👎</span>
+                  <span>{downvotes}</span>
+                </button>
+              </div>
+            </div>
 
             {/* Next Question CTA */}
             <div className="mt-4 pt-3 border-t border-surface-container-high/50 flex items-center justify-between">

@@ -1,26 +1,95 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { TopHeader } from "../layout/TopHeader";
-import { DuplicateCheckResult } from "@/types/database";
+import { DuplicateCheckResult, Question } from "@/types/database";
+import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
+import { getExamScoringRule } from "@/lib/utils/examScoring";
 
-const SUBJECTS = [
-  { id: "subj-maths", name: "Maths", icon: "calculate" },
-  { id: "subj-reasoning", name: "Reasoning", icon: "psychology" },
-  { id: "subj-english", name: "English", icon: "spellcheck" },
-  { id: "subj-gk", name: "GK", icon: "public" },
+export const EXAMS_LIST = [
+  { id: "exam-ssc-cgl", name: "SSC CGL", shortName: "SSC CGL" },
+  { id: "exam-ssc-chsl", name: "SSC CHSL (10+2)", shortName: "SSC CHSL" },
+  { id: "exam-railway-ntpc", name: "RRB NTPC & Group D", shortName: "Railways RRB" },
+  { id: "exam-banking-ibps", name: "Banking IBPS PO / Clerk & SBI", shortName: "Banking IBPS" },
+  { id: "exam-state-pcs", name: "State PCS (UPPSC, BPSC, MPPSC)", shortName: "State PCS" },
+  { id: "exam-upsc-csat", name: "UPSC CSAT & Prelims GS", shortName: "UPSC CSAT" },
+  { id: "exam-defence-cds", name: "Defence CDS / NDA", shortName: "Defence CDS" },
 ];
+
+export const EXAM_SUBJECTS_MAP: Record<
+  string,
+  { id: string; name: string; icon: string; slug: string }[]
+> = {
+  "exam-ssc-cgl": [
+    { id: "subj-maths", name: "Quantitative Aptitude", icon: "calculate", slug: "maths" },
+    { id: "subj-reasoning", name: "General Intelligence & Reasoning", icon: "psychology", slug: "reasoning" },
+    { id: "subj-english", name: "English Comprehension", icon: "spellcheck", slug: "english" },
+    { id: "subj-gk", name: "General Awareness (Polity & GK)", icon: "public", slug: "gk" },
+  ],
+  "exam-ssc-chsl": [
+    { id: "subj-chsl-maths", name: "Quantitative Aptitude", icon: "calculate", slug: "maths" },
+    { id: "subj-chsl-reasoning", name: "General Intelligence & Reasoning", icon: "psychology", slug: "reasoning" },
+    { id: "subj-chsl-english", name: "English Language", icon: "spellcheck", slug: "english" },
+    { id: "subj-chsl-gk", name: "General Awareness", icon: "public", slug: "gk" },
+  ],
+  "exam-railway-ntpc": [
+    { id: "subj-rrb-maths", name: "General Mathematics", icon: "calculate", slug: "maths" },
+    { id: "subj-rrb-reasoning", name: "General Intelligence & Reasoning", icon: "psychology", slug: "reasoning" },
+    { id: "subj-rrb-science", name: "General Science (Physics/Chem/Bio)", icon: "science", slug: "science" },
+    { id: "subj-rrb-gk", name: "General Awareness & Current Affairs", icon: "public", slug: "gk" },
+  ],
+  "exam-banking-ibps": [
+    { id: "subj-bank-quant", name: "Quantitative Aptitude & DI", icon: "calculate", slug: "maths" },
+    { id: "subj-bank-reasoning", name: "Reasoning Ability & Puzzles", icon: "psychology", slug: "reasoning" },
+    { id: "subj-bank-english", name: "English Language & Grammar", icon: "spellcheck", slug: "english" },
+    { id: "subj-bank-ga", name: "Banking & Financial Awareness", icon: "account_balance", slug: "gk" },
+  ],
+  "exam-state-pcs": [
+    { id: "subj-pcs-polity", name: "Indian Polity & Governance", icon: "gavel", slug: "gk" },
+    { id: "subj-pcs-history", name: "Indian History & Culture", icon: "menu_book", slug: "gk" },
+    { id: "subj-pcs-geo", name: "Geography & Environment", icon: "public", slug: "gk" },
+    { id: "subj-pcs-csat", name: "General Mental Ability (CSAT)", icon: "psychology", slug: "reasoning" },
+  ],
+  "exam-upsc-csat": [
+    { id: "subj-upsc-csat-quant", name: "Basic Numeracy & Data Interpretation", icon: "calculate", slug: "maths" },
+    { id: "subj-upsc-csat-reasoning", name: "Logical Reasoning & Analytical Ability", icon: "psychology", slug: "reasoning" },
+    { id: "subj-upsc-csat-comprehension", name: "Reading Comprehension & Verbal", icon: "spellcheck", slug: "english" },
+    { id: "subj-upsc-gs", name: "General Studies Paper-1 (GS)", icon: "public", slug: "gk" },
+  ],
+  "exam-defence-cds": [
+    { id: "subj-def-english", name: "English Comprehension", icon: "spellcheck", slug: "english" },
+    { id: "subj-def-gk", name: "General Knowledge & Defence", icon: "public", slug: "gk" },
+    { id: "subj-def-maths", name: "Elementary Mathematics", icon: "calculate", slug: "maths" },
+    { id: "subj-def-science", name: "General Science", icon: "science", slug: "science" },
+  ],
+};
+
+const LOCAL_STORAGE_DRAFT_KEY = "qz_loop_question_draft";
 
 export const CreateQuestionView: React.FC = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams ? searchParams.get("edit") : null;
 
   // Form states
+  const [selectedExamId, setSelectedExamId] = useState<string>("exam-ssc-cgl");
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("subj-gk");
+  const [targetTopic, setTargetTopic] = useState<string>("Arithmetic & Profit");
+  const [syllabusTag, setSyllabusTag] = useState<string>("");
+  const [pyqInfo, setPyqInfo] = useState<string>("");
   const [questionText, setQuestionText] = useState<string>("");
+  const [hindiQuestionText, setHindiQuestionText] = useState<string>("");
   const [language, setLanguage] = useState<"en" | "hi">("en");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+
   const [options, setOptions] = useState<[string, string, string, string]>([
+    "",
+    "",
+    "",
+    "",
+  ]);
+  const [hindiOptions, setHindiOptions] = useState<[string, string, string, string]>([
     "",
     "",
     "",
@@ -28,31 +97,217 @@ export const CreateQuestionView: React.FC = () => {
   ]);
   const [correctOptionId, setCorrectOptionId] = useState<string>("A");
   const [explanation, setExplanation] = useState<string>("");
-  const [targetTopic, setTargetTopic] = useState<string>("Arithmetic & Profit");
+  const [hindiExplanation, setHindiExplanation] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
+  const [previewLanguage, setPreviewLanguage] = useState<"en" | "hi">("en");
+
+  // Edit Mode state
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+  const [isLoadingEdit, setIsLoadingEdit] = useState<boolean>(false);
 
   // Duplicate check state
   const [duplicateResult, setDuplicateResult] = useState<DuplicateCheckResult | null>(null);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState<boolean>(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState<boolean>(false);
 
-  // Submission state
+  // Draft state
+  const [hasRestorableDraft, setHasRestorableDraft] = useState<boolean>(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const isInitialMount = useRef(true);
+
+  // Submission & WhatsApp Share state
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState<boolean>(false);
+  const [publishedQuestion, setPublishedQuestion] = useState<Question | null>(null);
+  const [shareCopied, setShareCopied] = useState<boolean>(false);
 
-  // Quality & Dopamine score calculation
+  // 1. Fetch Question Data if editing
+  useEffect(() => {
+    if (!editId) {
+      // Check if draft exists
+      if (typeof window !== "undefined") {
+        const savedDraft = localStorage.getItem(LOCAL_STORAGE_DRAFT_KEY);
+        if (savedDraft) {
+          try {
+            const parsed = JSON.parse(savedDraft);
+            if (parsed.questionText || parsed.options?.some((o: string) => o.trim())) {
+              setHasRestorableDraft(true);
+              setDraftSavedAt(parsed.savedAt || "recently");
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+      return;
+    }
+
+    setIsEditMode(true);
+    setIsLoadingEdit(true);
+
+    fetch(`/api/questions/${editId}?edit=true`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.question) {
+          const q: Question = data.question;
+          if (q.examination_id) setSelectedExamId(q.examination_id);
+          setSelectedSubjectId(q.subject_id || "subj-gk");
+          setQuestionText(q.question_text || "");
+          setHindiQuestionText(q.hindi_question_text || "");
+          setLanguage(q.language || "en");
+          setDifficulty(q.difficulty || "medium");
+          setExplanation(q.explanation || "");
+          setHindiExplanation(q.hindi_explanation || "");
+          setSyllabusTag(q.syllabus_tag || "");
+          setPyqInfo(q.pyq_info || "");
+          if (q.options && q.options.length >= 4) {
+            setOptions([
+              q.options[0]?.text || "",
+              q.options[1]?.text || "",
+              q.options[2]?.text || "",
+              q.options[3]?.text || "",
+            ]);
+            setHindiOptions([
+              q.options[0]?.hindi_text || "",
+              q.options[1]?.hindi_text || "",
+              q.options[2]?.hindi_text || "",
+              q.options[3]?.hindi_text || "",
+            ]);
+          }
+          if (q.correct_option_id) {
+            setCorrectOptionId(q.correct_option_id);
+          }
+        } else {
+          setErrorMsg(data.error || "Failed to load question for editing");
+        }
+      })
+      .catch((err) => {
+        setErrorMsg(err.message || "Failed to load question for editing");
+      })
+      .finally(() => {
+        setIsLoadingEdit(false);
+      });
+  }, [editId]);
+
+  // 2. Draft Autosaving (Debounced)
+  const saveDraft = useCallback(() => {
+    if (isEditMode) return;
+    if (typeof window === "undefined") return;
+
+    const draft = {
+      selectedExamId,
+      selectedSubjectId,
+      targetTopic,
+      syllabusTag,
+      pyqInfo,
+      questionText,
+      hindiQuestionText,
+      language,
+      difficulty,
+      options,
+      hindiOptions,
+      correctOptionId,
+      explanation,
+      hindiExplanation,
+      savedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    localStorage.setItem(LOCAL_STORAGE_DRAFT_KEY, JSON.stringify(draft));
+    setDraftSavedAt(draft.savedAt);
+  }, [
+    isEditMode,
+    selectedExamId,
+    selectedSubjectId,
+    targetTopic,
+    syllabusTag,
+    pyqInfo,
+    questionText,
+    hindiQuestionText,
+    language,
+    difficulty,
+    options,
+    hindiOptions,
+    correctOptionId,
+    explanation,
+    hindiExplanation,
+  ]);
+
+  const handleExamChange = (examId: string) => {
+    setSelectedExamId(examId);
+    const subjs = EXAM_SUBJECTS_MAP[examId] || EXAM_SUBJECTS_MAP["exam-ssc-cgl"];
+    if (subjs && subjs.length > 0) {
+      const stillValid = subjs.some((s) => s.id === selectedSubjectId);
+      if (!stillValid) {
+        setSelectedSubjectId(subjs[0].id);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (isEditMode) return;
+
+    const timer = setTimeout(() => {
+      if (questionText.trim().length > 3 || options.some((o) => o.trim())) {
+        saveDraft();
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [questionText, options, explanation, hindiQuestionText, hindiOptions, hindiExplanation, saveDraft, isEditMode]);
+
+  const handleRestoreDraft = () => {
+    if (typeof window === "undefined") return;
+    const raw = localStorage.getItem(LOCAL_STORAGE_DRAFT_KEY);
+    if (!raw) return;
+    try {
+      const draft = JSON.parse(raw);
+      if (draft.selectedExamId) setSelectedExamId(draft.selectedExamId);
+      if (draft.selectedSubjectId) setSelectedSubjectId(draft.selectedSubjectId);
+      if (draft.targetTopic) setTargetTopic(draft.targetTopic);
+      if (draft.syllabusTag) setSyllabusTag(draft.syllabusTag);
+      if (draft.pyqInfo) setPyqInfo(draft.pyqInfo);
+      if (draft.questionText) setQuestionText(draft.questionText);
+      if (draft.hindiQuestionText) setHindiQuestionText(draft.hindiQuestionText);
+      if (draft.language) setLanguage(draft.language);
+      if (draft.difficulty) setDifficulty(draft.difficulty);
+      if (draft.options) setOptions(draft.options);
+      if (draft.hindiOptions) setHindiOptions(draft.hindiOptions);
+      if (draft.correctOptionId) setCorrectOptionId(draft.correctOptionId);
+      if (draft.explanation) setExplanation(draft.explanation);
+      if (draft.hindiExplanation) setHindiExplanation(draft.hindiExplanation);
+      setHasRestorableDraft(false);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleDiscardDraft = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(LOCAL_STORAGE_DRAFT_KEY);
+    }
+    setHasRestorableDraft(false);
+    setDraftSavedAt(null);
+  };
+
+  // 3. Quality & Engagement score calculation
   const calculateQualityScore = () => {
-    let score = 40;
+    let score = 30;
     if (questionText.trim().length >= 25) score += 20;
     if (options.every((o) => o.trim().length > 0)) score += 20;
-    if (explanation.trim().length >= 15) score += 20;
+    if (explanation.trim().length >= 15) score += 15;
+    if (hindiQuestionText.trim().length >= 15) score += 10;
+    if (syllabusTag.trim().length > 0 || pyqInfo.trim().length > 0) score += 5;
     return Math.min(100, score);
   };
 
-  // Debounced duplicate detection
+  // 4. Debounced duplicate detection
   const checkDuplicateQuestion = useCallback(async (text: string) => {
-    if (!text || text.trim().length < 8) {
+    if (!text || text.trim().length < 8 || isEditMode) {
       setDuplicateResult(null);
       return;
     }
@@ -73,7 +328,7 @@ export const CreateQuestionView: React.FC = () => {
     } finally {
       setIsCheckingDuplicate(false);
     }
-  }, []);
+  }, [isEditMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -89,6 +344,13 @@ export const CreateQuestionView: React.FC = () => {
     setOptions(updated);
   };
 
+  const handleHindiOptionChange = (index: number, val: string) => {
+    const updated: [string, string, string, string] = [...hindiOptions];
+    updated[index] = val;
+    setHindiOptions(updated);
+  };
+
+  // 5. Submit Form (Create or Update)
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -103,7 +365,7 @@ export const CreateQuestionView: React.FC = () => {
       return;
     }
 
-    if (duplicateResult?.is_exact_duplicate) {
+    if (!isEditMode && duplicateResult?.is_exact_duplicate) {
       setErrorMsg("This exact question already exists in Qz Loop. Exact duplicates cannot be republished.");
       return;
     }
@@ -111,31 +373,45 @@ export const CreateQuestionView: React.FC = () => {
     setIsSubmitting(true);
     try {
       const formattedOptions = [
-        { id: "A", text: options[0].trim() },
-        { id: "B", text: options[1].trim() },
-        { id: "C", text: options[2].trim() },
-        { id: "D", text: options[3].trim() },
+        { id: "A", text: options[0].trim(), hindi_text: hindiOptions[0]?.trim() || undefined },
+        { id: "B", text: options[1].trim(), hindi_text: hindiOptions[1]?.trim() || undefined },
+        { id: "C", text: options[2].trim(), hindi_text: hindiOptions[2]?.trim() || undefined },
+        { id: "D", text: options[3].trim(), hindi_text: hindiOptions[3]?.trim() || undefined },
       ];
 
-      const res = await fetch("/api/questions/create", {
-        method: "POST",
+      const payload = {
+        examinationId: selectedExamId,
+        subjectId: selectedSubjectId,
+        questionText: questionText.trim(),
+        hindiQuestionText: hindiQuestionText.trim() || undefined,
+        language,
+        options: formattedOptions,
+        correctOptionId,
+        explanation: explanation.trim() || undefined,
+        hindiExplanation: hindiExplanation.trim() || undefined,
+        difficulty,
+        syllabusTag: syllabusTag.trim() || undefined,
+        pyqInfo: pyqInfo.trim() || undefined,
+      };
+
+      const url = isEditMode ? `/api/questions/${editId}` : "/api/questions/create";
+      const method = isEditMode ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subjectId: selectedSubjectId,
-          questionText: questionText.trim(),
-          language,
-          options: formattedOptions,
-          correctOptionId,
-          explanation: explanation.trim() || undefined,
-          difficulty,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
       if (data.success) {
+        setPublishedQuestion(data.question);
         setPublishSuccess(true);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(LOCAL_STORAGE_DRAFT_KEY);
+        }
       } else {
-        setErrorMsg(data.error || "Failed to publish question");
+        setErrorMsg(data.error || "Failed to save question");
       }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Network error");
@@ -144,38 +420,120 @@ export const CreateQuestionView: React.FC = () => {
     }
   };
 
+  const handleShareToWhatsApp = () => {
+    if (!publishedQuestion) return;
+    const examObj = EXAMS_LIST.find((e) => e.id === (publishedQuestion.examination_id || selectedExamId));
+    const challengeText = formatWhatsAppChallenge({
+      question: publishedQuestion,
+      authorUsername: publishedQuestion.author_name?.toLowerCase().replace(/\s+/g, "_"),
+      targetExam: `${examObj?.shortName || "SSC CGL"} · ${publishedQuestion.subject_name || "General"}`,
+      language: publishedQuestion.language,
+    });
+    openWhatsAppShare(challengeText);
+  };
+
+  const handleCopyChallenge = () => {
+    if (!publishedQuestion || typeof window === "undefined") return;
+    const examObj = EXAMS_LIST.find((e) => e.id === (publishedQuestion.examination_id || selectedExamId));
+    const challengeText = formatWhatsAppChallenge({
+      question: publishedQuestion,
+      authorUsername: publishedQuestion.author_name?.toLowerCase().replace(/\s+/g, "_"),
+      targetExam: `${examObj?.shortName || "SSC CGL"} · ${publishedQuestion.subject_name || "General"}`,
+      language: publishedQuestion.language,
+    });
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(challengeText);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    }
+  };
+
+  if (isLoadingEdit) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <TopHeader currentTab="create" streakDays={14} activeExamName="SSC CGL" />
+        <div className="flex-1 flex items-center justify-center p-8 text-secondary">
+          <span className="material-symbols-outlined animate-spin text-[32px] text-primary">sync</span>
+          <span className="ml-2 font-medium">Loading question details...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen pb-24">
       <TopHeader currentTab="create" streakDays={14} activeExamName="SSC CGL" />
 
       <div className="flex flex-col w-full px-4 pt-3 pb-8">
         {publishSuccess ? (
-          <div className="py-12 flex flex-col items-center justify-center text-center gap-4 animate-in fade-in">
-            <div className="w-16 h-16 rounded-full bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center shadow-md">
-              <span className="material-symbols-outlined text-[36px]">rocket_launch</span>
+          <div className="py-8 flex flex-col items-center justify-center text-center gap-4 animate-in fade-in max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center shadow-md">
+              <span className="material-symbols-outlined text-[36px]">
+                {isEditMode ? "check_circle" : "rocket_launch"}
+              </span>
             </div>
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface">
-              Question Published!
+              {isEditMode ? "Question Updated!" : "Question Published!"}
             </h2>
-            <p className="font-body-md text-body-md text-secondary max-w-xs">
-              Your question is now live in the community practice feed for SSC CGL aspirants.
+            <p className="font-body-md text-body-md text-secondary">
+              {isEditMode
+                ? "Your question revisions and bilingual solutions have been saved."
+                : "Your question is now live in the community feed for competitive aspirants."}
             </p>
-            <div className="flex items-center gap-3 mt-4">
-              <button
-                onClick={() => {
-                  setPublishSuccess(false);
-                  setQuestionText("");
-                  setOptions(["", "", "", ""]);
-                  setExplanation("");
-                  setDuplicateResult(null);
-                }}
-                className="px-4 py-2.5 rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors"
-              >
-                Add Another
-              </button>
+
+            {/* Direct WhatsApp Challenge Sharing Card */}
+            <div className="w-full bg-[#25D366]/10 border border-[#25D366]/30 rounded-2xl p-4 flex flex-col gap-3 my-2 text-left">
+              <div className="flex items-center gap-2 text-[#25D366] font-bold text-sm">
+                <span className="material-symbols-outlined text-[20px]">share</span>
+                <span>Challenge Aspirants on WhatsApp</span>
+              </div>
+              <p className="text-xs text-on-surface/80 leading-relaxed">
+                Post this formatted challenge directly to your Telegram or WhatsApp study groups to test your peers!
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleShareToWhatsApp}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-[#25D366] text-white font-bold text-xs shadow-sm hover:bg-[#20ba59] active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">chat</span>
+                  <span>Share to WhatsApp</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyChallenge}
+                  className="py-2.5 px-3 rounded-xl bg-surface-container font-semibold text-xs hover:bg-surface-container-high transition-colors text-on-surface flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                  <span>{shareCopied ? "Copied!" : "Copy Text"}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-2 w-full">
+              {!isEditMode && (
+                <button
+                  onClick={() => {
+                    setPublishSuccess(false);
+                    setPublishedQuestion(null);
+                    setQuestionText("");
+                    setHindiQuestionText("");
+                    setOptions(["", "", "", ""]);
+                    setHindiOptions(["", "", "", ""]);
+                    setExplanation("");
+                    setHindiExplanation("");
+                    setSyllabusTag("");
+                    setPyqInfo("");
+                    setDuplicateResult(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors"
+                >
+                  Add Another
+                </button>
+              )}
               <button
                 onClick={() => router.push("/")}
-                className="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm hover:bg-primary-container transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm hover:bg-primary-container transition-colors"
               >
                 Go to Feed
               </button>
@@ -183,6 +541,71 @@ export const CreateQuestionView: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
+            {/* Draft Restore Notification Banner */}
+            {hasRestorableDraft && !isEditMode && (
+              <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-on-surface flex items-center justify-between gap-2 animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[20px] shrink-0">
+                    history_edu
+                  </span>
+                  <div className="text-xs min-w-0">
+                    <span className="font-bold">Unfinished draft restored</span>
+                    <span className="text-secondary block text-[11px] truncate">
+                      Last autosaved at {draftSavedAt}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleRestoreDraft}
+                    className="px-2.5 py-1 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 transition-colors"
+                  >
+                    Load Draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDiscardDraft}
+                    className="p-1 rounded-lg text-secondary hover:text-error transition-colors"
+                    title="Discard draft"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Header info bar with Save Draft Button */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h1 className="font-headline-sm text-headline-sm font-bold text-on-surface">
+                  {isEditMode ? "Edit Question" : "Author New Question"}
+                </h1>
+                {isEditMode && (
+                  <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-primary text-[10px] font-bold">
+                    ID: {editId}
+                  </span>
+                )}
+              </div>
+              {!isEditMode && (
+                <div className="flex items-center gap-1.5 text-xs text-secondary">
+                  {draftSavedAt && (
+                    <span className="text-[11px] text-tertiary font-medium hidden sm:inline">
+                      Autosaved {draftSavedAt}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={saveDraft}
+                    className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs flex items-center gap-1 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">save</span>
+                    <span>Save Draft</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Editor vs Reel Preview Mode Tabs */}
             <div className="flex items-center justify-between bg-surface-container rounded-xl p-1">
               <button
@@ -218,14 +641,16 @@ export const CreateQuestionView: React.FC = () => {
                   {calculateQualityScore()}%
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-on-surface">Reel Engagement Score</div>
+                  <div className="text-xs font-bold text-on-surface">Question Quality Index</div>
                   <div className="text-[10px] text-secondary">
-                    {calculateQualityScore() >= 80 ? "🔥 High-yield feed quality" : "Add proof trick for max reach"}
+                    {calculateQualityScore() >= 80
+                      ? "🔥 High-yield bilingual feed quality"
+                      : "Add Hindi translation or PYQ tag for max reach"}
                   </div>
                 </div>
               </div>
               <span className="text-[11px] font-bold text-primary px-2 py-0.5 rounded-full bg-primary-fixed/50">
-                Trending Ready
+                Exam Ready
               </span>
             </div>
 
@@ -233,42 +658,98 @@ export const CreateQuestionView: React.FC = () => {
               /* Live Reel Preview Card */
               <div className="p-4 rounded-2xl bg-surface-container-lowest border border-surface-container-high/60 shadow-md flex flex-col gap-3 relative">
                 <div className="flex items-center justify-between pb-2 border-b border-surface-container-high/40">
-                  <span className="px-2.5 py-0.5 rounded-full bg-primary-fixed text-primary text-xs font-bold uppercase">
-                    {SUBJECTS.find((s) => s.id === selectedSubjectId)?.name || "Subject"} · {targetTopic}
-                  </span>
-                  <span className="text-xs text-secondary font-mono">Reel Preview</span>
-                </div>
-                <h3 className="text-base font-bold text-on-surface leading-snug">
-                  {questionText.trim() || "Type your question statement in the editor to preview..."}
-                </h3>
-                <div className="flex flex-col gap-2 my-1">
-                  {(["A", "B", "C", "D"] as const).map((letter, idx) => (
-                    <div
-                      key={letter}
-                      className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-medium ${
-                        correctOptionId === letter
-                          ? "bg-emerald-500/20 border-emerald-600 text-emerald-950 dark:text-emerald-100 font-bold"
-                          : "bg-surface-container-low border-surface-container-high/40 text-on-surface"
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full bg-primary-fixed text-primary text-xs font-bold uppercase">
+                      {(EXAM_SUBJECTS_MAP[selectedExamId] || EXAM_SUBJECTS_MAP["exam-ssc-cgl"]).find((s) => s.id === selectedSubjectId)?.name || "Subject"} · {targetTopic}
+                    </span>
+                    {syllabusTag && (
+                      <span className="px-2 py-0.5 rounded-full bg-surface-container text-secondary text-[10px] font-bold">
+                        {syllabusTag}
+                      </span>
+                    )}
+                    {pyqInfo && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-200 text-[10px] font-bold">
+                        {pyqInfo}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Toggle Preview English vs Hindi */}
+                  <div className="flex items-center rounded-lg bg-surface-container p-0.5 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewLanguage("en")}
+                      className={`px-2 py-0.5 rounded-md ${
+                        previewLanguage === "en" ? "bg-primary text-on-primary" : "text-secondary"
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                          correctOptionId === letter ? "bg-emerald-600 text-white" : "bg-surface-container text-secondary"
-                        }`}>
-                          {letter}
-                        </span>
-                        <span>{options[idx] || `Option ${letter}`}</span>
-                      </div>
-                      {correctOptionId === letter && <span className="text-emerald-600 font-bold">✓ Correct</span>}
-                    </div>
-                  ))}
+                      EN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewLanguage("hi")}
+                      className={`px-2 py-0.5 rounded-md ${
+                        previewLanguage === "hi" ? "bg-primary text-on-primary" : "text-secondary"
+                      }`}
+                    >
+                      हिन्दी
+                    </button>
+                  </div>
                 </div>
-                {explanation.trim() && (
+
+                <h3 className="text-base font-bold text-on-surface leading-snug">
+                  {previewLanguage === "hi" && hindiQuestionText.trim()
+                    ? hindiQuestionText
+                    : (questionText.trim() || "Type your question statement in the editor to preview...")}
+                </h3>
+
+                <div className="flex flex-col gap-2 my-1">
+                  {(["A", "B", "C", "D"] as const).map((letter, idx) => {
+                    const optText =
+                      previewLanguage === "hi" && hindiOptions[idx]?.trim()
+                        ? hindiOptions[idx]
+                        : options[idx];
+
+                    return (
+                      <div
+                        key={letter}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-medium ${
+                          correctOptionId === letter
+                            ? "bg-emerald-500/20 border-emerald-600 text-emerald-950 dark:text-emerald-100 font-bold"
+                            : "bg-surface-container-low border-surface-container-high/40 text-on-surface"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                              correctOptionId === letter
+                                ? "bg-emerald-600 text-white"
+                                : "bg-surface-container text-secondary"
+                            }`}
+                          >
+                            {letter}
+                          </span>
+                          <span>{optText || `Option ${letter}`}</span>
+                        </div>
+                        {correctOptionId === letter && (
+                          <span className="text-emerald-600 font-bold">
+                            ✓ Correct (+{getExamScoringRule(selectedExamId).marksPerCorrect.toFixed(2)})
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {((previewLanguage === "hi" && hindiExplanation.trim()) || explanation.trim()) && (
                   <div className="p-2.5 rounded-xl bg-surface-container-low text-xs text-on-surface border border-surface-container-high/40">
                     <strong className="text-primary font-bold">Quick Proof: </strong>
-                    {explanation}
+                    {previewLanguage === "hi" && hindiExplanation.trim()
+                      ? hindiExplanation
+                      : explanation}
                   </div>
                 )}
+
                 <div className="pt-2 flex justify-end">
                   <button
                     onClick={() => setActiveTab("edit")}
@@ -280,6 +761,38 @@ export const CreateQuestionView: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handlePublish} className="flex flex-col gap-4">
+                {/* Target Examination Selector */}
+                <section>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
+                      Target Examination
+                    </span>
+                    <span className="font-label-sm text-label-sm text-primary flex items-center gap-1 font-bold">
+                      <span className="material-symbols-outlined text-[14px]">school</span>
+                      Multi-Exam Mode
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                    {EXAMS_LIST.map((exam) => {
+                      const isSelected = selectedExamId === exam.id;
+                      return (
+                        <button
+                          key={exam.id}
+                          type="button"
+                          onClick={() => handleExamChange(exam.id)}
+                          className={`px-3 py-1.5 rounded-full font-label-md text-label-md transition-all shrink-0 ${
+                            isSelected
+                              ? "bg-primary text-on-primary shadow-sm font-bold scale-[1.02]"
+                              : "bg-surface-container text-secondary hover:text-on-surface"
+                          }`}
+                        >
+                          {exam.shortName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
                 {/* Subject Selector Filter Row */}
                 <section>
                   <div className="flex items-center justify-between mb-2">
@@ -292,7 +805,7 @@ export const CreateQuestionView: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-                    {SUBJECTS.map((s) => {
+                    {(EXAM_SUBJECTS_MAP[selectedExamId] || EXAM_SUBJECTS_MAP["exam-ssc-cgl"]).map((s) => {
                       const isSelected = selectedSubjectId === s.id;
                       return (
                         <button
@@ -313,265 +826,357 @@ export const CreateQuestionView: React.FC = () => {
                   </div>
                 </section>
 
-                {/* Subtopic Targeting */}
-                <section className="bg-surface-container-low rounded-xl p-3 border border-surface-container-high/40">
-                  <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1.5">
-                    Topic / Subtopic Target
-                  </label>
-                  <select
-                    value={targetTopic}
-                    onChange={(e) => setTargetTopic(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-semibold focus:outline-none focus:border-primary"
-                  >
-                    <option value="Arithmetic & Profit">Arithmetic & Profit & Loss</option>
-                    <option value="Geometry & Trigonometry">Geometry & Trigonometry</option>
-                    <option value="Syllogisms & Logic">Syllogisms & Analytical Logic</option>
-                    <option value="Grammar & Spotting Errors">Grammar & Spotting Errors</option>
-                    <option value="Vocabulary & Idioms">Vocabulary & Idioms</option>
-                    <option value="Indian Polity & History">Indian Polity & Modern History</option>
-                    <option value="Current Affairs & Science">Current Affairs & Science</option>
-                  </select>
+                {/* Subtopic, Syllabus Tag & PYQ Metadata Row */}
+                <section className="bg-surface-container-low rounded-xl p-3 border border-surface-container-high/40 flex flex-col gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
+                        Syllabus Tag
+                      </label>
+                      <input
+                        type="text"
+                        value={syllabusTag}
+                        onChange={(e) => setSyllabusTag(e.target.value)}
+                        placeholder="e.g. Indian Polity · Article 14-32"
+                        className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
+                        PYQ Exam & Year Info
+                      </label>
+                      <input
+                        type="text"
+                        value={pyqInfo}
+                        onChange={(e) => setPyqInfo(e.target.value)}
+                        placeholder="e.g. SSC CGL 2023 Tier 1, RRB NTPC 2021"
+                        className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
+                      Topic / Subtopic Target
+                    </label>
+                    <select
+                      value={targetTopic}
+                      onChange={(e) => setTargetTopic(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-semibold focus:outline-none focus:border-primary"
+                    >
+                      <option value="Arithmetic & Profit">Arithmetic & Profit & Loss</option>
+                      <option value="Geometry & Trigonometry">Geometry & Trigonometry</option>
+                      <option value="Syllogisms & Logic">Syllogisms & Analytical Logic</option>
+                      <option value="Grammar & Spotting Errors">Grammar & Spotting Errors</option>
+                      <option value="Vocabulary & Idioms">Vocabulary & Idioms</option>
+                      <option value="Indian Polity & History">Indian Polity & Modern History</option>
+                      <option value="Current Affairs & Science">Current Affairs & Science</option>
+                      <option value="Banking Reasoning & Puzzles">Banking Reasoning & Puzzles</option>
+                      <option value="Data Interpretation">Data Interpretation & Charts</option>
+                    </select>
+                  </div>
                 </section>
 
-            {/* Language & Difficulty Row */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setLanguage("en")}
-                  className={`px-2.5 py-1 rounded-lg text-label-sm font-semibold transition-all ${
-                    language === "en" ? "bg-surface-container-lowest text-primary shadow-xs" : "text-secondary"
-                  }`}
-                >
-                  English
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLanguage("hi")}
-                  className={`px-2.5 py-1 rounded-lg text-label-sm font-semibold transition-all ${
-                    language === "hi" ? "bg-surface-container-lowest text-primary shadow-xs" : "text-secondary"
-                  }`}
-                >
-                  हिंदी
-                </button>
-              </div>
-
-              <select
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
-                className="px-2.5 py-1 rounded-xl bg-surface-container-low border border-surface-container-high text-label-sm font-medium text-on-surface focus:outline-none"
-              >
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
-
-            {/* Question Input Card */}
-            <section className="bg-surface-container-low rounded-xl p-3.5 border border-surface-container-high/40 shadow-xs">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold">
-                  <span className="material-symbols-outlined text-[16px]">help</span>
-                  <span>Question Statement</span>
-                </label>
-                <span className="font-label-sm text-label-sm text-secondary">
-                  {questionText.length} / 300
-                </span>
-              </div>
-              <textarea
-                value={questionText}
-                onChange={(e) => setQuestionText(e.target.value)}
-                placeholder="Type question statement in English or हिंदी..."
-                rows={3}
-                maxLength={300}
-                className="w-full bg-transparent font-headline-sm text-headline-sm text-on-surface focus:outline-none resize-none leading-snug placeholder:text-secondary/50"
-              />
-              <div className="flex items-center justify-end gap-2 pt-1 border-t border-surface-container-high/30 text-secondary">
-                <button
-                  type="button"
-                  onClick={() => setQuestionText((prev) => prev + "² ")}
-                  className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
-                  title="Superscript"
-                >
-                  x²
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQuestionText((prev) => prev + "√ ")}
-                  className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
-                  title="Square root"
-                >
-                  √
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQuestionText((prev) => prev + "₹ ")}
-                  className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
-                  title="Rupee symbol"
-                >
-                  ₹
-                </button>
-              </div>
-            </section>
-
-            {/* Real-Time Duplicate Warning Banner */}
-            {duplicateResult?.is_similar && (
-              <div
-                className={`rounded-xl p-3 flex items-start justify-between gap-3 shadow-xs border ${
-                  duplicateResult.is_exact_duplicate
-                    ? "bg-error-container/40 border-error text-error"
-                    : "bg-primary-fixed/40 border-primary/20 text-on-surface"
-                }`}
-              >
-                <div className="flex items-start gap-2 flex-1 min-w-0">
-                  <span
-                    className={`material-symbols-outlined text-[20px] shrink-0 mt-0.5 ${
-                      duplicateResult.is_exact_duplicate ? "text-error" : "text-primary"
-                    }`}
-                  >
-                    warning
-                  </span>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-label-md text-label-md font-bold leading-tight">
-                      {duplicateResult.is_exact_duplicate
-                        ? "Exact Duplicate Detected"
-                        : "Similar Question Exists"}
-                    </span>
-                    <span className="font-body-sm text-body-sm line-clamp-1 opacity-90 mt-0.5">
-                      {duplicateResult.matched_question?.question_text}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowDuplicateModal(true)}
-                  className="px-3 py-1 rounded-lg bg-surface-container-lowest text-primary font-label-sm text-label-sm font-bold shadow-xs hover:bg-surface transition-colors shrink-0"
-                >
-                  View
-                </button>
-              </div>
-            )}
-
-            {/* Answer Choices Stack */}
-            <section>
-              <div className="flex items-center justify-between mb-1.5 px-0.5">
-                <span className="font-label-md text-label-md text-secondary font-semibold">
-                  Answer Choices
-                </span>
-                <span className="font-label-sm text-label-sm text-tertiary font-bold flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                  Option {correctOptionId} marked correct
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                {(["A", "B", "C", "D"] as const).map((letter, idx) => {
-                  const isCorrect = correctOptionId === letter;
-                  return (
-                    <div
-                      key={letter}
-                      onClick={() => setCorrectOptionId(letter)}
-                      className={`group cursor-pointer rounded-xl p-3 flex items-center justify-between transition-all border ${
-                        isCorrect
-                          ? "bg-tertiary-container/15 border-tertiary text-on-surface shadow-xs"
-                          : "bg-surface-container-low border-surface-container-high/40 text-on-surface hover:bg-surface-container"
+                {/* Primary Language & Difficulty */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setLanguage("en")}
+                      className={`px-2.5 py-1 rounded-lg text-label-sm font-semibold transition-all ${
+                        language === "en"
+                          ? "bg-surface-container-lowest text-primary shadow-xs"
+                          : "text-secondary"
                       }`}
                     >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div
-                          className={`w-7 h-7 rounded-full font-label-md text-label-md flex items-center justify-center shrink-0 font-bold transition-colors ${
-                            isCorrect
-                              ? "bg-tertiary text-on-tertiary shadow-xs"
-                              : "bg-surface-container-highest text-secondary"
-                          }`}
-                        >
-                          {letter}
-                        </div>
-                        <input
-                          type="text"
-                          value={options[idx]}
-                          onChange={(e) => handleOptionChange(idx, e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder={`Enter option ${letter}...`}
-                          className="bg-transparent font-body-lg text-body-lg text-on-surface focus:outline-none w-full"
-                        />
-                      </div>
+                      English Primary
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLanguage("hi")}
+                      className={`px-2.5 py-1 rounded-lg text-label-sm font-semibold transition-all ${
+                        language === "hi"
+                          ? "bg-surface-container-lowest text-primary shadow-xs"
+                          : "text-secondary"
+                      }`}
+                    >
+                      हिंदी Primary
+                    </button>
+                  </div>
 
-                      <div className="flex items-center pl-2 shrink-0">
-                        {isCorrect ? (
-                          <span className="flex items-center gap-1 text-tertiary font-label-sm text-label-sm font-bold">
-                            <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                            <span>Correct</span>
-                          </span>
-                        ) : (
-                          <span className="material-symbols-outlined text-[18px] text-secondary opacity-50 group-hover:opacity-100 transition-opacity">
-                            radio_button_unchecked
-                          </span>
-                        )}
+                  <select
+                    value={difficulty}
+                    onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
+                    className="px-2.5 py-1 rounded-xl bg-surface-container-low border border-surface-container-high text-label-sm font-medium text-on-surface focus:outline-none"
+                  >
+                    <option value="easy">Easy (-0.50 penalty)</option>
+                    <option value="medium">Medium (-0.50 penalty)</option>
+                    <option value="hard">Hard (-0.50 penalty)</option>
+                  </select>
+                </div>
+
+                {/* Question Input Card (English) */}
+                <section className="bg-surface-container-low rounded-xl p-3.5 border border-surface-container-high/40 shadow-xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold">
+                      <span className="material-symbols-outlined text-[16px]">help</span>
+                      <span>Question Statement (English)</span>
+                    </label>
+                    <span className="font-label-sm text-label-sm text-secondary">
+                      {questionText.length} / 400
+                    </span>
+                  </div>
+                  <textarea
+                    value={questionText}
+                    onChange={(e) => setQuestionText(e.target.value)}
+                    placeholder="Type question statement in English..."
+                    rows={3}
+                    maxLength={400}
+                    className="w-full bg-transparent font-headline-sm text-headline-sm text-on-surface focus:outline-none resize-none leading-snug placeholder:text-secondary/50"
+                  />
+                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-surface-container-high/30 text-secondary">
+                    <button
+                      type="button"
+                      onClick={() => setQuestionText((prev) => prev + "² ")}
+                      className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
+                      title="Superscript"
+                    >
+                      x²
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuestionText((prev) => prev + "√ ")}
+                      className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
+                      title="Square root"
+                    >
+                      √
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuestionText((prev) => prev + "₹ ")}
+                      className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
+                      title="Rupee symbol"
+                    >
+                      ₹
+                    </button>
+                  </div>
+                </section>
+
+                {/* Bilingual Hindi Question Card (Optional) */}
+                <section className="bg-surface-container-low rounded-xl p-3.5 border border-surface-container-high/40 shadow-xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold">
+                      <span className="material-symbols-outlined text-[16px] text-primary">translate</span>
+                      <span>Hindi Question Statement (हिन्दी अनुवाद - Optional)</span>
+                    </label>
+                    <span className="font-label-sm text-label-sm text-secondary">
+                      {hindiQuestionText.length} / 400
+                    </span>
+                  </div>
+                  <textarea
+                    value={hindiQuestionText}
+                    onChange={(e) => setHindiQuestionText(e.target.value)}
+                    placeholder="प्रश्न का हिन्दी अनुवाद यहाँ लिखें..."
+                    rows={2}
+                    maxLength={400}
+                    className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none leading-snug placeholder:text-secondary/50"
+                  />
+                </section>
+
+                {/* Real-Time Duplicate Warning Banner */}
+                {duplicateResult?.is_similar && !isEditMode && (
+                  <div
+                    className={`rounded-xl p-3 flex items-start justify-between gap-3 shadow-xs border ${
+                      duplicateResult.is_exact_duplicate
+                        ? "bg-error-container/40 border-error text-error"
+                        : "bg-primary-fixed/40 border-primary/20 text-on-surface"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      <span
+                        className={`material-symbols-outlined text-[20px] shrink-0 mt-0.5 ${
+                          duplicateResult.is_exact_duplicate ? "text-error" : "text-primary"
+                        }`}
+                      >
+                        warning
+                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-label-md text-label-md font-bold leading-tight">
+                          {duplicateResult.is_exact_duplicate
+                            ? "Exact Duplicate Detected"
+                            : "Similar Question Exists"}
+                        </span>
+                        <span className="font-body-sm text-body-sm line-clamp-1 opacity-90 mt-0.5">
+                          {duplicateResult.matched_question?.question_text}
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowDuplicateModal(true)}
+                      className="px-3 py-1 rounded-lg bg-surface-container-lowest text-primary font-label-sm text-label-sm font-bold shadow-xs hover:bg-surface transition-colors shrink-0"
+                    >
+                      View
+                    </button>
+                  </div>
+                )}
 
-              <p className="font-body-sm text-body-sm text-secondary mt-1.5 px-1 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[15px] text-primary">touch_app</span>
-                <span>Tap any option row to mark it as the correct answer.</span>
-              </p>
-            </section>
+                {/* Answer Choices Stack */}
+                <section>
+                  <div className="flex items-center justify-between mb-1.5 px-0.5">
+                    <span className="font-label-md text-label-md text-secondary font-semibold">
+                      Answer Choices & Hindi Options
+                    </span>
+                    <span className="font-label-sm text-label-sm text-tertiary font-bold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                      Option {correctOptionId} marked correct
+                    </span>
+                  </div>
 
-            {/* Explanation Field (Optional) */}
-            <section className="bg-surface-container-low rounded-xl p-3 border border-surface-container-high/40">
-              <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold mb-1">
-                <span className="material-symbols-outlined text-[16px] text-primary">lightbulb</span>
-                <span>Quick Explanation / Proof (Optional)</span>
-              </label>
-              <textarea
-                value={explanation}
-                onChange={(e) => setExplanation(e.target.value)}
-                placeholder="Include key formula, shortcut, or reason for students..."
-                rows={2}
-                className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none"
-              />
-            </section>
+                  <div className="flex flex-col gap-2.5">
+                    {(["A", "B", "C", "D"] as const).map((letter, idx) => {
+                      const isCorrect = correctOptionId === letter;
+                      return (
+                        <div
+                          key={letter}
+                          onClick={() => setCorrectOptionId(letter)}
+                          className={`group cursor-pointer rounded-xl p-3 flex flex-col gap-2 transition-all border ${
+                            isCorrect
+                              ? "bg-tertiary-container/15 border-tertiary text-on-surface shadow-xs"
+                              : "bg-surface-container-low border-surface-container-high/40 text-on-surface hover:bg-surface-container"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div
+                                className={`w-7 h-7 rounded-full font-label-md text-label-md flex items-center justify-center shrink-0 font-bold transition-colors ${
+                                  isCorrect
+                                    ? "bg-tertiary text-on-tertiary shadow-xs"
+                                    : "bg-surface-container-highest text-secondary"
+                                }`}
+                              >
+                                {letter}
+                              </div>
+                              <input
+                                type="text"
+                                value={options[idx]}
+                                onChange={(e) => handleOptionChange(idx, e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder={`Option ${letter} (English)...`}
+                                className="bg-transparent font-body-md text-body-md text-on-surface focus:outline-none w-full"
+                              />
+                            </div>
 
-            {/* Error Message Banner */}
-            {errorMsg && (
-              <div className="p-3 rounded-xl bg-error-container text-on-error-container text-label-md font-semibold flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">error</span>
-                <span>{errorMsg}</span>
-              </div>
+                            <div className="flex items-center pl-2 shrink-0">
+                              {isCorrect ? (
+                                <span className="flex items-center gap-1 text-tertiary font-label-sm text-label-sm font-bold">
+                                  <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                                  <span>Correct</span>
+                                </span>
+                              ) : (
+                                <span className="material-symbols-outlined text-[18px] text-secondary opacity-50 group-hover:opacity-100 transition-opacity">
+                                  radio_button_unchecked
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Optional Hindi Option input */}
+                          <div className="pl-10">
+                            <input
+                              type="text"
+                              value={hindiOptions[idx]}
+                              onChange={(e) => handleHindiOptionChange(idx, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder={`Option ${letter} Hindi (हिन्दी अनुवाद - Optional)...`}
+                              className="bg-transparent text-xs text-secondary placeholder:text-secondary/40 focus:outline-none w-full border-t border-surface-container-high/30 pt-1"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p className="font-body-sm text-body-sm text-secondary mt-1.5 px-1 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px] text-primary">touch_app</span>
+                    <span>Tap any option row to mark it as the correct answer.</span>
+                  </p>
+                </section>
+
+                {/* Explanation Fields (English & Hindi) */}
+                <section className="bg-surface-container-low rounded-xl p-3 border border-surface-container-high/40 flex flex-col gap-2.5">
+                  <div>
+                    <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold mb-1">
+                      <span className="material-symbols-outlined text-[16px] text-primary">lightbulb</span>
+                      <span>Quick Explanation / Solution Proof (English - Optional)</span>
+                    </label>
+                    <textarea
+                      value={explanation}
+                      onChange={(e) => setExplanation(e.target.value)}
+                      placeholder="Include key formula, shortcut, or reason for students..."
+                      rows={2}
+                      className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold mb-1">
+                      <span className="material-symbols-outlined text-[16px] text-primary">translate</span>
+                      <span>Hindi Explanation (हिन्दी व्याख्या - Optional)</span>
+                    </label>
+                    <textarea
+                      value={hindiExplanation}
+                      onChange={(e) => setHindiExplanation(e.target.value)}
+                      placeholder="हिन्दी में स्पष्टीकरण या शॉर्ट ट्रिक..."
+                      rows={2}
+                      className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none"
+                    />
+                  </div>
+                </section>
+
+                {/* Error Message Banner */}
+                {errorMsg && (
+                  <div className="p-3 rounded-xl bg-error-container text-on-error-container text-label-md font-semibold flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px]">error</span>
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                {/* Publish / Update Button */}
+                <section className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || (!isEditMode && duplicateResult?.is_exact_duplicate)}
+                    className={`w-full h-14 rounded-2xl font-label-lg text-label-lg shadow-md transition-all flex items-center justify-center gap-2 ${
+                      !isEditMode && duplicateResult?.is_exact_duplicate
+                        ? "bg-surface-container text-secondary cursor-not-allowed"
+                        : "bg-primary-container text-on-primary hover:bg-primary active:scale-98"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[22px]">
+                      {isEditMode ? "save" : "rocket_launch"}
+                    </span>
+                    <span>
+                      {isSubmitting
+                        ? isEditMode
+                          ? "Updating..."
+                          : "Publishing..."
+                        : isCheckingDuplicate
+                        ? "Checking Duplicates..."
+                        : isEditMode
+                        ? "Update Question"
+                        : "Publish Question"}
+                    </span>
+                  </button>
+                  <p className="text-center font-label-sm text-label-sm text-secondary mt-2">
+                    Subject to community peer review and quality verification
+                  </p>
+                </section>
+              </form>
             )}
-
-            {/* Publish Button */}
-            <section className="pt-2">
-              <button
-                type="submit"
-                disabled={isSubmitting || duplicateResult?.is_exact_duplicate}
-                className={`w-full h-14 rounded-2xl font-label-lg text-label-lg shadow-md transition-all flex items-center justify-center gap-2 ${
-                  duplicateResult?.is_exact_duplicate
-                    ? "bg-surface-container text-secondary cursor-not-allowed"
-                    : "bg-primary-container text-on-primary hover:bg-primary active:scale-98"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[22px]">rocket_launch</span>
-                <span>
-                  {isSubmitting
-                    ? "Publishing..."
-                    : isCheckingDuplicate
-                    ? "Checking Duplicates..."
-                    : "Publish Question"}
-                </span>
-              </button>
-              <p className="text-center font-label-sm text-label-sm text-secondary mt-2">
-                Subject to peer verification before live mock tests
-              </p>
-            </section>
-          </form>
+          </div>
         )}
       </div>
-    )}
-  </div>
 
       {/* Duplicate Details Modal */}
       {showDuplicateModal && duplicateResult?.matched_question && (
