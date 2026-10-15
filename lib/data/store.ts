@@ -472,6 +472,43 @@ class DataStore {
     return profile || this.getCurrentUser();
   }
 
+  public syncUserFromAuth(data: {
+    id: string;
+    display_name: string;
+    username: string;
+    target_exam?: string;
+    preferred_examination_id?: string;
+    avatar_url?: string | null;
+  }): UserProfile {
+    let existing = this.profiles.find((p) => p.id === data.id);
+    if (!existing) {
+      existing = {
+        id: data.id,
+        display_name: data.display_name,
+        username: data.username,
+        target_exam: data.target_exam || "Railways (RRB NTPC & Group D)",
+        preferred_examination_id: data.preferred_examination_id || "exam-railway-ntpc",
+        avatar_url: data.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
+        role: "student",
+        current_streak: 0,
+        daily_goal: 10,
+        today_solved_count: 0,
+        total_questions_answered: 0,
+        overall_accuracy: 0,
+        created_at: new Date().toISOString(),
+      };
+      this.profiles.push(existing);
+    } else {
+      if (data.display_name) existing.display_name = data.display_name;
+      if (data.username) existing.username = data.username;
+      if (data.target_exam) existing.target_exam = data.target_exam;
+      if (data.preferred_examination_id) existing.preferred_examination_id = data.preferred_examination_id;
+      if (data.avatar_url) existing.avatar_url = data.avatar_url;
+    }
+    this.currentUserId = data.id;
+    return existing;
+  }
+
   // --- Examinations & Subjects ---
   public getExaminations(): Examination[] {
     return this.examinations;
