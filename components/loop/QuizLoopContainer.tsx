@@ -84,6 +84,24 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         }
       })
       .catch(() => {});
+
+    // Deep link directly to a shared quiz question: /loop?q=...
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const qParam = params.get("q") || params.get("questionId");
+      if (qParam) {
+        fetch(`/api/questions/${qParam}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success && data.question) {
+              setQuestions([data.question]);
+              setCurrentIndex(0);
+              setIsStarted(true);
+            }
+          })
+          .catch(() => {});
+      }
+    }
   }, []);
 
   // Fetch Questions for the chosen subject flow
@@ -686,6 +704,18 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           const targetIdx = questions.findIndex((q) => q.id === qId);
           if (targetIdx !== -1) {
             setCurrentIndex(targetIdx);
+            setIsStarted(true);
+          } else {
+            fetch(`/api/questions/${qId}`)
+              .then((res) => res.json())
+              .then((data) => {
+                if (data.success && data.question) {
+                  setQuestions((prev) => [data.question, ...prev]);
+                  setCurrentIndex(0);
+                  setIsStarted(true);
+                }
+              })
+              .catch(() => {});
           }
         }}
       />

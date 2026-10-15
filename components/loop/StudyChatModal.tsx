@@ -81,12 +81,17 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
                 </div>
               )}
             </div>
-            <div>
+            <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
-                <h3 className="font-bold text-on-surface text-sm">{friend.display_name}</h3>
+                <h3 className="font-bold text-on-surface text-sm truncate">{friend.display_name}</h3>
+                {friend.username && (
+                  <span className="text-[11px] font-bold text-primary">@{friend.username}</span>
+                )}
                 <span className="text-[10px] text-tertiary font-bold">🔥 {friend.streak_days}d</span>
               </div>
-              <p className="text-[10px] text-secondary">{friend.last_active || "Study Partner"}</p>
+              <p className="text-[10px] text-secondary truncate">
+                {friend.target_exam || friend.last_active || "Study Partner"}
+              </p>
             </div>
           </div>
           <button

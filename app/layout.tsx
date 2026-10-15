@@ -1,10 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { UsernameOnboardingModal } from "@/components/auth/UsernameOnboardingModal";
 
 export const metadata: Metadata = {
   title: "Qz Loop — Scroll. Solve. Improve. Repeat.",
   description: "A mobile-first, infinite-scroll competitive quiz app for Indian students preparing for competitive exams like SSC CGL.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/logo.jpg",
+    shortcut: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -29,6 +35,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="icon" href="/logo.jpg" type="image/jpeg" />
+        <link rel="apple-touch-icon" href="/logo.jpg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -39,6 +47,7 @@ export default function RootLayout({
       <body className="bg-surface font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between items-center selection:bg-primary-fixed selection:text-primary">
         <div className="w-full max-w-[480px] min-h-screen bg-surface-container-lowest flex flex-col relative shadow-[0_0_24px_rgba(0,0,0,0.06)] md:border-x md:border-surface-container-high/60">
           {children}
+          <UsernameOnboardingModal />
         </div>
       </body>
     </html>

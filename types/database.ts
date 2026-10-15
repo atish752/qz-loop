@@ -77,6 +77,8 @@ export interface QuestionReport {
 export interface UserProfile {
   id: string;
   display_name: string;
+  username: string; // Unique Instagram-style username (e.g., rahul_cgl)
+  target_exam?: string; // Target examination (e.g., SSC CGL)
   avatar_url?: string;
   preferred_examination_id?: string;
   role: 'student' | 'admin' | 'moderator';
@@ -117,6 +119,7 @@ export interface LeaderboardEntry {
   rank: number;
   user_id: string;
   display_name: string;
+  username?: string;
   avatar_url?: string;
   total_attempts: number;
   correct_count: number;
@@ -165,6 +168,7 @@ export interface QuestionCollection {
 export interface FriendUser {
   id: string;
   display_name: string;
+  username: string; // Unique username (e.g. amit_ssc)
   avatar_url?: string;
   streak_days: number;
   target_exam: string;

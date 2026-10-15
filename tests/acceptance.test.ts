@@ -311,8 +311,116 @@ async function runTests() {
   const updatedHabit = db.updateDailyGoal("user-current", 35);
   assert(updatedHabit.daily_goal === 35, "Daily practice goal updated successfully to 35");
 
+  // Scenario 25: User Profile & Unique Instagram-style Username Enforcement
+  console.log("\n[Scenario 25] User Profile & Unique Instagram-style Username Enforcement");
+  const currProfile = db.getCurrentUser();
+  assert(Boolean(currProfile.display_name), "Profile carries display name");
+  assert(Boolean(currProfile.username), "Profile carries unique username");
+  assert(Boolean(currProfile.target_exam || currProfile.preferred_examination_id), "Profile carries target examination");
+
+  // Verify username uniqueness check
+  assert(db.isUsernameAvailable("amit_ssc", "user-current") === false, "Taken username 'amit_ssc' correctly detected as unavailable");
+  assert(db.isUsernameAvailable("AMIT_SSC", "user-current") === false, "Case-insensitive uppercase handle correctly detected as unavailable");
+  assert(db.isUsernameAvailable("super_unique_aspirant_99", "user-current") === true, "New unique username correctly detected as available");
+  assert(db.isUsernameAvailable("a!", "user-current") === false, "Invalid username with symbols correctly rejected");
+  assert(db.isUsernameAvailable(".bad_dot", "user-current") === false, "Leading dot in username rejected");
+  assert(db.isUsernameAvailable("bad_dot.", "user-current") === false, "Trailing dot in username rejected");
+  assert(db.isUsernameAvailable("consecutive..dot", "user-current") === false, "Consecutive dots in username rejected");
+  assert(db.isUsernameAvailable("with space", "user-current") === false, "Space inside username rejected");
+
+  // Verify error is thrown if trying to take someone else's username
+  let duplicateUsernameBlocked = false;
+  try {
+    db.updateProfile({ username: "amit_ssc" });
+  } catch (err: unknown) {
+    duplicateUsernameBlocked = true;
+  }
+  assert(duplicateUsernameBlocked, "Profile update strictly blocks duplicate username collision");
+
+  // Verify valid unique username update succeeds
+  const updatedProfile = db.updateProfile({ username: "rahul_ssc_topper", display_name: "Rahul Topper", target_exam: "SSC CGL" });
+  assert(updatedProfile.username === "rahul_ssc_topper", "Unique username successfully updated");
+  assert(updatedProfile.display_name === "Rahul Topper", "Display name successfully updated");
+  assert(updatedProfile.target_exam === "SSC CGL", "Target examination successfully maintained");
+
+  // Revert username back to rahul_cgl for test purity
+  db.updateProfile({ username: "rahul_cgl", display_name: "Rahul S." });
+
+  // Scenario 26: Social Screen - Search Aspirants by Unique Username & Friend System
+  console.log("\n[Scenario 26] Social Screen - Search Aspirants by Unique Username & Friend System");
+  const searchResults = db.searchUsers("amit_ssc", "user-current");
+  assert(searchResults.length > 0, "Search by unique username returns matching student profile");
+  assert(searchResults[0].username === "amit_ssc", "Returned student profile has exact matching username");
+  assert(Boolean(searchResults[0].target_exam), "Searched user carries target examination");
+
+  // Send friend request by unique handle with '@' prefix
+  const handleFriendReq = db.sendFriendRequest("user-current", "@vikram_p");
+  assert(handleFriendReq.success === true, "Friend request accepted via unique @handle");
+  assert(handleFriendReq.friend?.username === "vikram_p", "Connected friend retains unique username");
+
+  // Verify self-friend requests are strictly blocked
+  const selfFriendReq = db.sendFriendRequest("user-current", "@rahul_cgl");
+  assert(selfFriendReq.success === false, "Self-friend request strictly blocked");
+
+  // Verify request to non-existent handle is blocked
+  const invalidFriendReq = db.sendFriendRequest("user-current", "@nonexistent_ghost_999");
+  assert(invalidFriendReq.success === false, "Friend request to non-existent handle strictly blocked");
+
+  // Scenario 27: Quiz Loop Sharing & Normal Quiz Loop Experience (Answer or Ignore)
+  console.log("\n[Scenario 27] Quiz Loop Sharing & Normal Quiz Loop Experience (Answer or Ignore)");
+  // Share a quiz reel to a friend
+  const sharedReelMsg = db.sendMessage({
+    fromUserId: "user-current",
+    toUserId: "user-amit",
+    text: "Practice this tricky quant question!",
+    questionId: initialFeed[0].id,
+  });
+  assert(sharedReelMsg.question_id === initialFeed[0].id, "Direct message links shared quiz reel ID");
+
+  // Friend fetches the shared question
+  const fetchedSharedQ = db.getQuestionById(sharedReelMsg.question_id!);
+  assert(Boolean(fetchedSharedQ), "Friend successfully opens shared quiz");
+  assert(fetchedSharedQ?.correct_option_id === undefined, "Security rule: correct answer hidden before answering");
+
+  // Option 1: Ignore flow - Friend ignores the shared quiz without submitting
+  const attemptsBeforeIgnore = fetchedSharedQ!.total_attempts;
+  const userAttemptsBefore = db.getAttemptsByUser("user-amit").length;
+  // Ignoring leaves question metrics and user history untouched
+  const questionAfterIgnore = db.getQuestionById(sharedReelMsg.question_id!);
+  assert(questionAfterIgnore!.total_attempts === attemptsBeforeIgnore, "Ignored question does not increment community attempts");
+  assert(db.getAttemptsByUser("user-amit").length === userAttemptsBefore, "Ignored question does not record user attempt");
+
+  // Option 2: Practice flow - friend submits answer -> timer stops, feedback provided, attempts updated
+  const beforeAttempts = questionAfterIgnore!.total_attempts;
+  const friendAttempt = db.submitAttempt({
+    userId: "user-amit",
+    questionId: fetchedSharedQ!.id,
+    selectedOptionId: "B",
+    responseTimeMs: 6400,
+  });
+  assert(typeof friendAttempt.isCorrect === "boolean", "Practice provides instant correctness feedback");
+  assert(Boolean(friendAttempt.explanation), "Practice reveals author proof and explanation");
+  assert(friendAttempt.updatedMetrics.total_attempts === beforeAttempts + 1, "Question community attempts incremented");
+
+  // Scenario 28: Brand Logo and Navigation Hierarchy
+  console.log("\n[Scenario 28] Brand Logo and Navigation Hierarchy");
+  const fs = await import("fs");
+  assert(fs.existsSync("public/logo.jpg"), "Official brand logo image exists in public/logo.jpg");
+  assert(fs.existsSync("public/icon.png"), "Official app icon exists in public/icon.png");
+  assert(fs.existsSync("public/icon.svg"), "Official SVG icon exists in public/icon.svg");
+
+  // Verify icon.png is a genuine PNG binary
+  const pngHeader = fs.readFileSync("public/icon.png").slice(0, 8);
+  const isRealPng = pngHeader.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  assert(isRealPng, "public/icon.png is verified as genuine PNG binary");
+
+  // Verify Leaderboard calculation includes unique usernames and remains available for Profile Ranks entry
+  const lbWeekly = db.getLeaderboard("weekly");
+  assert(lbWeekly.length > 0, "Leaderboard calculations remain available for Profile Ranks entry");
+  assert(Boolean(lbWeekly[0].username), "Leaderboard entry carries unique Instagram-style username");
+
   console.log("\n=================================================");
-  console.log("   ALL 24 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 28 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

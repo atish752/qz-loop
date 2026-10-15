@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/data/store";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const checkUsername = searchParams.get("checkUsername");
+
+    if (checkUsername) {
+      const user = db.getCurrentUser();
+      const isAvailable = db.isUsernameAvailable(checkUsername, user.id);
+      return NextResponse.json({
+        success: true,
+        username: checkUsername.trim().toLowerCase().replace(/^@/, ""),
+        available: isAvailable,
+      });
+    }
+
     const user = db.getCurrentUser();
     const exams = db.getExaminations();
     const subjects = db.getSubjects(user.preferred_examination_id);
@@ -32,7 +45,7 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to update profile";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }
 

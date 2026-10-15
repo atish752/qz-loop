@@ -5,7 +5,7 @@ import Link from "next/link";
 import { UserProfile } from "@/types/database";
 
 interface TopHeaderProps {
-  currentTab?: "home" | "matrix" | "create" | "leaderboard" | "profile";
+  currentTab?: "home" | "matrix" | "create" | "loop" | "social" | "leaderboard" | "profile";
   streakDays?: number;
   activeExamName?: string;
   user?: UserProfile | null;
@@ -24,7 +24,15 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       <div className="h-14 px-4 flex items-center justify-between">
         {/* Brand & Exam Chip */}
         <div className="flex items-center gap-2">
-          <Link href="/" className="flex items-center gap-1 group">
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 shadow-xs border border-primary/20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo.jpg"
+                alt="Qz Loop Logo"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+              />
+            </div>
             <span className="text-primary font-headline-sm font-bold tracking-tight">Qz Loop</span>
           </Link>
           <button

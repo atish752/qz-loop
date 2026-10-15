@@ -70,6 +70,8 @@ export const SEED_PROFILES: UserProfile[] = [
   {
     id: "user-current",
     display_name: "Rahul S.",
+    username: "rahul_cgl",
+    target_exam: "SSC CGL",
     avatar_url: "https://lh3.googleusercontent.com/aida-public/AB6AXuB3HxZXij6KtfCXo9mnvLQmf4xUsXoNd9KYNpxhrXS0hc02n1JzIsvrW-LFeO4nmNG3zK39luMh3NymOFBjqDa61rhZjz-N11uCG0H6OiyRiviC5HoEaoCxkVH2kipgc0lyZV-a2AkiY3-rBiWZ_1M9A9shscNshOvHhAv8wopIWqnnnXs_wik3Iiro6SCPvBqjWIGmZsNa_1TgM4fq1GbohC-Unw4xMnx2mHoKFIwfx9roU33xDEPfTQ",
     preferred_examination_id: "exam-ssc-cgl",
     role: "student",
@@ -82,6 +84,8 @@ export const SEED_PROFILES: UserProfile[] = [
   {
     id: "user-amit",
     display_name: "Amit Sharma",
+    username: "amit_ssc",
+    target_exam: "SSC CGL",
     avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
     preferred_examination_id: "exam-ssc-cgl",
     role: "student",
@@ -93,6 +97,8 @@ export const SEED_PROFILES: UserProfile[] = [
   {
     id: "user-priya",
     display_name: "Priya K.",
+    username: "priya_quant",
+    target_exam: "SSC CGL",
     avatar_url: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&auto=format&fit=crop&q=80",
     preferred_examination_id: "exam-ssc-cgl",
     role: "student",
@@ -104,6 +110,8 @@ export const SEED_PROFILES: UserProfile[] = [
   {
     id: "user-vikram",
     display_name: "Vikram Patel",
+    username: "vikram_p",
+    target_exam: "SSC CHSL",
     avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
     preferred_examination_id: "exam-ssc-cgl",
     role: "student",
@@ -115,6 +123,8 @@ export const SEED_PROFILES: UserProfile[] = [
   {
     id: "user-ananya",
     display_name: "Ananya Roy",
+    username: "ananya_r",
+    target_exam: "SSC CGL",
     avatar_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
     preferred_examination_id: "exam-ssc-cgl",
     role: "student",

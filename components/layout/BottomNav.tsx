@@ -8,9 +8,9 @@ export const BottomNav: React.FC = () => {
   const pathname = usePathname();
 
   const isHome = pathname === "/" || pathname === "/home";
-  const isLoop = pathname === "/loop" || pathname === "/qzloop" || pathname === "/feed";
   const isCreate = pathname === "/create" || pathname === "/add";
-  const isLeaderboard = pathname === "/leaderboard" || pathname === "/ranking";
+  const isLoop = pathname === "/loop" || pathname === "/qzloop" || pathname === "/feed";
+  const isSocial = pathname === "/social" || pathname.startsWith("/social");
   const isProfile = pathname === "/profile" || pathname === "/me";
 
   return (
@@ -33,56 +33,70 @@ export const BottomNav: React.FC = () => {
             <span className="font-label-sm text-label-sm">Home</span>
           </Link>
 
-          {/* 2. Qz Loop (Swipeable Reel Quiz Feed) */}
-          <Link
-            href="/loop"
-            className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 ${
-              isLoop ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
-            }`}
-          >
-            <span
-              className="material-symbols-outlined text-[24px]"
-              style={isLoop ? { fontVariationSettings: "'FILL' 1" } : {}}
-            >
-              all_inclusive
-            </span>
-            <span className="font-label-sm text-label-sm">qz loop</span>
-          </Link>
-
-          {/* 3. Add Question (+) Prominent Center Action */}
+          {/* 2. Plus / Create (Second Tab) */}
           <Link
             href="/create"
-            className="flex items-center justify-center min-w-[52px] min-h-[52px] -mt-3 group"
-            title="Create Question"
-          >
-            <div
-              className={`w-[50px] h-[50px] rounded-full flex items-center justify-center shadow-md transition-transform duration-150 active:scale-95 ${
-                isCreate
-                  ? "bg-primary text-on-primary ring-4 ring-primary-fixed"
-                  : "bg-primary-container text-on-primary hover:bg-primary shadow-sm"
-              }`}
-            >
-              <span className="material-symbols-outlined text-[26px]">add</span>
-            </div>
-          </Link>
-
-          {/* 4. Leaderboard */}
-          <Link
-            href="/leaderboard"
             className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 ${
-              isLeaderboard ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
+              isCreate ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
             }`}
           >
             <span
               className="material-symbols-outlined text-[24px]"
-              style={isLeaderboard ? { fontVariationSettings: "'FILL' 1" } : {}}
+              style={isCreate ? { fontVariationSettings: "'FILL' 1" } : {}}
             >
-              leaderboard
+              add_circle
             </span>
-            <span className="font-label-sm text-label-sm">Ranks</span>
+            <span className="font-label-sm text-label-sm">Create</span>
           </Link>
 
-          {/* 5. Profile */}
+          {/* 3. Center Highlight: Qz Loop (Purple Background Main Highlight with Brand Icon) */}
+          <Link
+            href="/loop"
+            className="flex flex-col items-center justify-center min-w-[56px] min-h-[56px] -mt-5 group"
+            title="Qz Loop Reels"
+          >
+            <div
+              className={`w-[54px] h-[54px] rounded-full flex items-center justify-center shadow-lg transition-all duration-200 active:scale-95 p-0.5 ${
+                isLoop
+                  ? "bg-gradient-to-tr from-primary to-[#8338ec] ring-4 ring-primary-fixed shadow-primary/30"
+                  : "bg-gradient-to-tr from-primary to-[#7209b7] hover:shadow-primary/25 shadow-md"
+              }`}
+            >
+              <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-primary border-2 border-white/20">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/logo.jpg"
+                  alt="Qz Loop"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                />
+              </div>
+            </div>
+            <span
+              className={`font-label-sm text-[10px] tracking-tight mt-0.5 font-bold transition-colors ${
+                isLoop ? "text-primary" : "text-secondary group-hover:text-on-surface"
+              }`}
+            >
+              qz loop
+            </span>
+          </Link>
+
+          {/* 4. Social (Chat & Friends) - Replaced Ranks */}
+          <Link
+            href="/social"
+            className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 ${
+              isSocial ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
+            }`}
+          >
+            <span
+              className="material-symbols-outlined text-[24px]"
+              style={isSocial ? { fontVariationSettings: "'FILL' 1" } : {}}
+            >
+              forum
+            </span>
+            <span className="font-label-sm text-label-sm">Social</span>
+          </Link>
+
+          {/* 5. Profile (with entry to Ranks / Leaderboard) */}
           <Link
             href="/profile"
             className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 ${

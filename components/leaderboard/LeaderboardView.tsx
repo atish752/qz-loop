@@ -152,6 +152,11 @@ export const LeaderboardView: React.FC = () => {
                       <span className="font-label-lg text-label-lg text-on-surface truncate">
                         {entry.display_name}
                       </span>
+                      {entry.username && (
+                        <span className="font-label-sm text-label-sm text-primary font-bold">
+                          @{entry.username}
+                        </span>
+                      )}
                       {entry.is_current_user && (
                         <span className="px-1.5 py-0.2 rounded bg-primary text-on-primary font-label-sm text-label-sm font-bold">
                           YOU
@@ -205,6 +210,11 @@ export const LeaderboardView: React.FC = () => {
                       <span className="font-label-md text-label-md text-on-surface truncate font-semibold">
                         {entry.display_name}
                       </span>
+                      {entry.username && (
+                        <span className="font-label-sm text-label-sm text-primary font-bold">
+                          @{entry.username}
+                        </span>
+                      )}
                       {entry.is_current_user && (
                         <span className="px-1.5 py-0.2 rounded bg-primary text-on-primary font-label-sm text-label-sm font-bold">
                           YOU

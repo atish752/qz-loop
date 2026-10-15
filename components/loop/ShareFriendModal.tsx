@@ -95,6 +95,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
   const filteredFriends = friends.filter(
     (f) =>
       f.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (f.username && f.username.toLowerCase().includes(searchQuery.toLowerCase().replace(/^@/, ""))) ||
       f.target_exam.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -144,7 +145,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
           </span>
           <input
             type="text"
-            placeholder="Search study friends..."
+            placeholder="Search study friends by name or @username..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
@@ -180,6 +181,9 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-on-surface text-xs truncate">
                           {friend.display_name}
+                        </span>
+                        <span className="text-[10px] text-primary font-bold">
+                          @{friend.username || friend.display_name.toLowerCase().replace(/\s+/g, "_")}
                         </span>
                         <span className="text-[10px] text-tertiary font-semibold">
                           🔥 {friend.streak_days}d
@@ -234,7 +238,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
           <div className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Enter aspirant username or name..."
+              placeholder="Enter unique @username (e.g. @amit_ssc)..."
               value={addFriendInput}
               onChange={(e) => setAddFriendInput(e.target.value)}
               className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"

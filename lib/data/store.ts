@@ -162,6 +162,7 @@ class DataStore {
       {
         id: "user-amit",
         display_name: "Amit Kumar",
+        username: "amit_ssc",
         avatar_url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
         streak_days: 18,
         target_exam: "SSC CGL (AIR #1 Aim)",
@@ -171,6 +172,7 @@ class DataStore {
       {
         id: "user-priya",
         display_name: "Priya Sharma",
+        username: "priya_quant",
         avatar_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
         streak_days: 14,
         target_exam: "SSC CGL (Quant Specialist)",
@@ -180,6 +182,7 @@ class DataStore {
       {
         id: "user-vikram",
         display_name: "Vikram Singh",
+        username: "vikram_p",
         avatar_url: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80",
         streak_days: 22,
         target_exam: "SSC CGL & CHSL",
@@ -189,6 +192,7 @@ class DataStore {
       {
         id: "user-ananya",
         display_name: "Ananya Roy",
+        username: "ananya_r",
         avatar_url: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&auto=format&fit=crop&q=80",
         streak_days: 9,
         target_exam: "SSC CGL (GK & English)",
@@ -282,6 +286,10 @@ class DataStore {
     return { totalSolved, overallAccuracy };
   }
 
+  public getAttemptsByUser(userId: string): QuestionAttempt[] {
+    return this.attempts.filter((a) => a.user_id === userId);
+  }
+
   public getCurrentUser(): UserProfile {
     const user = this.profiles.find((p) => p.id === this.currentUserId);
     if (!user) {
@@ -309,9 +317,55 @@ class DataStore {
     return this.profiles;
   }
 
+  public isUsernameAvailable(username: string, excludeUserId?: string): boolean {
+    const clean = username.trim().toLowerCase().replace(/^@+/, "");
+    if (!clean || clean.length < 3 || clean.length > 30) return false;
+    if (!/^[a-zA-Z0-9_.]+$/.test(clean)) return false;
+    if (clean.startsWith(".") || clean.endsWith(".") || clean.includes("..")) return false;
+    const existing = this.profiles.find((p) => p.username?.toLowerCase() === clean);
+    if (existing && existing.id !== excludeUserId) {
+      return false;
+    }
+    return true;
+  }
+
   public updateProfile(updates: Partial<UserProfile>): UserProfile {
     const user = this.getCurrentUser();
+
+    if (updates.username !== undefined) {
+      const cleanUsername = updates.username.trim().toLowerCase().replace(/^@+/, "");
+      if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+        throw new Error("Username must be between 3 and 30 characters long");
+      }
+      if (!/^[a-zA-Z0-9_.]+$/.test(cleanUsername)) {
+        throw new Error("Username can only contain letters, numbers, underscores and periods");
+      }
+      if (cleanUsername.startsWith(".") || cleanUsername.endsWith(".") || cleanUsername.includes("..")) {
+        throw new Error("Username cannot start or end with a period, or contain consecutive periods");
+      }
+      if (!this.isUsernameAvailable(cleanUsername, user.id)) {
+        throw new Error(`Username @${cleanUsername} is already taken. Please choose another.`);
+      }
+      updates.username = cleanUsername;
+    }
+
+    if (updates.preferred_examination_id && !updates.target_exam) {
+      const ex = this.examinations.find((e) => e.id === updates.preferred_examination_id);
+      if (ex) {
+        updates.target_exam = ex.name;
+      }
+    }
+
     Object.assign(user, updates);
+
+    // Keep friends list sync if current user is represented
+    const matchingFriend = this.friends.find((f) => f.id === user.id);
+    if (matchingFriend) {
+      if (user.display_name) matchingFriend.display_name = user.display_name;
+      if (user.username) matchingFriend.username = user.username;
+      if (user.target_exam) matchingFriend.target_exam = user.target_exam;
+    }
+
     return user;
   }
 
@@ -961,6 +1015,7 @@ class DataStore {
         rank: 0,
         user_id: uId,
         display_name: profile.display_name,
+        username: profile.username,
         avatar_url: profile.avatar_url,
         total_attempts: attempts,
         correct_count: correct,
@@ -1134,30 +1189,123 @@ class DataStore {
     return this.friends;
   }
 
+  public searchUsers(query: string, currentUserId?: string): (UserProfile & { isFriend: boolean; friendStatus?: string })[] {
+    const q = query.trim().toLowerCase().replace(/^@/, "");
+    if (!q) return [];
+    const currId = currentUserId || this.currentUserId;
+
+    return this.profiles
+      .filter((p) => p.id !== currId)
+      .filter((p) =>
+        p.username.toLowerCase().includes(q) ||
+        p.display_name.toLowerCase().includes(q)
+      )
+      .map((p) => {
+        const friend = this.friends.find((f) => f.id === p.id || f.username?.toLowerCase() === p.username.toLowerCase());
+        return {
+          ...p,
+          isFriend: friend?.status === "friend",
+          friendStatus: friend?.status,
+        };
+      });
+  }
+
   public sendFriendRequest(
     userId: string,
     targetUserIdOrName: string
   ): { success: boolean; message: string; friend?: FriendUser } {
-    const query = targetUserIdOrName.trim().toLowerCase();
-    const existing = this.friends.find((f) => f.id === targetUserIdOrName || f.display_name.toLowerCase().includes(query));
-    if (existing) {
-      if (existing.status === "friend") {
-        return { success: true, message: `${existing.display_name} is already your study partner!`, friend: existing };
-      }
-      existing.status = "friend";
-      return { success: true, message: `Connected with ${existing.display_name}!`, friend: existing };
+    const cleanTarget = targetUserIdOrName.trim();
+    const isHandle = cleanTarget.startsWith("@");
+    const query = cleanTarget.toLowerCase().replace(/^@+/, "");
+
+    // 0. Prevent adding oneself
+    const currentUser = this.profiles.find((p) => p.id === userId) || this.getCurrentUser();
+    if (
+      targetUserIdOrName === currentUser.id ||
+      query === currentUser.username.toLowerCase() ||
+      cleanTarget.toLowerCase() === currentUser.display_name.toLowerCase()
+    ) {
+      return { success: false, message: "You cannot add yourself as a study partner" };
     }
 
+    // 1. Check if already in friends list
+    const existing = this.friends.find(
+      (f) =>
+        f.id === targetUserIdOrName ||
+        f.username?.toLowerCase() === query ||
+        f.display_name.toLowerCase() === query ||
+        f.display_name.toLowerCase() === cleanTarget.toLowerCase()
+    );
+    if (existing) {
+      if (existing.status === "friend") {
+        return {
+          success: true,
+          message: `@${existing.username || existing.display_name} is already your study partner!`,
+          friend: existing,
+        };
+      }
+      existing.status = "friend";
+      return {
+        success: true,
+        message: `Connected with @${existing.username || existing.display_name}!`,
+        friend: existing,
+      };
+    }
+
+    // 2. Check in registered user profiles (Exact match on ID, username, or display name)
+    const matchedProfile = this.profiles.find(
+      (p) =>
+        p.id === targetUserIdOrName ||
+        p.username?.toLowerCase() === query ||
+        p.display_name.toLowerCase() === cleanTarget.toLowerCase() ||
+        (!isHandle && p.display_name.toLowerCase().includes(query))
+    );
+
+    if (isHandle && !matchedProfile) {
+      return {
+        success: false,
+        message: `No aspirant found with username @${query}. Please verify the handle.`,
+      };
+    }
+
+    const generatedUsername = matchedProfile
+      ? matchedProfile.username
+      : query.replace(/[^a-z0-9_.]/g, "_");
+
     const newFriend: FriendUser = {
-      id: `usr-fr-${Date.now()}`,
-      display_name: targetUserIdOrName.trim(),
-      streak_days: Math.floor(Math.random() * 15) + 3,
-      target_exam: "SSC CGL Aspirant",
+      id: matchedProfile ? matchedProfile.id : `usr-fr-${Date.now()}`,
+      display_name: matchedProfile ? matchedProfile.display_name : cleanTarget,
+      username: generatedUsername,
+      avatar_url: matchedProfile?.avatar_url,
+      streak_days: matchedProfile ? matchedProfile.current_streak : Math.floor(Math.random() * 15) + 3,
+      target_exam: matchedProfile?.target_exam || "SSC CGL Aspirant",
       status: "friend",
       last_active: "Active just now",
     };
     this.friends.unshift(newFriend);
-    return { success: true, message: `Friend request accepted! Now studying with ${newFriend.display_name}`, friend: newFriend };
+    return {
+      success: true,
+      message: `Friend request accepted! Now studying with @${newFriend.username}`,
+      friend: newFriend,
+    };
+  }
+
+  public respondFriendRequest(
+    userId: string,
+    friendId: string,
+    action: "accept" | "decline"
+  ): { success: boolean; message: string } {
+    const friend = this.friends.find((f) => f.id === friendId);
+    if (!friend) {
+      return { success: false, message: "Request not found" };
+    }
+    if (action === "accept") {
+      friend.status = "friend";
+      return { success: true, message: `Accepted friend request from @${friend.username || friend.display_name}` };
+    } else {
+      this.friends = this.friends.filter((f) => f.id !== friendId);
+      return { success: true, message: `Declined friend request` };
+    }
   }
 
   // --- Direct Study Chat Messages ---

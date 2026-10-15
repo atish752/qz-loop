@@ -5,10 +5,26 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const friendId = searchParams.get("friendId");
-    if (!friendId) {
-      return NextResponse.json({ success: false, error: "Friend ID required" }, { status: 400 });
-    }
     const currentUser = db.getCurrentUser();
+
+    if (!friendId) {
+      // Return all messages involving current user
+      const friends = db.getFriends(currentUser.id);
+      const allMsgs: any[] = [];
+      friends.forEach((f) => {
+        const msgs = db.getMessages(currentUser.id, f.id);
+        allMsgs.push(...msgs);
+      });
+      const enhanced = allMsgs.map((m) => {
+        if (m.question_id) {
+          const q = db.getQuestionById(m.question_id);
+          return { ...m, question: q };
+        }
+        return m;
+      });
+      return NextResponse.json({ success: true, messages: enhanced });
+    }
+
     const messages = db.getMessages(currentUser.id, friendId);
 
     // Enhance any question references with question preview
