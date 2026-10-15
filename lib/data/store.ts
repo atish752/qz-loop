@@ -65,27 +65,27 @@ class DataStore {
       { qId: "q-eng-1", correct: true, ms: 7400, daysAgo: 0 },
       { qId: "q-gk-1", correct: true, ms: 6800, daysAgo: 0 },
       { qId: "q-math-2", correct: false, ms: 22000, daysAgo: 0 },
-      { qId: "q-gk-hi-1", correct: true, ms: 7100, daysAgo: 0 },
+      { qId: "q-gk-2", correct: true, ms: 7100, daysAgo: 0 },
       // Yesterday (4 attempts)
       { qId: "q-reas-2", correct: true, ms: 14200, daysAgo: 1 },
-      { qId: "q-math-3", correct: true, ms: 11000, daysAgo: 1 },
+      { qId: "q-math-1", correct: true, ms: 11000, daysAgo: 1 },
       { qId: "q-eng-2", correct: false, ms: 16800, daysAgo: 1 },
-      { qId: "q-gk-2", correct: true, ms: 5500, daysAgo: 1 },
+      { qId: "q-gk-3", correct: true, ms: 5500, daysAgo: 1 },
       // 2 days ago (4 attempts)
-      { qId: "q-math-hi-1", correct: true, ms: 12000, daysAgo: 2 },
-      { qId: "q-reas-3", correct: false, ms: 18000, daysAgo: 2 },
-      { qId: "q-eng-3", correct: true, ms: 8900, daysAgo: 2 },
-      { qId: "q-gk-3", correct: true, ms: 6200, daysAgo: 2 },
+      { qId: "q-math-2", correct: true, ms: 12000, daysAgo: 2 },
+      { qId: "q-reas-1", correct: false, ms: 18000, daysAgo: 2 },
+      { qId: "q-eng-1", correct: true, ms: 8900, daysAgo: 2 },
+      { qId: "q-gk-4", correct: true, ms: 6200, daysAgo: 2 },
       // 3 days ago (4 attempts)
-      { qId: "q-math-4", correct: true, ms: 9100, daysAgo: 3 },
-      { qId: "q-reas-4", correct: true, ms: 13500, daysAgo: 3 },
-      { qId: "q-eng-4", correct: false, ms: 15400, daysAgo: 3 },
-      { qId: "q-gk-4", correct: true, ms: 7800, daysAgo: 3 },
+      { qId: "q-math-1", correct: true, ms: 9100, daysAgo: 3 },
+      { qId: "q-reas-2", correct: true, ms: 13500, daysAgo: 3 },
+      { qId: "q-eng-2", correct: false, ms: 15400, daysAgo: 3 },
+      { qId: "q-gk-1", correct: true, ms: 7800, daysAgo: 3 },
       // 4 days ago (4 attempts)
-      { qId: "q-math-5", correct: true, ms: 10400, daysAgo: 4 },
-      { qId: "q-reas-5", correct: true, ms: 8800, daysAgo: 4 },
-      { qId: "q-eng-5", correct: true, ms: 9200, daysAgo: 4 },
-      { qId: "q-gk-5", correct: false, ms: 19500, daysAgo: 4 },
+      { qId: "q-math-2", correct: true, ms: 10400, daysAgo: 4 },
+      { qId: "q-reas-1", correct: true, ms: 8800, daysAgo: 4 },
+      { qId: "q-eng-1", correct: true, ms: 9200, daysAgo: 4 },
+      { qId: "q-gk-2", correct: false, ms: 19500, daysAgo: 4 },
     ];
 
     for (const a of baseAttempts) {
@@ -143,10 +143,10 @@ class DataStore {
     // 2. Playlists / Collections
     const defaultPlaylists: { name: string; qIds: string[]; desc: string }[] = [
       { name: "Saved Questions", qIds: ["q-math-1", "q-reas-1"], desc: "General bookmarked questions" },
-      { name: "Maths Tricks", qIds: ["q-math-1", "q-math-3", "q-math-hi-1"], desc: "High-yield calculation and shortcut proofs" },
+      { name: "Maths Tricks", qIds: ["q-math-1", "q-math-2"], desc: "High-yield calculation and shortcut proofs" },
       { name: "Reasoning Logic", qIds: ["q-reas-1", "q-reas-2"], desc: "Syllogisms and pattern mastery" },
-      { name: "High-Yield English", qIds: ["q-eng-1", "q-eng-3"], desc: "Vocabulary and critical grammar rules" },
-      { name: "GK Rapid Recall", qIds: ["q-gk-1", "q-gk-hi-1", "q-gk-3"], desc: "Static GK and recurring PYQs" },
+      { name: "High-Yield English", qIds: ["q-eng-1", "q-eng-2"], desc: "Vocabulary and critical grammar rules" },
+      { name: "GK Rapid Recall", qIds: ["q-gk-1", "q-gk-2", "q-gk-3", "q-gk-4"], desc: "Static GK and recurring PYQs" },
     ];
 
     this.collections = defaultPlaylists.map((p, idx) => ({
@@ -318,6 +318,17 @@ class DataStore {
     return this.profiles;
   }
 
+  public getProfileById(userId: string): UserProfile | undefined {
+    const user = this.profiles.find((p) => p.id === userId);
+    if (!user) return undefined;
+    const todayAttempts = this.getAttemptsInPeriod(user.id, "today");
+    user.today_solved_count = todayAttempts.length;
+    const lifetime = this.getUserLifetimeSummary(user.id);
+    user.total_questions_answered = lifetime.totalSolved;
+    user.overall_accuracy = lifetime.overallAccuracy;
+    return user;
+  }
+
   public isUsernameAvailable(username: string, excludeUserId?: string): boolean {
     const clean = username.trim().toLowerCase().replace(/^@+/, "");
     if (!clean || clean.length < 3 || clean.length > 30) return false;
@@ -370,6 +381,93 @@ class DataStore {
     return user;
   }
 
+  public signUpUser(data: {
+    display_name: string;
+    username: string;
+    target_exam?: string;
+    preferred_examination_id?: string;
+    avatar_url?: string;
+    email?: string;
+  }): UserProfile {
+    const cleanUsername = data.username.trim().toLowerCase().replace(/^@+/, "");
+    if (!this.isUsernameAvailable(cleanUsername)) {
+      throw new Error(`Username @${cleanUsername} is already taken. Please choose another.`);
+    }
+
+    // Determine target exam name
+    let targetExam = data.target_exam;
+    const examId = data.preferred_examination_id || "exam-ssc-cgl";
+    if (!targetExam) {
+      const ex = this.examinations.find((e) => e.id === examId);
+      targetExam = ex ? ex.name : "SSC CGL / CHSL / MTS";
+    }
+
+    const newUserId = `user-${Date.now()}`;
+    const newProfile: UserProfile = {
+      id: newUserId,
+      display_name: data.display_name.trim(),
+      username: cleanUsername,
+      target_exam: targetExam,
+      preferred_examination_id: examId,
+      avatar_url: data.avatar_url || "",
+      role: "student",
+      current_streak: 0, // Starts at zero scratch!
+      last_active_date: new Date().toISOString().split("T")[0],
+      daily_goal: 10,
+      today_solved_count: 0, // 0 solved
+      total_questions_answered: 0, // 0 total answered
+      overall_accuracy: 0, // 0% accuracy
+      created_at: new Date().toISOString(),
+    };
+
+    this.profiles.push(newProfile);
+    this.currentUserId = newUserId;
+
+    // Fresh 0-scratch habit engine settings
+    this.habitSettings.set(newUserId, {
+      daily_goal: 10,
+      solved_today: 0,
+      combo_streak: 0,
+      boost_multiplier: 1.0,
+      schedule_slots: [
+        { id: "slot-1", time: "08:00 AM", label: "Morning Warmup Drill", active: true },
+        { id: "slot-2", time: "02:00 PM", label: "Speed & Accuracy Sprint", active: true },
+        { id: "slot-3", time: "09:00 PM", label: "Night Spaced Revision Loop", active: true },
+      ],
+    });
+
+    // Zero attempts, zero friends, zero playlists for this clean slate user
+    return newProfile;
+  }
+
+  public resetUserData(userId: string): UserProfile {
+    this.attempts = this.attempts.filter((a) => a.user_id !== userId);
+    this.collections = this.collections.filter((c) => c.user_id !== userId);
+    this.friends = this.friends.filter((f) => f.id !== userId);
+    this.hiddenQuestions = this.hiddenQuestions.filter((h) => h.user_id !== userId);
+
+    // Clear likes by this user
+    for (const [qId, likers] of this.likes.entries()) {
+      likers.delete(userId);
+    }
+
+    const profile = this.profiles.find((p) => p.id === userId);
+    if (profile) {
+      profile.current_streak = 0;
+      profile.today_solved_count = 0;
+      profile.total_questions_answered = 0;
+      profile.overall_accuracy = 0;
+    }
+
+    const habit = this.habitSettings.get(userId);
+    if (habit) {
+      habit.solved_today = 0;
+      habit.combo_streak = 0;
+    }
+
+    return profile || this.getCurrentUser();
+  }
+
   // --- Examinations & Subjects ---
   public getExaminations(): Examination[] {
     return this.examinations;
@@ -411,9 +509,14 @@ class DataStore {
     }
     const filterAll = targetSlugs.length === 0 || targetSlugs.includes("all");
 
+    // Check if current exam has specific questions
+    const hasSpecificQuestions = this.questions.some(
+      (q) => q.examination_id === examId && q.publication_status === "published" && q.moderation_status === "active"
+    );
+
     // Filter by exam and subject
     let pool = this.questions.filter((q) => {
-      if (q.examination_id !== examId) return false;
+      if (hasSpecificQuestions && q.examination_id !== examId) return false;
       if (q.publication_status !== "published" || q.moderation_status !== "active") return false;
       if (userHiddenIds.has(q.id)) return false;
       if (sessionExcludedIds.has(q.id)) return false;
@@ -424,7 +527,8 @@ class DataStore {
         const matchingSubjIds = new Set(
           this.subjects.filter((s) => targetSlugs.includes(s.slug.toLowerCase())).map((s) => s.id)
         );
-        if (!matchingSubjIds.has(q.subject_id)) return false;
+        const matchesSlugDirectly = q.subject_slug && targetSlugs.includes(q.subject_slug.toLowerCase());
+        if (!matchingSubjIds.has(q.subject_id) && !matchesSlugDirectly) return false;
       }
       return true;
     });
@@ -1348,8 +1452,14 @@ class DataStore {
   }
 
   // --- Friends System ---
-  public getFriends(userId: string): FriendUser[] {
-    return this.friends;
+  private userFriends: Map<string, FriendUser[]> = new Map();
+
+  public getFriends(userId?: string): FriendUser[] {
+    const targetId = userId || this.currentUserId;
+    if (targetId === "user-current") {
+      return this.friends;
+    }
+    return this.userFriends.get(targetId) || [];
   }
 
   public searchUsers(query: string, currentUserId?: string): (UserProfile & { isFriend: boolean; friendStatus?: string })[] {

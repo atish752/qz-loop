@@ -12,6 +12,11 @@
     color: #141b2b;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
+
+  html.dark, html.dark body {
+    background-color: #0b0f19;
+    color: #f0f3fa;
+  }
   
   body {
     overscroll-behavior-y: none;
@@ -25,6 +30,49 @@
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0px);
   }
+}
+
+/* Dark Mode surface & typography overrides */
+html.dark .bg-surface {
+  background-color: #0b0f19 !important;
+}
+
+html.dark .bg-surface-container-lowest {
+  background-color: #121724 !important;
+}
+
+html.dark .bg-surface-container-low {
+  background-color: #181f2f !important;
+}
+
+html.dark .bg-surface-container {
+  background-color: #1e2638 !important;
+}
+
+html.dark .bg-surface-container-high {
+  background-color: #263046 !important;
+}
+
+html.dark .bg-surface-container-highest {
+  background-color: #2f3a53 !important;
+}
+
+html.dark .text-on-surface {
+  color: #f0f3fa !important;
+}
+
+html.dark .text-on-surface-variant {
+  color: #a0aec0 !important;
+}
+
+html.dark .text-secondary {
+  color: #94a3b8 !important;
+}
+
+html.dark .border-surface-container-high\/40,
+html.dark .border-surface-container-high\/60,
+html.dark .border-surface-container-high {
+  border-color: #263046 !important;
 }
 
 /* Hide scrollbars for clean mobile feel */

@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const user = db.getCurrentUser();
+    const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id");
+    const user = (requestedUserId ? db.getProfileById(requestedUserId) : null) || db.getCurrentUser();
     const exams = db.getExaminations();
     const subjects = db.getSubjects(user.preferred_examination_id);
     const hiddenCount = db.getHiddenQuestions(user.id).length;

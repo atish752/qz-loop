@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { UserProfile } from "@/types/database";
 
@@ -10,21 +10,65 @@ interface TopHeaderProps {
   activeExamName?: string;
   user?: UserProfile | null;
   onSelectExam?: () => void;
+  onOpenAuth?: (reason?: string) => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
   currentTab = "home",
-  streakDays = 14,
-  activeExamName = "SSC CGL",
+  streakDays = 0,
+  activeExamName = "Railways (RRB NTPC & Group D)",
   user,
   onSelectExam,
+  onOpenAuth,
 }) => {
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
+  // Initialize theme from localStorage or system preference on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("qz_theme");
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const shouldBeDark = savedTheme === "dark" || (!savedTheme && prefersDark);
+      setIsDarkMode(shouldBeDark);
+      if (shouldBeDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  }, []);
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    const nextMode = !isDarkMode;
+    setIsDarkMode(nextMode);
+    if (nextMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("qz_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("qz_theme", "light");
+    }
+  };
+
+  const handleAuthClick = () => {
+    if (onOpenAuth) {
+      onOpenAuth("Sign in to track your practice streak, study matrix and All India rank");
+    } else {
+      window.dispatchEvent(
+        new CustomEvent("open_auth_modal", {
+          detail: { reason: "Sign in to track your practice streak and rank" },
+        })
+      );
+    }
+  };
+
   return (
     <header className="sticky top-0 w-full z-40 bg-surface-container-lowest/90 backdrop-blur-md border-b border-surface-container-high/40 pt-safe">
-      <div className="h-14 px-4 flex items-center justify-between">
+      <div className="h-14 px-3 flex items-center justify-between">
         {/* Brand & Exam Chip */}
-        <div className="flex items-center gap-2">
-          <Link href="/" className="flex items-center gap-2 group">
+        <div className="flex items-center gap-2 min-w-0">
+          <Link href="/" className="flex items-center gap-2 group shrink-0">
             <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 shadow-xs border border-primary/20">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -33,53 +77,80 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform"
               />
             </div>
-            <span className="text-primary font-headline-sm font-bold tracking-tight">Qz Loop</span>
+            <span className="text-primary font-headline-sm font-bold tracking-tight hidden xs:inline">Qz Loop</span>
           </Link>
           <button
             onClick={onSelectExam}
-            className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors text-label-sm font-semibold"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors text-[11px] font-semibold truncate max-w-[150px] xs:max-w-[190px]"
             title="Switch Target Exam"
           >
-            <span>{activeExamName}</span>
-            <span className="material-symbols-outlined text-[14px]">expand_more</span>
+            <span className="truncate">{activeExamName}</span>
+            <span className="material-symbols-outlined text-[14px] shrink-0">expand_more</span>
           </button>
         </div>
 
-        {/* Right side: Streak and Profile Avatar */}
-        <div className="flex items-center gap-2.5">
-          {/* Daily Streak Indicator */}
-          <div
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-error-container/80 text-on-error-container shadow-xs animate-pulse-subtle"
-            title={`${streakDays} Day Practice Streak`}
+        {/* Right side: Dark Mode toggle + Streak + Auth / Profile Avatar */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Night Mode Moon/Sun Toggle Switch */}
+          <button
+            onClick={toggleDarkMode}
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-colors border border-surface-container-high/40"
+            title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
+            aria-label="Toggle Night Mode"
           >
-            <span className="text-sm">🔥</span>
-            <span className="font-label-md text-label-md font-bold">{streakDays}</span>
-            <span className="font-label-sm text-label-sm text-error font-medium">d</span>
-          </div>
+            <span className="material-symbols-outlined text-[18px]">
+              {isDarkMode ? "light_mode" : "dark_mode"}
+            </span>
+          </button>
 
-          {/* Profile Avatar */}
-          <Link
-            href="/profile"
-            className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center transition-transform active:scale-95 ${
-              currentTab === "profile"
-                ? "ring-2 ring-primary ring-offset-1"
-                : "border border-surface-container-high"
-            }`}
-            title="My Profile"
-          >
-            {user?.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.avatar_url}
-                alt={user.display_name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-primary flex items-center justify-center text-on-primary">
-                <span className="material-symbols-outlined text-[18px]">person</span>
+          {/* User Logged In vs Guest */}
+          {user ? (
+            <>
+              {/* Daily Streak Indicator */}
+              <div
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-error-container/80 text-on-error-container shadow-xs animate-pulse-subtle"
+                title={`${user.current_streak || streakDays} Day Practice Streak`}
+              >
+                <span className="text-xs">🔥</span>
+                <span className="font-label-md text-xs font-bold">{user.current_streak ?? streakDays}</span>
+                <span className="font-label-sm text-[10px] text-error font-medium">d</span>
               </div>
-            )}
-          </Link>
+
+              {/* Profile Avatar */}
+              <Link
+                href="/profile"
+                className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center transition-transform active:scale-95 ${
+                  currentTab === "profile"
+                    ? "ring-2 ring-primary ring-offset-1"
+                    : "border border-surface-container-high"
+                }`}
+                title={`@${user.username || user.display_name}`}
+              >
+                {user.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.avatar_url}
+                    alt={user.display_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-primary flex items-center justify-center text-on-primary">
+                    <span className="material-symbols-outlined text-[16px]">person</span>
+                  </div>
+                )}
+              </Link>
+            </>
+          ) : (
+            /* Guest / Unauthenticated Visitor: Prominent Sign In button */
+            <button
+              onClick={handleAuthClick}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-on-primary hover:bg-primary-container active:scale-95 transition-all text-xs font-bold shadow-xs"
+              title="Sign In with Google or Email"
+            >
+              <span className="material-symbols-outlined text-[15px]">login</span>
+              <span>Sign In</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

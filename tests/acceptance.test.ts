@@ -419,8 +419,49 @@ async function runTests() {
   assert(lbWeekly.length > 0, "Leaderboard calculations remain available for Profile Ranks entry");
   assert(Boolean(lbWeekly[0].username), "Leaderboard entry carries unique Instagram-style username");
 
+  // Scenario 29: Top 10 Indian Competitive Examinations Ordered by Candidate Volume & Major Subjects
+  console.log("\n[Scenario 29] Top 10 Indian Competitive Examinations Ordered by Candidate Volume");
+  const exams = db.getExaminations();
+  assert(exams.length === 10, "Exactly top 10 Indian competitive exams present");
+  assert(exams[0].id === "exam-railway-ntpc", "Rank #1 exam by student volume is Railways (RRB NTPC & Group D)");
+  assert(exams[1].id === "exam-ssc-cgl", "Rank #2 exam by student volume is SSC CGL / CHSL / MTS");
+  assert(exams[2].id === "exam-neet-ug", "Rank #3 exam by student volume is NEET UG");
+  assert(exams[3].id === "exam-cuet-ug", "Rank #4 exam by student volume is CUET UG");
+  assert(exams[4].id === "exam-jee-main", "Rank #5 exam by student volume is JEE Main");
+  assert(exams[5].id === "exam-banking-ibps", "Rank #6 exam by student volume is Banking IBPS / SBI PO & Clerk");
+  assert(exams[6].id === "exam-state-police", "Rank #7 exam by student volume is State Police / Constable & SI");
+  assert(exams[7].id === "exam-state-pcs", "Rank #8 exam by student volume is State PCS");
+  assert(exams[8].id === "exam-defence-cds", "Rank #9 exam by student volume is Defence NDA / CDS / AFCAT");
+  assert(exams[9].id === "exam-upsc-csat", "Rank #10 exam by student volume is UPSC Civil Services");
+  for (const ex of exams) {
+    const subjects = db.getSubjects(ex.id);
+    assert(subjects.length >= 3, `Exam '${ex.name}' has authentic major subjects mapped (${subjects.length} subjects)`);
+  }
+
+  // Scenario 30: Fresh User Signup & Absolute Zero Scratch Initialization
+  console.log("\n[Scenario 30] Fresh User Signup & Absolute Zero Scratch Initialization");
+  const freshUser = db.signUpUser({
+    display_name: "Fresh Aspirant",
+    username: "fresh_aspirant_01",
+    target_exam: "Railways (RRB NTPC & Group D)",
+    preferred_examination_id: "exam-railway-ntpc",
+    avatar_url: "data:image/jpeg;base64,mockcompressedavatar",
+  });
+  assert(freshUser.current_streak === 0, "Fresh user starts at 0 streak");
+  assert(freshUser.today_solved_count === 0, "Fresh user starts at 0 solved today");
+  assert(freshUser.total_questions_answered === 0, "Fresh user starts at 0 total answered");
+  assert(freshUser.overall_accuracy === 0, "Fresh user starts at 0% accuracy");
+  const freshMatrix = db.getMatrixStats(freshUser.id, "today");
+  assert(freshMatrix.total_solved === 0, "Fresh user matrix starts at 0 solved");
+  assert(freshMatrix.accuracy_percentage === 0, "Fresh user matrix accuracy is 0%");
+  assert(freshMatrix.fastest_correct_seconds === null, "Fresh user matrix fastest time is null");
+  assert(db.getFriends(freshUser.id).length === 0, "Fresh user starts with empty friends list");
+  assert(db.getUserCollections(freshUser.id).length === 0, "Fresh user starts with empty saved playlists");
+  const defaultFeed = db.getFeedQuestions({ examId: "exam-railway-ntpc" });
+  assert(defaultFeed.length === 10, "Default 10 clean GK/baseline questions are available for new user to browse immediately");
+
   console.log("\n=================================================");
-  console.log("   ALL 28 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 30 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

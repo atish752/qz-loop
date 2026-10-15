@@ -221,6 +221,19 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   const handleSelectOption = async (optionId: string) => {
     if (isAnswered || isSubmitting) return;
 
+    // Require sign-in before answering
+    if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+      window.dispatchEvent(
+        new CustomEvent("open_auth_modal", {
+          detail: {
+            reason: "Sign in required to answer questions, check accuracy & track rank",
+            mode: "signup",
+          },
+        })
+      );
+      return;
+    }
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
@@ -323,6 +336,18 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
   // Toggle Like button (Fire icon)
   const handleToggleLike = async () => {
+    if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+      window.dispatchEvent(
+        new CustomEvent("open_auth_modal", {
+          detail: {
+            reason: "Sign in required to like questions & save them to your favorites!",
+            mode: "signup",
+          },
+        })
+      );
+      return;
+    }
+
     const nextLiked = !isLiked;
     setIsLiked(nextLiked);
     setLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
@@ -386,6 +411,18 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   };
 
   const handleQuickSave = async () => {
+    if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+      window.dispatchEvent(
+        new CustomEvent("open_auth_modal", {
+          detail: {
+            reason: "Sign in required to save questions to your revision playlists",
+            mode: "signup",
+          },
+        })
+      );
+      return;
+    }
+
     const nextSaved = !isSaved;
     setIsSaved(nextSaved);
     setQuickSaveToast(nextSaved ? "Saved to Quick Revision!" : "Removed from Saved");
@@ -828,7 +865,20 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
           {/* Comments / Discussion Button */}
           <button
-            onClick={() => setShowCommentsModal(true)}
+            onClick={() => {
+              if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+                window.dispatchEvent(
+                  new CustomEvent("open_auth_modal", {
+                    detail: {
+                      reason: "Sign in required to view proof shortcuts & discuss with aspirants",
+                      mode: "signup",
+                    },
+                  })
+                );
+                return;
+              }
+              setShowCommentsModal(true);
+            }}
             className="flex flex-col items-center group active:scale-90 transition-transform"
             title="Shortcuts & Discussions"
           >
@@ -840,7 +890,20 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
           {/* Share / Friends Button */}
           <button
-            onClick={() => setShowShareModal(true)}
+            onClick={() => {
+              if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+                window.dispatchEvent(
+                  new CustomEvent("open_auth_modal", {
+                    detail: {
+                      reason: "Sign in required to challenge and share with study partners",
+                      mode: "signup",
+                    },
+                  })
+                );
+                return;
+              }
+              setShowShareModal(true);
+            }}
             className="flex flex-col items-center group active:scale-90 transition-transform"
             title="Share to study friends"
           >

@@ -35,28 +35,44 @@ export const ProfileView: React.FC = () => {
   }>({ checking: false, available: null, message: "" });
   const [editError, setEditError] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState<boolean>(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [isResettingData, setIsResettingData] = useState<boolean>(false);
+  const [resetSuccess, setResetSuccess] = useState<boolean>(false);
 
   useEffect(() => {
-    // Fetch profile data
-    fetch("/api/profile")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.user) {
-          setUser(data.user);
-          setExams(data.exams || []);
-          setAllProfiles(data.allProfiles || []);
-          setEditName(data.user.display_name || "");
-          setEditUsername(data.user.username || "");
-          setEditExamId(data.user.preferred_examination_id || "exam-ssc-cgl");
+    const checkAuthAndLoad = () => {
+      if (typeof window !== "undefined") {
+        const uid = localStorage.getItem("qz_user_id");
+        setIsLoggedIn(Boolean(uid));
 
-          // Onboarding prompt if username has not been chosen yet
-          if (!data.user.username) {
-            setShowEditProfileModal(true);
-          }
-        }
-      })
-      .catch(() => {});
+        const url = uid ? `/api/profile?userId=${encodeURIComponent(uid)}` : "/api/profile";
+        fetch(url)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success && data.user) {
+              setUser(data.user);
+              setExams(data.exams || []);
+              setAllProfiles(data.allProfiles || []);
+              setEditName(data.user.display_name || "");
+              setEditUsername(data.user.username || "");
+              setEditExamId(data.user.preferred_examination_id || "exam-ssc-cgl");
 
+              // Onboarding prompt if username has not been chosen yet and user is logged in
+              if (uid && !data.user.username) {
+                setShowEditProfileModal(true);
+              }
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    checkAuthAndLoad();
+    window.addEventListener("qz_auth_changed", checkAuthAndLoad);
+    return () => window.removeEventListener("qz_auth_changed", checkAuthAndLoad);
+  }, []);
+
+  useEffect(() => {
     // Fetch authored questions
     fetch("/api/questions/author")
       .then((res) => res.json())
@@ -298,75 +314,165 @@ export const ProfileView: React.FC = () => {
     }
   };
 
+  const handleResetData = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to reset all your practice data? Your streak, question attempts, matrix statistics, and saved playlists will be reset to absolute zero."
+    );
+    if (!confirmed) return;
+
+    setIsResettingData(true);
+    try {
+      const res = await fetch("/api/auth/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user?.id }),
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        setUser(data.user);
+        setResetSuccess(true);
+        setTimeout(() => setResetSuccess(false), 3000);
+      }
+    } catch {
+      alert("Failed to reset data. Please try again.");
+    } finally {
+      setIsResettingData(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("qz_user_id");
+      localStorage.removeItem("qz_auth_user");
+      setIsLoggedIn(false);
+      setUser(null);
+      window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: null } }));
+    }
+  };
+
   const activeExam = exams.find((e) => e.id === user?.preferred_examination_id);
   const dailyTarget = user?.daily_goal || 10;
-  const todaySolved = user?.today_solved_count || 6;
+  const todaySolved = isLoggedIn ? (user?.today_solved_count || 0) : 0;
   const targetPercent = Math.min(100, Math.round((todaySolved / dailyTarget) * 100));
 
   return (
     <div className="flex flex-col min-h-screen pb-24">
       <TopHeader
         currentTab="profile"
-        streakDays={user?.current_streak || 14}
-        activeExamName={activeExam?.name || "SSC CGL"}
-        user={user}
+        streakDays={isLoggedIn ? (user?.current_streak || 0) : 0}
+        activeExamName={user?.target_exam || activeExam?.name || "Railways RRB"}
+        user={isLoggedIn ? user : null}
         onSelectExam={() => setShowExamModal(true)}
       />
 
       <div className="flex flex-col w-full px-4 pt-3 pb-8">
-        {/* Profile Header */}
-        <div className="flex items-center justify-between gap-3 pt-2 pb-4">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="relative shrink-0">
-              <div className="w-16 h-16 rounded-full overflow-hidden bg-primary-fixed flex items-center justify-center shadow-xs border border-surface-container-high">
-                {user?.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={user.avatar_url}
-                    alt={user.display_name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="material-symbols-outlined text-[32px] text-primary">person</span>
-                )}
-              </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-tertiary-fixed flex items-center justify-center shadow-xs border-2 border-surface-container-lowest">
-                <span className="material-symbols-outlined text-[13px] text-on-tertiary-fixed font-bold">
-                  verified
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface truncate">
-                  {user?.display_name || "Rahul S."}
-                </h1>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold">
-                  Aspirant
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-label-md text-label-md font-bold text-primary">
-                  @{user?.username || "rahul_cgl"}
-                </span>
-                <span className="text-secondary text-xs">•</span>
-                <span className="font-body-sm text-body-sm text-secondary truncate">
-                  {user?.target_exam || activeExam?.name || "SSC CGL"}
-                </span>
-              </div>
-            </div>
+        {resetSuccess && (
+          <div className="p-3 mb-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]">check_circle</span>
+            <span>Your practice data has been reset to absolute fresh 0 scratch!</span>
           </div>
+        )}
 
-          <button
-            onClick={openEditProfile}
-            className="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 shadow-xs transition-colors shrink-0"
-            title="Edit Profile & Username"
-          >
-            <span className="material-symbols-outlined text-[16px]">edit</span>
-            <span>Edit</span>
-          </button>
-        </div>
+        {/* Profile Header: Guest vs Logged In */}
+        {!isLoggedIn ? (
+          <div className="rounded-2xl p-5 bg-surface-container-low border border-primary/20 shadow-xs mb-4 flex flex-col gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center text-secondary shrink-0 border border-surface-container-high">
+                <span className="material-symbols-outlined text-[36px]">account_circle</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface truncate">
+                    Guest Aspirant
+                  </h1>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold">
+                    Guest
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="font-label-md text-label-md font-bold text-primary">
+                    @guest
+                  </span>
+                  <span className="text-secondary text-xs">•</span>
+                  <span className="font-body-sm text-body-sm text-secondary truncate">
+                    {activeExam?.name || "Top 10 Indian Exams"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-secondary leading-relaxed">
+              Create your account with your unique username and chosen competitive exam. Start from fresh 0 scratch and build your practice streak!
+            </p>
+
+            <button
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("open_auth_modal", {
+                    detail: { reason: "Sign in or create an account to start your streak", mode: "signup" },
+                  })
+                );
+              }}
+              className="w-full py-2.5 rounded-xl bg-primary text-on-primary font-bold text-sm flex items-center justify-center gap-2 shadow-sm hover:bg-primary-container active:scale-95 transition-all"
+            >
+              <span className="material-symbols-outlined text-[18px]">login</span>
+              <span>Sign In / Create Account</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3 pt-2 pb-4">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="relative shrink-0">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-primary-fixed flex items-center justify-center shadow-xs border border-surface-container-high">
+                  {user?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={user.avatar_url}
+                      alt={user.display_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-[32px] text-primary">person</span>
+                  )}
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-tertiary-fixed flex items-center justify-center shadow-xs border-2 border-surface-container-lowest">
+                  <span className="material-symbols-outlined text-[13px] text-on-tertiary-fixed font-bold">
+                    verified
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface truncate">
+                    {user?.display_name || "Aspirant"}
+                  </h1>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold">
+                    Aspirant
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="font-label-md text-label-md font-bold text-primary">
+                    @{user?.username || "aspirant"}
+                  </span>
+                  <span className="text-secondary text-xs">•</span>
+                  <span className="font-body-sm text-body-sm text-secondary truncate">
+                    {user?.target_exam || activeExam?.name || "SSC CGL"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={openEditProfile}
+              className="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 shadow-xs transition-colors shrink-0"
+              title="Edit Profile & Username"
+            >
+              <span className="material-symbols-outlined text-[16px]">edit</span>
+              <span>Edit</span>
+            </button>
+          </div>
+        )}
 
         {/* All India Ranks & Standings Prominent Entry */}
         <div className="bg-gradient-to-r from-primary-fixed/60 via-primary-container/25 to-surface-container-low rounded-2xl p-4 mb-4 border border-primary/25 shadow-xs flex items-center justify-between">
@@ -695,6 +801,79 @@ export const ProfileView: React.FC = () => {
                 </div>
               </div>
               <span className="material-symbols-outlined text-[20px] text-primary">download</span>
+            </button>
+          )}
+
+          {/* Reset Practice Data to Fresh 0 */}
+          {isLoggedIn && (
+            <button
+              onClick={handleResetData}
+              disabled={isResettingData}
+              className="w-full flex items-center justify-between p-3.5 hover:bg-error-container/20 transition-colors text-left group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-error-container flex items-center justify-center text-error shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">restart_alt</span>
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-body-lg text-body-lg text-error font-semibold truncate group-hover:underline">
+                    {isResettingData ? "Resetting..." : "Reset Data to Fresh 0"}
+                  </span>
+                  <span className="font-body-sm text-body-sm text-secondary truncate">
+                    Reset streak, attempts and matrix to absolute zero
+                  </span>
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-[20px] text-error">chevron_right</span>
+            </button>
+          )}
+
+          {/* Sign Out / Sign In */}
+          {isLoggedIn ? (
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center justify-between p-3.5 hover:bg-surface-container transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-secondary shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">logout</span>
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-body-lg text-body-lg text-on-surface font-semibold truncate">
+                    Sign Out
+                  </span>
+                  <span className="font-body-sm text-body-sm text-secondary truncate">
+                    Return to guest browsing mode
+                  </span>
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-[20px] text-secondary">chevron_right</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent("open_auth_modal", {
+                    detail: { reason: "Sign in to track your practice streak and rank", mode: "signup" },
+                  })
+                );
+              }}
+              className="w-full flex items-center justify-between p-3.5 hover:bg-surface-container transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center text-on-primary shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">login</span>
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-body-lg text-body-lg text-primary font-bold truncate">
+                    Sign In / Sign Up
+                  </span>
+                  <span className="font-body-sm text-body-sm text-secondary truncate">
+                    Google Sign-in or create unique handle
+                  </span>
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-[20px] text-primary">chevron_right</span>
             </button>
           )}
         </div>

@@ -56,17 +56,31 @@ export const SocialView: React.FC = () => {
   const practiceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const practiceStartTimeRef = useRef<number | null>(null);
 
-  // Load User Profile
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+
+  // Check auth and load User Profile
   useEffect(() => {
-    fetch("/api/profile")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setUser(data.user);
-          setExams(data.exams || []);
-        }
-      })
-      .catch(() => {});
+    const checkAuth = () => {
+      if (typeof window !== "undefined") {
+        const uid = localStorage.getItem("qz_user_id");
+        setIsLoggedIn(Boolean(uid));
+
+        const url = uid ? `/api/profile?userId=${encodeURIComponent(uid)}` : "/api/profile";
+        fetch(url)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              setUser(data.user);
+              setExams(data.exams || []);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    checkAuth();
+    window.addEventListener("qz_auth_changed", checkAuth);
+    return () => window.removeEventListener("qz_auth_changed", checkAuth);
   }, []);
 
   // Load Friends List & All Messages
@@ -348,13 +362,51 @@ export const SocialView: React.FC = () => {
     <div className="flex flex-col min-h-screen pb-24 bg-surface">
       <TopHeader
         currentTab="social"
-        streakDays={user?.current_streak || 14}
-        activeExamName={user?.target_exam || activeExam?.name || "SSC CGL"}
-        user={user}
+        streakDays={isLoggedIn ? (user?.current_streak || 0) : 0}
+        activeExamName={user?.target_exam || activeExam?.name || "Railways RRB"}
+        user={isLoggedIn ? user : null}
         onSelectExam={() => setShowExamModal(true)}
       />
 
       <div className="flex flex-col w-full px-4 pt-3 pb-6 max-w-[480px] mx-auto">
+        {/* Guest Visitor Banner if not logged in */}
+        {!isLoggedIn && (
+          <div className="rounded-2xl p-4 bg-surface-container-low border border-primary/20 shadow-xs mb-4 flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[22px]">forum</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <h3 className="font-bold text-on-surface text-base">Connect with Fellow Aspirants</h3>
+                <p className="text-xs text-secondary mt-0.5 leading-relaxed">
+                  Sign in or create your free account to find study partners by @username, challenge friends with quiz reels, and chat in real-time.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("open_auth_modal", {
+                      detail: { reason: "Sign in to connect and study with aspirants", mode: "signup" },
+                    })
+                  );
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary-container active:scale-95 transition-all"
+              >
+                <span className="material-symbols-outlined text-[16px]">login</span>
+                <span>Sign In / Sign Up</span>
+              </button>
+              <Link
+                href="/loop"
+                className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs flex items-center gap-1 transition-colors"
+              >
+                <span>Browse Loop</span>
+                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </Link>
+            </div>
+          </div>
+        )}
         {/* Header Title */}
         <div className="flex items-center justify-between pb-3">
           <div>

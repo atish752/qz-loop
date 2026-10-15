@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS examinations (
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
   description TEXT,
+  category TEXT,
+  display_order INT NOT NULL DEFAULT 0,
+  marks_per_question NUMERIC(4,2) DEFAULT 2.0,
+  negative_marks NUMERIC(4,2) DEFAULT 0.5,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -40,11 +44,17 @@ CREATE TABLE IF NOT EXISTS subjects (
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   display_name TEXT NOT NULL,
+  username TEXT UNIQUE NOT NULL,
+  target_exam TEXT,
   avatar_url TEXT,
   preferred_examination_id UUID REFERENCES examinations(id) ON DELETE SET NULL,
   role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'admin', 'moderator')),
   current_streak INT NOT NULL DEFAULT 0,
   last_active_date DATE,
+  daily_goal INT NOT NULL DEFAULT 10,
+  today_solved_count INT NOT NULL DEFAULT 0,
+  total_questions_answered INT NOT NULL DEFAULT 0,
+  overall_accuracy NUMERIC(5,2) NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -52,15 +62,21 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- 6. Questions table
 CREATE TABLE IF NOT EXISTS questions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  author_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  author_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   examination_id UUID NOT NULL REFERENCES examinations(id) ON DELETE CASCADE,
   subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
   question_text TEXT NOT NULL,
+  hindi_question_text TEXT,
   language TEXT NOT NULL DEFAULT 'en' CHECK (language IN ('en', 'hi')),
-  options JSONB NOT NULL, -- Array of { id: string, text: string }
+  options JSONB NOT NULL, -- Array of { id: string, text: string, hindi_text?: string }
   correct_option_id TEXT NOT NULL, -- 'A', 'B', 'C', 'D'
   explanation TEXT,
+  hindi_explanation TEXT,
   difficulty TEXT DEFAULT 'medium' CHECK (difficulty IN ('easy', 'medium', 'hard')),
+  syllabus_tag TEXT,
+  pyq_info TEXT,
+  quality_upvotes INT NOT NULL DEFAULT 0,
+  quality_downvotes INT NOT NULL DEFAULT 0,
   normalized_fingerprint TEXT NOT NULL, -- Lowercase, punctuation & whitespace stripped
   publication_status TEXT NOT NULL DEFAULT 'published' CHECK (publication_status IN ('draft', 'published', 'archived')),
   moderation_status TEXT NOT NULL DEFAULT 'active' CHECK (moderation_status IN ('active', 'flagged', 'hidden')),
@@ -187,7 +203,6 @@ CREATE POLICY "Examinations viewable by all" ON examinations FOR SELECT USING (t
 CREATE POLICY "Subjects viewable by all" ON subjects FOR SELECT USING (true);
 
 -- Questions: Viewable by all when published and active.
--- Important: API endpoint masks correct_option_id for feed queries!
 CREATE POLICY "Published questions viewable by all" ON questions FOR SELECT USING (
   publication_status = 'published' AND moderation_status = 'active'
 );

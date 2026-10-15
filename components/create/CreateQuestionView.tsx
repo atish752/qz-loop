@@ -8,36 +8,48 @@ import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp
 import { getExamScoringRule } from "@/lib/utils/examScoring";
 
 export const EXAMS_LIST = [
-  { id: "exam-ssc-cgl", name: "SSC CGL", shortName: "SSC CGL" },
-  { id: "exam-ssc-chsl", name: "SSC CHSL (10+2)", shortName: "SSC CHSL" },
-  { id: "exam-railway-ntpc", name: "RRB NTPC & Group D", shortName: "Railways RRB" },
-  { id: "exam-banking-ibps", name: "Banking IBPS PO / Clerk & SBI", shortName: "Banking IBPS" },
-  { id: "exam-state-pcs", name: "State PCS (UPPSC, BPSC, MPPSC)", shortName: "State PCS" },
-  { id: "exam-upsc-csat", name: "UPSC CSAT & Prelims GS", shortName: "UPSC CSAT" },
-  { id: "exam-defence-cds", name: "Defence CDS / NDA", shortName: "Defence CDS" },
+  { id: "exam-railway-ntpc", name: "Railways (RRB NTPC & Group D)", shortName: "Railways RRB" },
+  { id: "exam-ssc-cgl", name: "SSC CGL / CHSL / MTS", shortName: "SSC CGL" },
+  { id: "exam-neet-ug", name: "NEET UG (Medical Entrance)", shortName: "NEET UG" },
+  { id: "exam-cuet-ug", name: "CUET UG (Central Universities)", shortName: "CUET UG" },
+  { id: "exam-jee-main", name: "JEE Main (Engineering Entrance)", shortName: "JEE Main" },
+  { id: "exam-banking-ibps", name: "Banking (IBPS / SBI PO & Clerk)", shortName: "Banking IBPS" },
+  { id: "exam-state-police", name: "State Police / Constable & SI (UP/Bihar/MP)", shortName: "State Police" },
+  { id: "exam-state-pcs", name: "State PCS (BPSC, UPPSC, MPPSC)", shortName: "State PCS" },
+  { id: "exam-defence-cds", name: "Defence (NDA / CDS / AFCAT)", shortName: "Defence CDS" },
+  { id: "exam-upsc-csat", name: "UPSC Civil Services (IAS / IPS Prelims)", shortName: "UPSC Civil Services" },
 ];
 
 export const EXAM_SUBJECTS_MAP: Record<
   string,
   { id: string; name: string; icon: string; slug: string }[]
 > = {
+  "exam-railway-ntpc": [
+    { id: "subj-rrb-maths", name: "General Mathematics", icon: "calculate", slug: "maths" },
+    { id: "subj-rrb-reasoning", name: "General Intelligence & Reasoning", icon: "psychology", slug: "reasoning" },
+    { id: "subj-rrb-science", name: "General Science", icon: "science", slug: "science" },
+    { id: "subj-rrb-gk", name: "General Awareness & Current Affairs", icon: "public", slug: "gk" },
+  ],
   "exam-ssc-cgl": [
     { id: "subj-maths", name: "Quantitative Aptitude", icon: "calculate", slug: "maths" },
     { id: "subj-reasoning", name: "General Intelligence & Reasoning", icon: "psychology", slug: "reasoning" },
     { id: "subj-english", name: "English Comprehension", icon: "spellcheck", slug: "english" },
     { id: "subj-gk", name: "General Awareness (Polity & GK)", icon: "public", slug: "gk" },
   ],
-  "exam-ssc-chsl": [
-    { id: "subj-chsl-maths", name: "Quantitative Aptitude", icon: "calculate", slug: "maths" },
-    { id: "subj-chsl-reasoning", name: "General Intelligence & Reasoning", icon: "psychology", slug: "reasoning" },
-    { id: "subj-chsl-english", name: "English Language", icon: "spellcheck", slug: "english" },
-    { id: "subj-chsl-gk", name: "General Awareness", icon: "public", slug: "gk" },
+  "exam-neet-ug": [
+    { id: "subj-neet-bio", name: "Biology (Botany & Zoology)", icon: "eco", slug: "biology" },
+    { id: "subj-neet-chem", name: "Chemistry", icon: "biotech", slug: "chemistry" },
+    { id: "subj-neet-phy", name: "Physics", icon: "bolt", slug: "physics" },
   ],
-  "exam-railway-ntpc": [
-    { id: "subj-rrb-maths", name: "General Mathematics", icon: "calculate", slug: "maths" },
-    { id: "subj-rrb-reasoning", name: "General Intelligence & Reasoning", icon: "psychology", slug: "reasoning" },
-    { id: "subj-rrb-science", name: "General Science (Physics/Chem/Bio)", icon: "science", slug: "science" },
-    { id: "subj-rrb-gk", name: "General Awareness & Current Affairs", icon: "public", slug: "gk" },
+  "exam-cuet-ug": [
+    { id: "subj-cuet-gt", name: "General Test (Quant, Logic & GK)", icon: "auto_awesome", slug: "gk" },
+    { id: "subj-cuet-eng", name: "English Language", icon: "spellcheck", slug: "english" },
+    { id: "subj-cuet-domain", name: "Domain Knowledge", icon: "menu_book", slug: "domain" },
+  ],
+  "exam-jee-main": [
+    { id: "subj-jee-maths", name: "Mathematics", icon: "calculate", slug: "maths" },
+    { id: "subj-jee-physics", name: "Physics", icon: "bolt", slug: "physics" },
+    { id: "subj-jee-chemistry", name: "Chemistry", icon: "science", slug: "chemistry" },
   ],
   "exam-banking-ibps": [
     { id: "subj-bank-quant", name: "Quantitative Aptitude & DI", icon: "calculate", slug: "maths" },
@@ -45,23 +57,28 @@ export const EXAM_SUBJECTS_MAP: Record<
     { id: "subj-bank-english", name: "English Language & Grammar", icon: "spellcheck", slug: "english" },
     { id: "subj-bank-ga", name: "Banking & Financial Awareness", icon: "account_balance", slug: "gk" },
   ],
-  "exam-state-pcs": [
-    { id: "subj-pcs-polity", name: "Indian Polity & Governance", icon: "gavel", slug: "gk" },
-    { id: "subj-pcs-history", name: "Indian History & Culture", icon: "menu_book", slug: "gk" },
-    { id: "subj-pcs-geo", name: "Geography & Environment", icon: "public", slug: "gk" },
-    { id: "subj-pcs-csat", name: "General Mental Ability (CSAT)", icon: "psychology", slug: "reasoning" },
+  "exam-state-police": [
+    { id: "subj-pol-gk", name: "General Knowledge & Law/Constitution", icon: "shield", slug: "gk" },
+    { id: "subj-pol-num", name: "Numerical & Mental Ability", icon: "calculate", slug: "maths" },
+    { id: "subj-pol-reas", name: "Mental Aptitude & Reasoning", icon: "psychology", slug: "reasoning" },
+    { id: "subj-pol-hindi", name: "General Hindi (सामान्य हिन्दी)", icon: "translate", slug: "hindi" },
   ],
-  "exam-upsc-csat": [
-    { id: "subj-upsc-csat-quant", name: "Basic Numeracy & Data Interpretation", icon: "calculate", slug: "maths" },
-    { id: "subj-upsc-csat-reasoning", name: "Logical Reasoning & Analytical Ability", icon: "psychology", slug: "reasoning" },
-    { id: "subj-upsc-csat-comprehension", name: "Reading Comprehension & Verbal", icon: "spellcheck", slug: "english" },
-    { id: "subj-upsc-gs", name: "General Studies Paper-1 (GS)", icon: "public", slug: "gk" },
+  "exam-state-pcs": [
+    { id: "subj-pcs-gs", name: "General Studies Paper-I", icon: "public", slug: "gk" },
+    { id: "subj-pcs-csat", name: "General Mental Ability (CSAT)", icon: "psychology", slug: "reasoning" },
+    { id: "subj-pcs-state", name: "State Special GK & History", icon: "map", slug: "state-gk" },
+    { id: "subj-pcs-hindi", name: "General Hindi & Essay", icon: "translate", slug: "hindi" },
   ],
   "exam-defence-cds": [
-    { id: "subj-def-english", name: "English Comprehension", icon: "spellcheck", slug: "english" },
-    { id: "subj-def-gk", name: "General Knowledge & Defence", icon: "public", slug: "gk" },
     { id: "subj-def-maths", name: "Elementary Mathematics", icon: "calculate", slug: "maths" },
+    { id: "subj-def-english", name: "English Comprehension", icon: "spellcheck", slug: "english" },
+    { id: "subj-def-gk", name: "General Knowledge & Defence", icon: "military_tech", slug: "gk" },
     { id: "subj-def-science", name: "General Science", icon: "science", slug: "science" },
+  ],
+  "exam-upsc-csat": [
+    { id: "subj-upsc-gs", name: "General Studies Paper-I", icon: "account_balance", slug: "gk" },
+    { id: "subj-upsc-csat", name: "CSAT Paper-II (Reasoning)", icon: "psychology", slug: "reasoning" },
+    { id: "subj-upsc-ca", name: "Current Affairs & Environment", icon: "eco", slug: "current-affairs" },
   ],
 };
 
@@ -354,6 +371,19 @@ export const CreateQuestionView: React.FC = () => {
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    // Require sign-in before publishing
+    if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+      window.dispatchEvent(
+        new CustomEvent("open_auth_modal", {
+          detail: {
+            reason: "Sign in required to create and publish questions to Qz Loop",
+            mode: "signup",
+          },
+        })
+      );
+      return;
+    }
 
     if (!questionText.trim()) {
       setErrorMsg("Please enter the question statement");
