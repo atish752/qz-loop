@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/data/store";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,8 +17,54 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id");
-    const user = requestedUserId ? db.getProfileById(requestedUserId) || null : null;
+    const cookieUserId = request.cookies.get("qz_user_id")?.value;
+    const requestedUserId =
+      searchParams.get("userId") ||
+      request.headers.get("x-user-id") ||
+      cookieUserId;
+
+    let user = requestedUserId ? db.getProfileById(requestedUserId) || null : null;
+
+    // Cloud recovery: if user is not in in-memory store, recover from Supabase
+    if (!user && requestedUserId) {
+      try {
+        const supabase = await createServerSupabaseClient();
+        if (supabase) {
+          const { data: dbProfile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", requestedUserId)
+            .maybeSingle();
+
+          if (dbProfile) {
+            user = db.syncUserFromAuth({
+              id: dbProfile.id,
+              display_name: dbProfile.display_name,
+              username: dbProfile.username,
+              target_exam: dbProfile.target_exam,
+              preferred_examination_id: dbProfile.preferred_examination_id,
+              avatar_url: dbProfile.avatar_url,
+              email: dbProfile.email,
+            });
+          } else {
+            const { data: authData } = await supabase.auth.getUser();
+            if (authData?.user && authData.user.id === requestedUserId) {
+              const u = authData.user;
+              const meta = u.user_metadata || {};
+              user = db.syncUserFromAuth({
+                id: u.id,
+                display_name: meta.full_name || meta.name || u.email?.split("@")[0] || "Aspirant",
+                username: "aspirant_" + u.id.slice(0, 6),
+                avatar_url: meta.avatar_url || meta.picture || null,
+                email: u.email,
+              });
+            }
+          }
+        }
+      } catch (recoveryErr) {
+        console.error("Supabase profile recovery notice:", recoveryErr);
+      }
+    }
     const exams = db.getExaminations();
     const activeExamId = user?.preferred_examination_id || exams[0]?.id || "exam-railway-ntpc";
     const subjects = db.getSubjects(activeExamId);

@@ -21,7 +21,9 @@ export async function POST(request: NextRequest) {
         const existing = db.getAllProfiles().find((p) => p.username === targetUsername);
         if (existing) {
           const switched = db.setCurrentUser(existing.id);
-          return NextResponse.json({ success: true, user: switched, isExisting: true });
+          const res = NextResponse.json({ success: true, user: switched, isExisting: true });
+          res.cookies.set("qz_user_id", switched.id, { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
+          return res;
         }
         targetUsername = `${baseUsername}_${counter++}`;
       }
@@ -36,7 +38,9 @@ export async function POST(request: NextRequest) {
         email: googleEmail,
       });
 
-      return NextResponse.json({ success: true, user: newUser, isNew: true });
+      const res = NextResponse.json({ success: true, user: newUser, isNew: true });
+      res.cookies.set("qz_user_id", newUser.id, { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
+      return res;
     }
 
     // Handle Email/Username Login
@@ -51,7 +55,9 @@ export async function POST(request: NextRequest) {
 
     if (matched) {
       const switched = db.setCurrentUser(matched.id);
-      return NextResponse.json({ success: true, user: switched });
+      const res = NextResponse.json({ success: true, user: switched });
+      res.cookies.set("qz_user_id", switched.id, { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
+      return res;
     }
 
     return NextResponse.json({

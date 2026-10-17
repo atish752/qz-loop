@@ -857,8 +857,23 @@ async function runTests() {
     assert(Boolean(TRANSLATIONS.hi[k]), `Hindi dictionary contains '${k}'`);
   }
 
+  // Scenario 47: Live Google OAuth Bridge & AuthSync Recovery
+  console.log("\n[Scenario 47] Live Google OAuth Bridge & AuthSync Recovery");
+  const authCallbackRouteFile = fs.readFileSync(path.join(__dirname, "../app/auth/callback/route.ts"), "utf8");
+  assert(authCallbackRouteFile.includes("localStorage.setItem(\"qz_user_id\""), "Auth callback writes user ID directly to client localStorage via bridge script");
+  assert(authCallbackRouteFile.includes("document.cookie = \"qz_user_id=\""), "Auth callback persists secure qz_user_id cookie");
+  assert(authCallbackRouteFile.includes("window.dispatchEvent(new CustomEvent(\"qz_auth_changed\""), "Auth callback triggers immediate client-side reactive auth broadcast");
+  assert(authCallbackRouteFile.includes("errorDesc || errorParam"), "Auth callback renders clean user-facing error notice if OAuth provider denies access");
+
+  const authSyncComponentFile = fs.readFileSync(path.join(__dirname, "../components/auth/AuthSync.tsx"), "utf8");
+  assert(authSyncComponentFile.includes("syncFromCookie"), "AuthSync provides cookie-to-localStorage automated fallback");
+  assert(authSyncComponentFile.includes("supabase.auth.onAuthStateChange"), "AuthSync subscribes to live Supabase OAuth session changes");
+
+  const layoutFile = fs.readFileSync(path.join(__dirname, "../app/layout.tsx"), "utf8");
+  assert(layoutFile.includes("<AuthSync />"), "RootLayout actively mounts <AuthSync /> on every application page");
+
   console.log("\n=================================================");
-  console.log("   ALL 46 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 47 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

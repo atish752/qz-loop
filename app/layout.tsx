@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { AuthSync } from "@/components/auth/AuthSync";
 import { UsernameOnboardingModal } from "@/components/auth/UsernameOnboardingModal";
 import { InteractiveOnboardingModal } from "@/components/onboarding/InteractiveOnboardingModal";
 
@@ -66,6 +67,7 @@ export default function RootLayout({
       </head>
       <body className="bg-surface font-sans text-on-surface antialiased min-h-screen flex flex-col justify-between items-center selection:bg-primary-fixed selection:text-primary">
         <div className="w-full max-w-[480px] min-h-screen bg-surface-container-lowest flex flex-col relative shadow-[0_0_24px_rgba(0,0,0,0.06)] md:border-x md:border-surface-container-high/60">
+          <AuthSync />
           {children}
           <AuthModal />
           <UsernameOnboardingModal />

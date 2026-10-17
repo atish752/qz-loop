@@ -43,11 +43,17 @@ export async function POST(request: NextRequest) {
       language_preference: lang,
     });
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       user: newUser,
       message: "Account created with fresh zero baseline data!",
     });
+    res.cookies.set("qz_user_id", newUser.id, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      sameSite: "lax",
+    });
+    return res;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Signup failed";
     return NextResponse.json({ success: false, error: message }, { status: 400 });
