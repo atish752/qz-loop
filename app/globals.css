@@ -2,14 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Light Mode Color Palette (RGB channels for Tailwind opacity resolution) */
+  --color-primary: 83 0 183;
+  --color-primary-container: 109 40 217;
+  --color-on-primary: 255 255 255;
+  --color-on-primary-container: 218 197 255;
+  --color-primary-fixed: 235 221 255;
+  --color-primary-fixed-dim: 211 187 255;
+  --color-secondary: 92 95 96;
+  --color-secondary-container: 225 227 228;
+  --color-on-secondary: 255 255 255;
+  --color-on-secondary-container: 98 101 102;
+  --color-tertiary: 0 75 49;
+  --color-tertiary-container: 0 101 68;
+  --color-on-tertiary: 255 255 255;
+  --color-on-tertiary-container: 88 231 171;
+  --color-tertiary-fixed: 111 251 190;
+  --color-tertiary-fixed-dim: 78 222 163;
+  --color-on-tertiary-fixed: 0 33 19;
+  --color-error: 186 26 26;
+  --color-error-container: 255 218 214;
+  --color-on-error: 255 255 255;
+  --color-on-error-container: 147 0 10;
+  --color-background: 249 249 255;
+  --color-on-background: 20 27 43;
+  --color-surface: 249 249 255;
+  --color-on-surface: 20 27 43;
+  --color-on-surface-variant: 74 68 85;
+  --color-surface-container-lowest: 255 255 255;
+  --color-surface-container-low: 241 243 255;
+  --color-surface-container: 233 237 255;
+  --color-surface-container-high: 225 232 253;
+  --color-surface-container-highest: 220 226 247;
+  --color-outline: 123 116 134;
+  --color-outline-variant: 204 195 215;
+}
+
+html.dark {
+  /* Redesigned Dark Mode Palette (Genuine powerful apps: Obsidian midnight slate + radiant contrast) */
+  /* Light purple contrast #a855f7 and #c084fc */
+  --color-primary: 168 85 247; /* #a855f7 */
+  --color-primary-container: 192 132 252; /* #c084fc */
+  --color-on-primary: 255 255 255;
+  --color-on-primary-container: 26 4 46;
+  --color-primary-fixed: 192 132 252;
+  --color-primary-fixed-dim: 168 85 247;
+  --color-secondary: 148 163 184; /* slate-400 */
+  --color-secondary-container: 38 48 70;
+  --color-on-secondary: 255 255 255;
+  --color-on-secondary-container: 203 213 225;
+  --color-tertiary: 52 211 153; /* emerald-400 */
+  --color-tertiary-container: 16 185 129;
+  --color-on-tertiary: 2 44 34;
+  --color-on-tertiary-container: 209 250 229;
+  --color-tertiary-fixed: 52 211 153;
+  --color-tertiary-fixed-dim: 16 185 129;
+  --color-on-tertiary-fixed: 2 44 34;
+  --color-error: 248 113 113; /* red-400 */
+  --color-error-container: 127 29 29;
+  --color-on-error: 255 255 255;
+  --color-on-error-container: 254 202 202;
+  --color-background: 11 15 25; /* #0b0f19 - deep midnight slate */
+  --color-on-background: 240 243 250;
+  --color-surface: 11 15 25;
+  --color-on-surface: 240 243 250; /* crystal clear text */
+  --color-on-surface-variant: 160 174 192;
+  --color-surface-container-lowest: 18 23 36; /* #121724 - elevated dark cards */
+  --color-surface-container-low: 24 31 47; /* #181f2f */
+  --color-surface-container: 30 38 56; /* #1e2638 */
+  --color-surface-container-high: 38 48 70; /* #263046 */
+  --color-surface-container-highest: 47 58 83; /* #2f3a53 */
+  --color-outline: 75 85 99;
+  --color-outline-variant: 55 65 81;
+}
+
 @layer base {
   html, body {
     width: 100%;
     margin: 0;
     padding: 0;
     min-height: 100vh;
-    background-color: #f9f9ff;
-    color: #141b2b;
+    background-color: rgb(var(--color-background));
+    color: rgb(var(--color-on-background));
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
@@ -30,52 +105,22 @@
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0px);
   }
+
+  /* Form controls in Dark Mode */
+  html.dark input,
+  html.dark textarea,
+  html.dark select {
+    color-scheme: dark;
+    color: #f0f3fa;
+  }
+
+  html.dark input::placeholder,
+  html.dark textarea::placeholder {
+    color: #64748b;
+  }
 }
 
-/* Dark Mode surface & typography overrides */
-html.dark .bg-surface {
-  background-color: #0b0f19 !important;
-}
-
-html.dark .bg-surface-container-lowest {
-  background-color: #121724 !important;
-}
-
-html.dark .bg-surface-container-low {
-  background-color: #181f2f !important;
-}
-
-html.dark .bg-surface-container {
-  background-color: #1e2638 !important;
-}
-
-html.dark .bg-surface-container-high {
-  background-color: #263046 !important;
-}
-
-html.dark .bg-surface-container-highest {
-  background-color: #2f3a53 !important;
-}
-
-html.dark .text-on-surface {
-  color: #f0f3fa !important;
-}
-
-html.dark .text-on-surface-variant {
-  color: #a0aec0 !important;
-}
-
-html.dark .text-secondary {
-  color: #94a3b8 !important;
-}
-
-html.dark .border-surface-container-high\/40,
-html.dark .border-surface-container-high\/60,
-html.dark .border-surface-container-high {
-  border-color: #263046 !important;
-}
-
-/* Dark Mode light purple overrides: makes dark purple buttons radiant & easily visible */
+/* Dark Mode radiant light purple overrides (#a855f7 and #c084fc for Scenario 42) */
 html.dark .bg-primary {
   background-color: #a855f7 !important;
   color: #ffffff !important;
@@ -106,24 +151,6 @@ html.dark .bg-primary-fixed {
 html.dark .bg-primary-fixed-dim {
   background-color: rgba(192, 132, 252, 0.35) !important;
   color: #f3e8ff !important;
-}
-
-html.dark .bg-primary\/10 {
-  background-color: rgba(168, 85, 247, 0.18) !important;
-}
-
-html.dark .bg-primary\/15 {
-  background-color: rgba(168, 85, 247, 0.22) !important;
-}
-
-html.dark .bg-primary\/20 {
-  background-color: rgba(168, 85, 247, 0.28) !important;
-}
-
-html.dark .border-primary\/20,
-html.dark .border-primary\/30,
-html.dark .border-primary\/40 {
-  border-color: rgba(192, 132, 252, 0.35) !important;
 }
 
 html.dark .from-primary {

@@ -1383,6 +1383,18 @@ class DataStore {
     return q;
   }
 
+  // --- Delete Question (Author Delete) ---
+  public deleteQuestion(id: string, userId?: string): boolean {
+    const idx = this.questions.findIndex((item) => item.id === id);
+    if (idx === -1) return false;
+    this.questions.splice(idx, 1);
+    // Remove from any collections
+    for (const col of this.collections) {
+      col.question_ids = col.question_ids.filter((qId) => qId !== id);
+    }
+    return true;
+  }
+
   // --- Question Quality Peer Verification (Upvote / Downvote) ---
   public voteQuestionQuality(
     userId: string,
@@ -1553,6 +1565,11 @@ class DataStore {
     return newCol;
   }
 
+  public getQuestionsByIds(ids: string[]): Question[] {
+    const set = new Set(ids);
+    return this.questions.filter((q) => set.has(q.id));
+  }
+
   // --- Friends System ---
   private userFriends: Map<string, FriendUser[]> = new Map();
 
@@ -1689,6 +1706,12 @@ class DataStore {
       (m) =>
         (m.from_user_id === userId && m.to_user_id === friendId) ||
         (m.from_user_id === friendId && m.to_user_id === userId)
+    );
+  }
+
+  public getAllMessagesForUser(userId: string): DirectMessage[] {
+    return this.messages.filter(
+      (m) => m.from_user_id === userId || m.to_user_id === userId
     );
   }
 

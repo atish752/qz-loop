@@ -16,6 +16,8 @@ import {
 } from "@/lib/utils/whatsapp";
 import { compressImageClientSide } from "@/lib/utils/imageCompression";
 import { setAppLanguage, useAppLanguage } from "@/lib/utils/i18n";
+import { ViewAllAuthoredModal } from "./ViewAllAuthoredModal";
+import { SavedCollectionsModal } from "./SavedCollectionsModal";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -35,6 +37,8 @@ export const ProfileView: React.FC = () => {
   const [isInstalled, setIsInstalled] = useState<boolean>(false);
 
   const [authoredQuestions, setAuthoredQuestions] = useState<Question[]>([]);
+  const [showAllAuthoredModal, setShowAllAuthoredModal] = useState<boolean>(false);
+  const [showSavedCollectionsModal, setShowSavedCollectionsModal] = useState<boolean>(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>("");
   const [editUsername, setEditUsername] = useState<string>("");
@@ -218,6 +222,7 @@ export const ProfileView: React.FC = () => {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId: user?.id,
           display_name: editName.trim(),
           username: editUsername.trim().toLowerCase(),
           preferred_examination_id: editExamId,
@@ -231,7 +236,10 @@ export const ProfileView: React.FC = () => {
       if (res.ok && data.success) {
         setUser(data.user);
         setAppLanguage(editLanguagePref);
+        localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
+        localStorage.setItem("qz_user_id", data.user.id);
         localStorage.setItem("qz_quiz_lang", editLanguagePref);
+        document.cookie = `qz_user_id=${data.user.id}; path=/; max-age=2592000; SameSite=Lax`;
         window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
         setShowEditProfileModal(false);
       } else {
@@ -256,6 +264,24 @@ export const ProfileView: React.FC = () => {
       }
     } catch {
       // Handled
+    }
+  };
+
+  const handleDeleteAuthoredQuestion = async (questionId: string) => {
+    const confirmMsg = t.deleteConfirm || "Are you sure you want to delete this question? This cannot be undone.";
+    if (!window.confirm(confirmMsg)) return;
+    try {
+      const res = await fetch(`/api/questions/${encodeURIComponent(questionId)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAuthoredQuestions((prev) => prev.filter((q) => q.id !== questionId));
+      } else {
+        alert(data.error || "Failed to delete question");
+      }
+    } catch {
+      alert("Network error while deleting question.");
     }
   };
 
@@ -430,10 +456,10 @@ export const ProfileView: React.FC = () => {
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface truncate">
-                    Guest Aspirant
+                    {t.guestAspirant || "Guest Aspirant"}
                   </h1>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-semibold">
-                    Guest
+                    {t.guestBadge || "Guest"}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -449,7 +475,7 @@ export const ProfileView: React.FC = () => {
             </div>
 
             <p className="text-xs text-secondary leading-relaxed">
-              Create your account with your unique username and chosen competitive exam. Start from fresh 0 scratch and build your practice streak!
+              {t.guestProfileBanner || "Create your account with your unique username and chosen competitive exam. Start from fresh 0 scratch and build your practice streak!"}
             </p>
 
             <button
@@ -463,7 +489,7 @@ export const ProfileView: React.FC = () => {
               className="w-full py-2.5 rounded-xl bg-primary text-on-primary font-bold text-sm flex items-center justify-center gap-2 shadow-sm hover:bg-primary-container active:scale-95 transition-all"
             >
               <span className="material-symbols-outlined text-[18px]">login</span>
-              <span>Sign In / Create Account</span>
+              <span>{t.signInCreateAccount || "Sign In with Google"}</span>
             </button>
           </div>
         ) : (
@@ -524,7 +550,7 @@ export const ProfileView: React.FC = () => {
               title="Edit Profile & Username"
             >
               <span className="material-symbols-outlined text-[16px]">edit</span>
-              <span>Edit</span>
+              <span>{t.editBtn || "Edit"}</span>
             </button>
           </div>
         )}
@@ -537,11 +563,11 @@ export const ProfileView: React.FC = () => {
             </div>
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-headline-sm text-headline-sm font-bold text-on-surface">All India Ranks</span>
+                <span className="font-headline-sm text-headline-sm font-bold text-on-surface">{t.allIndiaRanks || "All India Ranks"}</span>
                 <span className="text-[10px] bg-tertiary text-on-tertiary px-1.5 py-0.5 rounded-full font-bold">AIR</span>
               </div>
               <p className="font-body-sm text-body-sm text-secondary truncate mt-0.5">
-                Live rankings, sprint scores & weekly competition
+                {t.liveRankingsDesc || "Live rankings, sprint scores & weekly competition"}
               </p>
             </div>
           </div>
@@ -549,7 +575,7 @@ export const ProfileView: React.FC = () => {
             href="/leaderboard"
             className="px-3.5 py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold hover:bg-primary-container active:scale-95 transition-all shadow-xs shrink-0 flex items-center gap-1"
           >
-            <span>View Ranks</span>
+            <span>{t.viewRanks || "View Ranks"}</span>
             <span className="material-symbols-outlined text-[16px]">chevron_right</span>
           </Link>
         </div>
@@ -566,7 +592,7 @@ export const ProfileView: React.FC = () => {
                 </span>
               </div>
               <span className="font-label-sm text-label-sm text-secondary mt-0.5 font-medium">
-                Day Streak
+                {t.dayStreak || "Day Streak"}
               </span>
             </div>
 
@@ -579,7 +605,7 @@ export const ProfileView: React.FC = () => {
                 </span>
               </div>
               <span className="font-label-sm text-label-sm text-secondary mt-0.5 font-medium">
-                Questions
+                {t.questionsLabel || "Questions"}
               </span>
             </div>
 
@@ -592,7 +618,7 @@ export const ProfileView: React.FC = () => {
                 </span>
               </div>
               <span className="font-label-sm text-label-sm text-secondary mt-0.5 font-medium">
-                Accuracy
+                {t.metricAccuracy || "Accuracy"}
               </span>
             </div>
           </div>
@@ -604,7 +630,7 @@ export const ProfileView: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[20px]">flag</span>
               <span className="font-label-md text-label-md font-bold text-on-surface">
-                Daily Goal: {todaySolved} / {dailyTarget} solved
+                {t.dailyGoal}: {todaySolved} / {dailyTarget} {t.solvedOutOf}
               </span>
             </div>
             <span className="font-label-sm text-label-sm font-bold text-primary">
@@ -620,8 +646,8 @@ export const ProfileView: React.FC = () => {
           </div>
           <p className="font-body-sm text-body-sm text-secondary">
             {todaySolved >= dailyTarget
-              ? "Daily goal reached! Keep going to climb the leaderboard."
-              : `${dailyTarget - todaySolved} more questions to finish today's target.`}
+              ? t.dailyGoalReached
+              : `${dailyTarget - todaySolved} ${t.dailyGoalRemaining}`}
           </p>
         </div>
 
@@ -631,25 +657,37 @@ export const ProfileView: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[20px]">edit_document</span>
               <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                My Created Questions
+                {t.myCreatedQuestions || "My Created Questions"}
               </h2>
             </div>
-            <Link
-              href="/create"
-              className="px-2.5 py-1 rounded-lg bg-primary-fixed text-primary font-bold text-xs hover:bg-primary-fixed-dim transition-colors flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[14px]">add</span>
-              <span>New</span>
-            </Link>
+            <div className="flex items-center gap-1.5">
+              {authoredQuestions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllAuthoredModal(true)}
+                  className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[14px]">visibility</span>
+                  <span>{t.view || "View"} ({authoredQuestions.length})</span>
+                </button>
+              )}
+              <Link
+                href="/create"
+                className="px-2.5 py-1 rounded-lg bg-primary-fixed text-primary font-bold text-xs hover:bg-primary-fixed-dim transition-colors flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[14px]">add</span>
+                <span>{t.newBtn || "New"}</span>
+              </Link>
+            </div>
           </div>
 
           {authoredQuestions.length === 0 ? (
             <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high/40 text-center text-secondary text-xs">
-              You haven&apos;t created any practice questions yet. Tap &apos;New&apos; above to publish your first challenge!
+              {t.noAuthoredQuestions || "You haven't created any practice questions yet. Tap 'New' above to publish your first challenge!"}
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
-              {authoredQuestions.slice(0, 5).map((q) => (
+              {authoredQuestions.slice(0, 2).map((q) => (
                 <div
                   key={q.id}
                   className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 flex flex-col gap-2 shadow-xs"
@@ -677,10 +715,10 @@ export const ProfileView: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1 text-[11px] text-secondary">
-                      <span>{q.total_attempts} attempts</span>
+                      <span>{q.total_attempts} {t.attempts || "attempts"}</span>
                       <span>·</span>
                       <span className="font-bold text-tertiary">
-                        {q.total_attempts > 0 ? Math.round((q.correct_attempts / q.total_attempts) * 100) : 0}% acc
+                        {q.total_attempts > 0 ? Math.round((q.correct_attempts / q.total_attempts) * 100) : 0}% {t.accuracy || "acc"}
                       </span>
                     </div>
                   </div>
@@ -689,28 +727,51 @@ export const ProfileView: React.FC = () => {
                     {q.question_text}
                   </p>
 
-                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-surface-container-high/30">
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-surface-container-high/30">
                     <button
                       type="button"
                       onClick={() => handleShareQuestionToWhatsApp(q)}
-                      className="px-2.5 py-1 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] font-bold text-xs flex items-center gap-1 transition-colors"
+                      className="px-2.5 py-1 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] dark:text-[#25D366] font-bold text-xs flex items-center gap-1 transition-colors"
                       title="Share to WhatsApp study group"
                     >
                       <span className="material-symbols-outlined text-[15px]">chat</span>
-                      <span>WhatsApp Challenge</span>
+                      <span>{t.whatsAppChallenge || "WhatsApp Challenge"}</span>
                     </button>
 
-                    <Link
-                      href={`/create?edit=${q.id}`}
-                      className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 transition-colors"
-                      title="Edit question statement, options or solution"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">edit</span>
-                      <span>Edit</span>
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      <Link
+                        href={`/create?edit=${q.id}`}
+                        className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 transition-colors"
+                        title="Edit question statement, options or solution"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">edit</span>
+                        <span>{t.editQuestion || "Edit"}</span>
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAuthoredQuestion(q.id)}
+                        className="px-2 py-1 rounded-lg bg-error-container/40 hover:bg-error-container text-error font-bold text-xs flex items-center gap-1 transition-colors"
+                        title="Delete question"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">delete</span>
+                        <span>{t.delete || "Delete"}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
+
+              {authoredQuestions.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllAuthoredModal(true)}
+                  className="w-full py-2.5 px-4 rounded-xl border border-surface-container-high/60 bg-surface-container-low hover:bg-surface-container text-primary font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[16px]">visibility</span>
+                  <span>{t.viewAllQuestions || "View All Questions"} ({authoredQuestions.length})</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -718,12 +779,34 @@ export const ProfileView: React.FC = () => {
         {/* Section Label */}
         <div className="px-1 pb-1">
           <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider font-bold">
-            Preferences & Controls
+            {t.preferencesAndControls || "Preferences & Controls"}
           </span>
         </div>
 
         {/* Clean Menu List */}
         <div className="flex flex-col bg-surface-container-low rounded-2xl overflow-hidden border border-surface-container-high/40 divide-y divide-surface-container-high/40 mb-4">
+          {/* Saved Questions & Collections Manager */}
+          <button
+            type="button"
+            onClick={() => setShowSavedCollectionsModal(true)}
+            className="w-full flex items-center justify-between p-3.5 hover:bg-surface-container transition-colors text-left"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-primary-fixed/40 flex items-center justify-center text-primary shrink-0">
+                <span className="material-symbols-outlined text-[20px]">bookmarks</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-body-lg text-body-lg text-on-surface font-semibold truncate">
+                  {t.savedQuestionsBtn || "Saved Questions & Collections"}
+                </span>
+                <span className="font-body-sm text-body-sm text-secondary truncate">
+                  {t.savedQuestionsDesc || "Access bookmarked questions by playlist & collection"}
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-[20px] text-secondary">chevron_right</span>
+          </button>
+
           {/* All India Ranks & Standings Link */}
           <Link
             href="/leaderboard"
@@ -735,10 +818,10 @@ export const ProfileView: React.FC = () => {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="font-body-lg text-body-lg text-on-surface font-semibold truncate">
-                  All India Ranks & Standings
+                  {t.allIndiaRanks || "All India Ranks & Standings"}
                 </span>
                 <span className="font-body-sm text-body-sm text-secondary truncate">
-                  View full leaderboard & competitive scores
+                  {t.liveRankingsDesc || "View full leaderboard & competitive scores"}
                 </span>
               </div>
             </div>
@@ -756,7 +839,7 @@ export const ProfileView: React.FC = () => {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="font-body-lg text-body-lg text-on-surface font-semibold truncate">
-                  Target Exam
+                  {t.targetExam || "Target Exam"}
                 </span>
                 <span className="font-body-sm text-body-sm text-secondary truncate">
                   {activeExam?.name || "SSC CGL"}
@@ -777,17 +860,17 @@ export const ProfileView: React.FC = () => {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="font-body-lg text-body-lg text-on-surface font-semibold truncate">
-                  Hidden questions
+                  {t.hiddenQuestionsTitle || "Hidden questions"}
                 </span>
                 <span className="font-body-sm text-body-sm text-secondary truncate">
-                  {hiddenQuestions.length} excluded from feed
+                  {hiddenQuestions.length} {t.hiddenQuestionsDesc || "excluded from feed"}
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-1">
               {hiddenQuestions.length > 0 && (
                 <span className="px-2 py-0.5 rounded-full bg-surface-container font-label-sm text-label-sm text-primary font-bold">
-                  Restore
+                  {t.restore || "Restore"}
                 </span>
               )}
               <span className="material-symbols-outlined text-[20px] text-secondary">chevron_right</span>
@@ -805,10 +888,10 @@ export const ProfileView: React.FC = () => {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="font-body-lg text-body-lg text-on-surface font-semibold truncate">
-                  Share Qz Loop
+                  {t.shareApp || "Share Qz Loop"}
                 </span>
                 <span className="font-body-sm text-body-sm text-secondary truncate">
-                  {shareSuccess ? "Link copied!" : "Invite friends to compete"}
+                  {shareSuccess ? (t.copied || "Link copied!") : (t.shareAppDesc || "Invite friends to compete")}
                 </span>
               </div>
             </div>
@@ -826,10 +909,10 @@ export const ProfileView: React.FC = () => {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="font-body-lg text-body-lg text-[#25D366] font-bold truncate">
-                  Share Profile on WhatsApp
+                  {t.shareWhatsAppProfile || "Share Profile on WhatsApp"}
                 </span>
                 <span className="font-body-sm text-body-sm text-secondary truncate">
-                  Showcase your streak, questions solved & accuracy
+                  {t.shareWhatsAppProfileDesc || "Showcase your streak, questions solved & accuracy"}
                 </span>
               </div>
             </div>
@@ -848,10 +931,10 @@ export const ProfileView: React.FC = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-body-lg text-body-lg text-primary font-bold truncate">
-                    Install App on Device
+                    {t.installApp || "Install App on Device"}
                   </span>
                   <span className="font-body-sm text-body-sm text-secondary truncate">
-                    Fast offline-ready home screen shortcut
+                    {t.installAppDesc || "Fast offline-ready home screen shortcut"}
                   </span>
                 </div>
               </div>
@@ -872,10 +955,10 @@ export const ProfileView: React.FC = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-body-lg text-body-lg text-error font-semibold truncate group-hover:underline">
-                    {isResettingData ? "Resetting..." : "Reset Data to Fresh 0"}
+                    {isResettingData ? (t.resetting || "Resetting...") : (t.resetPracticeData || "Reset Data to Fresh 0")}
                   </span>
                   <span className="font-body-sm text-body-sm text-secondary truncate">
-                    Reset streak, attempts and matrix to absolute zero
+                    {t.resetPracticeDataDesc || "Reset streak, attempts and matrix to absolute zero"}
                   </span>
                 </div>
               </div>
@@ -895,10 +978,10 @@ export const ProfileView: React.FC = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-body-lg text-body-lg text-on-surface font-semibold truncate">
-                    Sign Out
+                    {t.signOut || "Sign Out"}
                   </span>
                   <span className="font-body-sm text-body-sm text-secondary truncate">
-                    Return to guest browsing mode
+                    {t.returnGuestMode || "Return to guest browsing mode"}
                   </span>
                 </div>
               </div>
@@ -921,10 +1004,10 @@ export const ProfileView: React.FC = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-body-lg text-body-lg text-primary font-bold truncate">
-                    Sign In / Sign Up
+                    {t.signInSignUp || "Sign In / Sign Up"}
                   </span>
                   <span className="font-body-sm text-body-sm text-secondary truncate">
-                    Google Sign-in or create unique handle
+                    {t.googleOrUniqueHandle || "Sign in with Google ID"}
                   </span>
                 </div>
               </div>
@@ -938,14 +1021,14 @@ export const ProfileView: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[20px]">support_agent</span>
-              <h3 className="font-headline-sm text-sm font-bold text-on-surface">Founder Support & Community</h3>
+              <h3 className="font-headline-sm text-sm font-bold text-on-surface">{t.founderSectionTitle || "Founder Support & Community"}</h3>
             </div>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
-              Direct Contact
+              {t.directContact || "Direct Contact"}
             </span>
           </div>
           <p className="text-xs text-secondary leading-relaxed">
-            Qz Loop is built with heart by {FOUNDER_NAME} for serious Indian competitive exam aspirants. Have a question, syllabus suggestion, or found a bug? Connect directly!
+            {t.founderCardDesc || `Qz Loop is built with heart by ${FOUNDER_NAME} for serious Indian competitive exam aspirants. Have a question, syllabus suggestion, or found a bug? Connect directly!`}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -960,7 +1043,7 @@ export const ProfileView: React.FC = () => {
                 <span className="material-symbols-outlined text-[16px]">chat</span>
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[11px] font-bold text-on-surface">WhatsApp Founder</span>
+                <span className="text-[11px] font-bold text-on-surface">{t.whatsAppFounder || "WhatsApp Founder"}</span>
                 <span className="text-[10px] text-secondary truncate">{FOUNDER_PHONE}</span>
               </div>
             </a>
@@ -974,7 +1057,7 @@ export const ProfileView: React.FC = () => {
                 <span className="material-symbols-outlined text-[16px]">mail</span>
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[11px] font-bold text-on-surface">Email {FOUNDER_NAME}</span>
+                <span className="text-[11px] font-bold text-on-surface">{t.emailFounderBtn || `Email ${FOUNDER_NAME}`}</span>
                 <span className="text-[10px] text-secondary truncate">{FOUNDER_EMAIL}</span>
               </div>
             </a>
@@ -990,12 +1073,12 @@ export const ProfileView: React.FC = () => {
             <div className="flex items-center gap-2.5">
               <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[20px]">group</span>
               <div>
-                <p className="font-bold text-on-surface text-xs">Join Aspirants WhatsApp Study Group</p>
-                <p className="text-[10px] text-secondary font-normal">Daily PYQs, exam updates & peer discussion</p>
+                <p className="font-bold text-on-surface text-xs">{t.joinOfficialWhatsAppGroup || "Join Aspirants WhatsApp Study Group"}</p>
+                <p className="text-[10px] text-secondary font-normal">{t.whatsAppGroupDesc || "Daily PYQs, exam updates & peer discussion"}</p>
               </div>
             </div>
             <span className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold group-hover:scale-105 transition-transform">
-              Join Group
+              {t.joinAspirantsGroupBtn || "Join Group"}
             </span>
           </a>
         </div>
@@ -1003,7 +1086,7 @@ export const ProfileView: React.FC = () => {
         {/* Demo Switcher for Verification & Multi-user Testing */}
         <div className="px-1 pb-1">
           <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider font-bold">
-            Switch Demo Aspirant Profile
+            {t.switchDemoProfile}
           </span>
         </div>
 
@@ -1047,10 +1130,10 @@ export const ProfileView: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
               <div>
                 <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                  Hidden Questions
+                  {t.hiddenQuestionsTitle}
                 </h3>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Questions marked &apos;I Know This · Hide&apos;
+                  {t.hiddenQuestionsSubtitle}
                 </p>
               </div>
               <button
@@ -1065,9 +1148,9 @@ export const ProfileView: React.FC = () => {
               {hiddenQuestions.length === 0 ? (
                 <div className="py-12 text-center text-secondary flex flex-col items-center gap-2">
                   <span className="material-symbols-outlined text-[36px] text-tertiary">check_circle</span>
-                  <p className="font-body-md text-body-md font-medium text-on-surface">No hidden questions</p>
+                  <p className="font-body-md text-body-md font-medium text-on-surface">{t.noHiddenQuestions}</p>
                   <p className="font-body-sm text-body-sm">
-                    You can hide easy questions anytime from the practice feed.
+                    {t.noHiddenQuestionsDesc}
                   </p>
                 </div>
               ) : (
@@ -1090,7 +1173,7 @@ export const ProfileView: React.FC = () => {
                       className="px-3 py-1.5 rounded-lg bg-primary-container text-on-primary font-label-sm text-label-sm font-bold shadow-xs hover:bg-primary transition-all shrink-0 active:scale-95 flex items-center gap-1"
                     >
                       <span className="material-symbols-outlined text-[15px]">undo</span>
-                      <span>Restore</span>
+                      <span>{t.restore}</span>
                     </button>
                   </div>
                 ))
@@ -1102,7 +1185,7 @@ export const ProfileView: React.FC = () => {
                 onClick={() => setShowHiddenModal(false)}
                 className="w-full py-2.5 rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors"
               >
-                Done
+                {t.done}
               </button>
             </div>
           </div>
@@ -1116,10 +1199,10 @@ export const ProfileView: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
               <div>
                 <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                  {user?.username ? "Edit Student Profile" : "Set Up Your Username"}
+                  {user?.username ? t.editStudentProfile : t.setUpUsername}
                 </h3>
                 <p className="font-body-sm text-body-sm text-secondary">
-                  Unique handle for social chat & study sharing
+                  {t.uniqueHandleDesc}
                 </p>
               </div>
               {user?.username && (
@@ -1153,10 +1236,10 @@ export const ProfileView: React.FC = () => {
 
                 <div className="flex flex-col gap-1 flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-sm text-xs font-bold text-on-surface">Profile Picture</span>
+                    <span className="font-label-sm text-xs font-bold text-on-surface">{t.profilePicture}</span>
                     {editAvatarSizeKb !== null && (
                       <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-full">
-                        {editAvatarSizeKb} KB · Compressed
+                        {editAvatarSizeKb} KB · {t.compressedBadge}
                       </span>
                     )}
                   </div>
@@ -1166,7 +1249,7 @@ export const ProfileView: React.FC = () => {
                     className="mt-0.5 text-left text-xs font-bold text-primary hover:underline flex items-center gap-1"
                   >
                     <span className="material-symbols-outlined text-[14px]">photo_camera</span>
-                    <span>{editAvatarUrl ? "Change Photo" : "Upload Photo (~20 KB)"}</span>
+                    <span>{editAvatarUrl ? t.changePhoto : t.uploadPhoto}</span>
                   </button>
                   <input
                     ref={editFileInputRef}
@@ -1181,7 +1264,7 @@ export const ProfileView: React.FC = () => {
               {/* Display Name */}
               <div className="flex flex-col gap-1">
                 <label className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
-                  Full Name
+                  {t.fullName}
                 </label>
                 <input
                   type="text"
@@ -1197,9 +1280,9 @@ export const ProfileView: React.FC = () => {
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
                   <label className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
-                    Unique Username
+                    {t.username}
                   </label>
-                  <span className="text-[11px] text-secondary">Instagram-style handle</span>
+                  <span className="text-[11px] text-secondary">{t.instaStyleHandle}</span>
                 </div>
                 <div className="relative">
                   <span className="absolute left-3.5 top-2.5 font-bold text-secondary text-sm">@</span>
@@ -1249,7 +1332,7 @@ export const ProfileView: React.FC = () => {
               {/* Target Exam */}
               <div className="flex flex-col gap-1">
                 <label className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
-                  Target Exam
+                  {t.targetExam}
                 </label>
                 <select
                   value={editExamId}
@@ -1267,7 +1350,7 @@ export const ProfileView: React.FC = () => {
               {/* Email Address */}
               <div className="flex flex-col gap-1">
                 <label className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
-                  {t.emailLabel || "Email Address"} (Optional)
+                  {t.emailLabel} ({lang === "hi" ? "वैकल्पिक" : "Optional"})
                 </label>
                 <input
                   type="email"
@@ -1282,9 +1365,9 @@ export const ProfileView: React.FC = () => {
               <div className="flex flex-col gap-1.5 p-2.5 rounded-2xl bg-surface-container-low/70 border border-surface-container-high/50">
                 <div className="flex items-center justify-between">
                   <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
-                    Study Language Preference
+                    {t.studyLanguagePref}
                   </label>
-                  <span className="text-[10px] text-secondary">Switch anytime</span>
+                  <span className="text-[10px] text-secondary">{t.switchAnytime}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -1330,7 +1413,7 @@ export const ProfileView: React.FC = () => {
                     onClick={() => setShowEditProfileModal(false)}
                     className="flex-1 py-2.5 rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors"
                   >
-                    Cancel
+                    {t.cancel}
                   </button>
                 )}
                 <button
@@ -1341,7 +1424,7 @@ export const ProfileView: React.FC = () => {
                   {isSavingProfile ? (
                     <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <span>Save Profile</span>
+                    <span>{t.saveProfileBtn}</span>
                   )}
                 </button>
               </div>
@@ -1369,6 +1452,21 @@ export const ProfileView: React.FC = () => {
               .catch(() => {});
           }
         }}
+      />
+
+      {/* View All Authored Questions Modal */}
+      <ViewAllAuthoredModal
+        isOpen={showAllAuthoredModal}
+        onClose={() => setShowAllAuthoredModal(false)}
+        questions={authoredQuestions}
+        authorUsername={user?.username || user?.display_name || "aspirant"}
+        onDeleteQuestion={(id) => setAuthoredQuestions((prev) => prev.filter((q) => q.id !== id))}
+      />
+
+      {/* Saved Questions & Collections Manager Modal */}
+      <SavedCollectionsModal
+        isOpen={showSavedCollectionsModal}
+        onClose={() => setShowSavedCollectionsModal(false)}
       />
     </div>
   );

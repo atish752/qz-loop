@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Question, QuestionCollection } from "@/types/database";
+import { useAppLanguage } from "@/lib/utils/i18n";
 
 interface SavePlaylistModalProps {
   question: Question;
@@ -16,6 +17,7 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
   onClose,
   onSavedChange,
 }) => {
+  const { t } = useAppLanguage();
   const [collections, setCollections] = useState<QuestionCollection[]>([]);
   const [newCollectionName, setNewCollectionName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -23,7 +25,9 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/collections")
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const url = currentUid ? `/api/collections?userId=${encodeURIComponent(currentUid)}` : "/api/collections";
+      fetch(url)
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.collections) {
@@ -36,12 +40,51 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Independent quick save (default "Saved Questions")
+  const defaultCollection = collections.find(
+    (c) => c.name.toLowerCase() === "saved questions"
+  );
+  const isSavedIndependently = defaultCollection?.question_ids.includes(question.id);
+
+  const handleToggleIndependent = async () => {
+    const action = isSavedIndependently ? "remove" : "save";
+    try {
+      setToastMsg(
+        isSavedIndependently
+          ? "Removed from Saved Questions"
+          : "Saved independently to Quick Revision! ✨"
+      );
+      setTimeout(() => setToastMsg(null), 2200);
+
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const res = await fetch("/api/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUid || undefined,
+          questionId: question.id,
+          collectionName: "Saved Questions",
+          action,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.collections) {
+        setCollections(data.collections);
+        const activeNames = data.collections
+          .filter((c: QuestionCollection) => c.question_ids.includes(question.id))
+          .map((c: QuestionCollection) => c.name);
+        if (onSavedChange) onSavedChange(activeNames);
+      }
+    } catch {
+      // Handled
+    }
+  };
+
   const handleToggleCollection = async (collection: QuestionCollection) => {
     const isCurrentlySaved = collection.question_ids.includes(question.id);
     const action = isCurrentlySaved ? "remove" : "save";
 
     try {
-      // Optimistic update
       const updated = collections.map((c) => {
         if (c.id === collection.id) {
           const newIds = isCurrentlySaved
@@ -65,10 +108,12 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
       );
       setTimeout(() => setToastMsg(null), 2000);
 
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       await fetch("/api/collections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId: currentUid || undefined,
           questionId: question.id,
           collectionName: collection.name,
           action,
@@ -85,10 +130,12 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
 
     setIsLoading(true);
     try {
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       const res = await fetch("/api/collections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId: currentUid || undefined,
           questionId: question.id,
           collectionName: newCollectionName.trim(),
           action: "save",
@@ -113,15 +160,19 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
       <div className="w-full max-w-md bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-200">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[24px]">bookmark</span>
             <div>
-              <h3 className="font-bold text-on-surface text-base">Save to Playlist</h3>
-              <p className="text-xs text-secondary">Organize practice questions into collections</p>
+              <h3 className="font-bold text-on-surface text-base">
+                {t.saveToCollection || "Save to Playlist / Collection"}
+              </h3>
+              <p className="text-xs text-secondary">
+                {t.savedQuestionsDesc || "Access bookmarked questions by playlist & collection"}
+              </p>
             </div>
           </div>
           <button
@@ -139,74 +190,131 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
           </div>
         )}
 
-        {/* Existing Playlists */}
-        <div className="flex-1 overflow-y-auto no-scrollbar py-2 flex flex-col gap-2 max-h-[260px]">
-          {collections.map((col) => {
-            const isSaved = col.question_ids.includes(question.id);
-            return (
-              <button
-                key={col.id}
-                onClick={() => handleToggleCollection(col)}
-                className={`w-full p-3 rounded-xl flex items-center justify-between text-left transition-all border ${
-                  isSaved
-                    ? "bg-primary-container/20 border-primary text-on-surface"
-                    : "bg-surface-container-low hover:bg-surface-container border-surface-container-high/30 text-on-surface"
+        {/* Option 1: Quick Save Independently */}
+        <div className="py-2.5">
+          <button
+            type="button"
+            onClick={handleToggleIndependent}
+            className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all border ${
+              isSavedIndependently
+                ? "bg-primary-fixed/40 border-primary text-on-surface shadow-xs font-bold"
+                : "bg-surface-container-low hover:bg-surface-container border-surface-container-high/50 text-on-surface"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                  isSavedIndependently
+                    ? "bg-primary text-on-primary"
+                    : "bg-surface-container text-primary"
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${
-                      isSaved ? "bg-primary text-on-primary" : "bg-surface-container text-secondary"
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">
-                      {isSaved ? "check" : "folder"}
-                    </span>
-                  </div>
-                  <div className="min-w-0 flex flex-col">
-                    <span className="font-bold text-xs truncate">{col.name}</span>
-                    <span className="text-[10px] text-secondary truncate">
-                      {col.question_ids.length} questions
-                      {col.description ? ` · ${col.description}` : ""}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="shrink-0 pl-2">
-                  <span
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center text-[12px] font-bold ${
-                      isSaved
-                        ? "bg-primary border-primary text-on-primary"
-                        : "border-secondary/50 text-transparent"
-                    }`}
-                  >
-                    ✓
-                  </span>
-                </div>
-              </button>
-            );
-          })}
+                <span className="material-symbols-outlined text-[20px]">
+                  {isSavedIndependently ? "bookmark_added" : "bookmark"}
+                </span>
+              </div>
+              <div className="text-left min-w-0">
+                <span className="font-bold text-xs block text-on-surface">
+                  {t.quickSaveIndependent || "Quick Save Independently"}
+                </span>
+                <span className="text-[10px] text-secondary">
+                  {t.savedIndependentDesc || "Saved directly to your private revision list"}
+                </span>
+              </div>
+            </div>
+            <div className="shrink-0 pl-2">
+              <span
+                className={`w-5 h-5 rounded-full border flex items-center justify-center text-[11px] font-bold ${
+                  isSavedIndependently
+                    ? "bg-primary border-primary text-on-primary"
+                    : "border-secondary/40 text-transparent"
+                }`}
+              >
+                ✓
+              </span>
+            </div>
+          </button>
         </div>
 
-        {/* Create New Playlist Input */}
+        {/* Section title: Or add to a collection */}
+        <div className="px-1 py-1 flex items-center justify-between">
+          <span className="text-[11px] font-bold text-secondary uppercase tracking-wider">
+            {t.existingCollections || "Your Collections"}
+          </span>
+          <span className="text-[10px] text-primary font-semibold">
+            Instagram Reels Style
+          </span>
+        </div>
+
+        {/* Existing Collections list */}
+        <div className="flex-1 overflow-y-auto no-scrollbar py-1 flex flex-col gap-2 max-h-[220px]">
+          {collections
+            .filter((c) => c.name.toLowerCase() !== "saved questions")
+            .map((col) => {
+              const isSaved = col.question_ids.includes(question.id);
+              return (
+                <button
+                  key={col.id}
+                  onClick={() => handleToggleCollection(col)}
+                  className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border ${
+                    isSaved
+                      ? "bg-primary-container/20 border-primary text-on-surface font-bold"
+                      : "bg-surface-container-low hover:bg-surface-container border-surface-container-high/40 text-on-surface"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
+                        isSaved ? "bg-primary text-on-primary" : "bg-surface-container text-secondary"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">
+                        {isSaved ? "check" : "folder"}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex flex-col">
+                      <span className="font-semibold text-xs truncate">{col.name}</span>
+                      <span className="text-[10px] text-secondary truncate">
+                        {col.question_ids.length} questions
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 pl-2">
+                    <span
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] font-bold ${
+                        isSaved
+                          ? "bg-primary border-primary text-on-primary"
+                          : "border-secondary/40 text-transparent"
+                      }`}
+                    >
+                      ✓
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+
+        {/* Create New Collection Input */}
         <form onSubmit={handleCreateCollection} className="mt-3 pt-3 border-t border-surface-container-high/40">
           <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
-            + New Collection / Playlist
+            + {t.newBtn || "New"} Collection / Playlist
           </label>
           <div className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="e.g. Maths Tricks, Formulas, PYQs..."
+              placeholder={t.newCollectionPlaceholder || "e.g. Maths Formulas, Hard PYQs..."}
               value={newCollectionName}
               onChange={(e) => setNewCollectionName(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
+              className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
             />
             <button
               type="submit"
               disabled={isLoading || !newCollectionName.trim()}
-              className="px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs disabled:opacity-40 hover:bg-primary-container active:scale-95 transition-all shrink-0"
+              className="px-3.5 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs disabled:opacity-40 hover:bg-primary-container active:scale-95 transition-all shrink-0"
             >
-              {isLoading ? "Saving..." : "Create & Save"}
+              {isLoading ? "Saving..." : t.createAndSave || "Create & Save"}
             </button>
           </div>
         </form>

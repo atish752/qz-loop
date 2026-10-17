@@ -22,7 +22,11 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
 
   useEffect(() => {
     if (isOpen && friend) {
-      fetch(`/api/messages?friendId=${friend.id}`)
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const url = currentUid
+        ? `/api/messages?friendId=${friend.id}&userId=${encodeURIComponent(currentUid)}`
+        : `/api/messages?friendId=${friend.id}`;
+      fetch(url)
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.messages) {

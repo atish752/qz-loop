@@ -36,7 +36,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [avatarSizeKb, setAvatarSizeKb] = useState<number | null>(null);
   const [isCompressingAvatar, setIsCompressingAvatar] = useState(false);
   const [email, setEmail] = useState("");
-  const [signinIdentifier, setSigninIdentifier] = useState("");
   const [languagePref, setLanguagePref] = useState<"en" | "hi">("en");
 
   // Validation & Loading
@@ -198,7 +197,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      // Mock fallback: prefill Google credentials and transition to Step 2
+      // Mock fallback: if signin mode, log in existing user if present
+      if (mode === "signin") {
+        try {
+          const profRes = await fetch("/api/profile");
+          const profData = await profRes.json();
+          const existing = (profData?.allProfiles || []).find((p: any) => p.id !== "user-current") || profData?.user;
+          if (existing && existing.id && existing.id !== "user-current") {
+            localStorage.setItem("qz_user_id", existing.id);
+            localStorage.setItem("qz_auth_user", JSON.stringify(existing));
+            document.cookie = `qz_user_id=${existing.id}; path=/; max-age=2592000; SameSite=Lax`;
+            window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: existing } }));
+            if (onSuccess) onSuccess(existing);
+            handleClose();
+            return;
+          }
+        } catch {
+          // fall through to setup profile
+        }
+      }
+
+      // Mock fallback: prefill Google credentials and transition to Step 2 for profile completion
       const randNum = Math.floor(Math.random() * 900 + 100);
       const googleName = "Aspirant " + randNum;
       const googleEmail = `aspirant_${Date.now()}@gmail.com`;
@@ -217,7 +236,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // Email / Form Signup Handler
+  // Google Sign-Up Profile Completion Handler
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -257,8 +276,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         localStorage.setItem("qz_user_id", data.user.id);
         localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
         localStorage.setItem("qz_quiz_lang", languagePref);
+        document.cookie = `qz_user_id=${data.user.id}; path=/; max-age=2592000; SameSite=Lax`;
         setAppLanguage(languagePref);
         window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
+        window.dispatchEvent(new CustomEvent("qz_account_completed", { detail: { user: data.user } }));
+        window.dispatchEvent(new CustomEvent("open_onboarding_tour", { detail: { user: data.user } }));
         if (onSuccess) onSuccess(data.user);
         handleClose();
       } else {
@@ -266,41 +288,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch {
       setError("Network connection issue during signup.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Sign In Handler
-  const handleSignInSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!signinIdentifier.trim()) {
-      setError("Please enter your username or email");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier: signinIdentifier.trim() }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success && data.user) {
-        localStorage.setItem("qz_user_id", data.user.id);
-        localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
-        window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
-        if (onSuccess) onSuccess(data.user);
-        handleClose();
-      } else {
-        setError(data.error || "Login failed. Account not found.");
-      }
-    } catch {
-      setError("Network connection issue during login.");
     } finally {
       setIsLoading(false);
     }
@@ -399,23 +386,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <span>{t.continueWithGoogle || "Continue with Google ID"}</span>
             </button>
 
-            <div className="flex items-center gap-2 my-0.5">
-              <div className="flex-1 h-px bg-surface-container-high/60" />
-              <span className="text-[10px] uppercase font-bold text-secondary tracking-wider">or</span>
-              <div className="flex-1 h-px bg-surface-container-high/60" />
+            <div className="p-3 rounded-xl bg-surface-container-low/60 border border-surface-container-high/40 text-[11px] text-secondary flex flex-col gap-1 text-center">
+              <span className="font-semibold text-on-surface">1-Tap Google Account Verification</span>
+              <p className="text-[10px] leading-relaxed">
+                One-tap sign up securely links your account and allows you to set your unique @handle, target exam, and study language preference.
+              </p>
             </div>
-
-            <button
-              type="button"
-              onClick={() => { setSignupStep(2); setError(null); }}
-              className="w-full py-2.5 px-4 rounded-xl border border-surface-container-high/70 bg-surface-container-low hover:bg-surface-container active:scale-[0.98] transition-all flex items-center justify-between text-xs font-bold text-on-surface"
-            >
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[17px]">edit_note</span>
-                <span>{t.continueWithEmail || "Choose Handle & Details Manually"}</span>
-              </div>
-              <span className="material-symbols-outlined text-[15px] text-secondary">arrow_forward</span>
-            </button>
           </div>
         )}
 
@@ -656,14 +632,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </form>
         )}
 
-        {/* 3. SIGN IN FORM */}
+        {/* 3. SIGN IN FORM - Google ID Only */}
         {mode === "signin" && (
-          <form onSubmit={handleSignInSubmit} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 py-1">
             <button
               type="button"
               onClick={handleGoogleSignIn}
               disabled={isLoading}
-              className="w-full py-2.5 px-4 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container-low active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-xs font-bold text-on-surface shadow-xs disabled:opacity-50"
+              className="w-full py-3.5 px-4 rounded-2xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container-low active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-xs font-bold text-on-surface shadow-xs disabled:opacity-50"
             >
               <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.66-5.17 3.66-9.12z" />
@@ -674,24 +650,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <span>{t.continueWithGoogle || "Continue with Google ID"}</span>
             </button>
 
-            <div className="flex items-center gap-2 my-0.5">
-              <div className="flex-1 h-px bg-surface-container-high/60" />
-              <span className="text-[10px] uppercase font-bold text-secondary tracking-wider">or with handle</span>
-              <div className="flex-1 h-px bg-surface-container-high/60" />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
-                Username or Email
-              </label>
-              <input
-                type="text"
-                required
-                value={signinIdentifier}
-                onChange={(e) => setSigninIdentifier(e.target.value)}
-                placeholder="e.g. @rahul_cgl or rahul_cgl"
-                className="w-full px-3 py-2.5 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs font-semibold text-on-surface focus:outline-none focus:border-primary"
-              />
+            <div className="p-3 rounded-xl bg-surface-container-low/60 border border-surface-container-high/40 text-[11px] text-secondary flex flex-col gap-1 text-center">
+              <span className="font-semibold text-on-surface">Seamless Live Cross-Device Sync</span>
+              <p className="text-[10px] leading-relaxed">
+                Signing in with your Google ID automatically restores your practice streaks, syllabus accuracy matrix, and All India Ranks across any device.
+              </p>
             </div>
 
             {error && (
@@ -700,15 +663,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <span>{error}</span>
               </div>
             )}
-
-            <button
-              type="submit"
-              disabled={isLoading || !signinIdentifier.trim()}
-              className="w-full mt-1 py-3 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-md hover:bg-primary-container active:scale-95 transition-all disabled:opacity-40"
-            >
-              {isLoading ? "Signing In..." : "Sign In & Continue Practice"}
-            </button>
-          </form>
+          </div>
         )}
 
         {/* Features Checklist */}

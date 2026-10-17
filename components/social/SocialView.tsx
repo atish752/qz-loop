@@ -6,8 +6,10 @@ import { UserProfile, FriendUser, DirectMessage, Question } from "@/types/databa
 import { TopHeader } from "../layout/TopHeader";
 import { ExamSwitchModal } from "../feed/ExamSwitchModal";
 import confetti from "canvas-confetti";
+import { useAppLanguage } from "@/lib/utils/i18n";
 
 export const SocialView: React.FC = () => {
+  const { t, lang } = useAppLanguage();
   // Sub-tabs: "chat" (default) or "friends"
   const [activeTab, setActiveTab] = useState<"chat" | "friends">("chat");
 
@@ -128,7 +130,11 @@ export const SocialView: React.FC = () => {
   useEffect(() => {
     if (selectedFriend) {
       setIsLoadingChat(true);
-      fetch(`/api/messages?friendId=${selectedFriend.id}`)
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const url = currentUid
+        ? `/api/messages?friendId=${selectedFriend.id}&userId=${encodeURIComponent(currentUid)}`
+        : `/api/messages?friendId=${selectedFriend.id}`;
+      fetch(url)
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.messages) {
@@ -391,9 +397,9 @@ export const SocialView: React.FC = () => {
                 <span className="material-symbols-outlined text-[22px]">forum</span>
               </div>
               <div className="flex flex-col min-w-0">
-                <h3 className="font-bold text-on-surface text-base">Connect with Fellow Aspirants</h3>
+                <h3 className="font-bold text-on-surface text-base">{t.connectAspirantsTitle || "Connect with Fellow Aspirants"}</h3>
                 <p className="text-xs text-secondary mt-0.5 leading-relaxed">
-                  Sign in or create your free account to find study partners by @username, challenge friends with quiz reels, and chat in real-time.
+                  {t.connectAspirantsDesc || "Sign in or create your free account to find study partners by @username, challenge friends with quiz reels, and chat in real-time."}
                 </p>
               </div>
             </div>
@@ -409,13 +415,13 @@ export const SocialView: React.FC = () => {
                 className="flex-1 py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary-container active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[16px]">login</span>
-                <span>Sign In / Sign Up</span>
+                <span>{t.signInSignUp || "Sign In / Sign Up"}</span>
               </button>
               <Link
                 href="/loop"
                 className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs flex items-center gap-1 transition-colors"
               >
-                <span>Browse Loop</span>
+                <span>{t.browseLoop || "Browse Loop"}</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </Link>
             </div>
@@ -425,15 +431,15 @@ export const SocialView: React.FC = () => {
         <div className="flex items-center justify-between pb-3">
           <div>
             <h1 className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface">
-              Social Lounge
+              {t.socialLounge || "Social Lounge"}
             </h1>
             <p className="font-body-sm text-body-sm text-secondary">
-              Chat with aspirants, share quizzes & study together
+              {t.socialLoungeDesc || "Chat with aspirants, share quizzes & study together"}
             </p>
           </div>
           <span className="flex items-center gap-1 font-label-sm text-label-sm bg-primary-fixed/50 text-primary px-2.5 py-1 rounded-full font-bold">
             <span className="material-symbols-outlined text-[16px]">groups</span>
-            <span>Study Hub</span>
+            <span>{t.studyHub || "Study Hub"}</span>
           </span>
         </div>
 
@@ -451,7 +457,7 @@ export const SocialView: React.FC = () => {
             }`}
           >
             <span className="material-symbols-outlined text-[18px]">forum</span>
-            <span>Chat</span>
+            <span>{t.chatSubTab || "Chat"}</span>
             {allMessages.length > 0 && (
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === "chat" ? "bg-white/20 text-white" : "bg-surface-container text-secondary"}`}>
                 {friends.length}
@@ -471,7 +477,7 @@ export const SocialView: React.FC = () => {
             }`}
           >
             <span className="material-symbols-outlined text-[18px]">group</span>
-            <span>Friends</span>
+            <span>{t.friendsSubTab || "Friends"}</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === "friends" ? "bg-white/20 text-white" : "bg-surface-container text-secondary"}`}>
               {friends.length}
             </span>
@@ -492,7 +498,7 @@ export const SocialView: React.FC = () => {
                     <button
                       onClick={() => setSelectedFriend(null)}
                       className="p-1 rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container-high transition-colors"
-                      title="Back to conversations"
+                      title={t.backToConversations || "Back to conversations"}
                     >
                       <span className="material-symbols-outlined text-[20px]">arrow_back</span>
                     </button>
@@ -531,10 +537,10 @@ export const SocialView: React.FC = () => {
                   <button
                     onClick={handleOpenQuickShare}
                     className="px-2.5 py-1 rounded-xl bg-primary text-on-primary font-bold text-xs flex items-center gap-1 hover:bg-primary-container active:scale-95 transition-all shadow-xs"
-                    title="Share a Quiz with this Friend"
+                    title={t.shareQuiz || "Share Quiz"}
                   >
                     <span className="material-symbols-outlined text-[15px]">send</span>
-                    <span>Share Quiz</span>
+                    <span>{t.shareQuiz || "Share Quiz"}</span>
                   </button>
                 </div>
 
@@ -543,18 +549,22 @@ export const SocialView: React.FC = () => {
                   {isLoadingChat ? (
                     <div className="py-16 flex flex-col items-center justify-center text-center gap-2">
                       <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      <p className="text-xs text-secondary">Loading study messages...</p>
+                      <p className="text-xs text-secondary">{t.loadingMessages || "Loading study messages..."}</p>
                     </div>
                   ) : messages.length === 0 ? (
                     <div className="py-12 flex flex-col items-center justify-center text-center gap-2 text-secondary">
                       <span className="material-symbols-outlined text-[32px] text-primary/40">chat</span>
-                      <p className="text-xs font-medium text-on-surface">No messages yet with @{selectedFriend.username}</p>
-                      <p className="text-[11px]">Send a greeting or challenge them to practice a quiz!</p>
+                      <p className="text-xs font-medium text-on-surface">
+                        {t.noMessagesWith || "No messages yet with"} @{selectedFriend.username}
+                      </p>
+                      <p className="text-[11px]">
+                        {t.sendGreeting || "Send a greeting or challenge them to practice a quiz!"}
+                      </p>
                       <button
                         onClick={handleOpenQuickShare}
                         className="mt-2 px-3 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-xs hover:bg-primary-container"
                       >
-                        Send Quiz Challenge
+                        {t.sendQuizChallenge || "Send Quiz Challenge"}
                       </button>
                     </div>
                   ) : (
@@ -586,9 +596,9 @@ export const SocialView: React.FC = () => {
                                 <div className="flex items-center justify-between">
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase bg-primary-fixed/30 text-primary">
                                     <span className="material-symbols-outlined text-[11px]">quiz</span>
-                                    {m.question.subject_name || "Quiz"} Challenge
+                                    {m.question.subject_name || "Quiz"} {t.sharedQuizChallengeLabel || "Challenge"}
                                   </span>
-                                  <span className="text-[10px] opacity-75 font-medium">Reel Practice</span>
+                                  <span className="text-[10px] opacity-75 font-medium">{t.reelPracticeLabel || "Reel Practice"}</span>
                                 </div>
 
                                 <p className="font-semibold text-xs line-clamp-2">
@@ -605,7 +615,7 @@ export const SocialView: React.FC = () => {
                                     }`}
                                   >
                                     <span className="material-symbols-outlined text-[15px]">play_arrow</span>
-                                    <span>Practice Question Now</span>
+                                    <span>{t.practiceQuestionNow || "Practice Question Now"}</span>
                                   </button>
                                   <Link
                                     href={`/loop?q=${m.question.id}`}
@@ -614,7 +624,7 @@ export const SocialView: React.FC = () => {
                                         ? "bg-white/20 text-white hover:bg-white/30"
                                         : "bg-surface-container hover:bg-surface-container-high text-primary"
                                     }`}
-                                    title="Open directly in Quiz Loop full screen"
+                                    title={t.openInQuizLoop || "Open directly in Quiz Loop full screen"}
                                   >
                                     <span className="material-symbols-outlined text-[14px]">open_in_new</span>
                                   </Link>
@@ -638,7 +648,7 @@ export const SocialView: React.FC = () => {
                     type="button"
                     onClick={handleOpenQuickShare}
                     className="p-2 rounded-xl text-primary hover:bg-surface-container-high transition-colors shrink-0"
-                    title="Share a Quiz"
+                    title={t.shareQuiz || "Share a Quiz"}
                   >
                     <span className="material-symbols-outlined text-[20px]">add_circle</span>
                   </button>
@@ -646,14 +656,14 @@ export const SocialView: React.FC = () => {
                     type="text"
                     value={chatInputText}
                     onChange={(e) => setChatInputText(e.target.value)}
-                    placeholder="Type study message or formula..."
+                    placeholder={t.typeStudyMessage || "Type study message or formula..."}
                     className="flex-1 px-3 py-2 rounded-xl bg-surface-container-lowest border border-surface-container-high/60 text-xs text-on-surface focus:outline-none focus:border-primary"
                   />
                   <button
                     type="submit"
                     disabled={isSendingMessage || !chatInputText.trim()}
                     className="p-2 rounded-xl bg-primary text-on-primary disabled:opacity-40 hover:bg-primary-container active:scale-95 transition-all shrink-0"
-                    title="Send"
+                    title={t.sendDirectMessage || "Send"}
                   >
                     <span className="material-symbols-outlined text-[18px]">send</span>
                   </button>
@@ -664,52 +674,74 @@ export const SocialView: React.FC = () => {
               <div className="flex flex-col gap-2.5">
                 <div className="flex items-center justify-between px-1">
                   <span className="font-label-sm text-label-sm text-secondary uppercase font-bold tracking-wider">
-                    Recent Study Chats
+                    {t.recentStudyChats || "Recent Study Chats"}
                   </span>
                   <button
                     onClick={() => setActiveTab("friends")}
                     className="text-xs text-primary font-bold flex items-center gap-0.5 hover:underline"
                   >
-                    <span>Find Aspirants</span>
+                    <span>{t.findAspirants || "Find Aspirants"}</span>
                     <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                   </button>
                 </div>
 
                 {isLoadingFriends ? (
                   <div className="py-16 text-center text-secondary text-xs">
-                    Loading conversations...
+                    {t.loadingConversations || "Loading conversations..."}
                   </div>
-                ) : friends.length === 0 ? (
-                  <div className="p-8 rounded-2xl bg-surface-container-low text-center flex flex-col items-center gap-2 border border-surface-container-high/40">
-                    <span className="material-symbols-outlined text-[36px] text-primary/40">forum</span>
-                    <p className="font-bold text-sm text-on-surface">No conversations yet</p>
-                    <p className="text-xs text-secondary max-w-xs">
-                      Switch to the Friends tab to search unique usernames and connect with study peers!
-                    </p>
-                    <button
-                      onClick={() => setActiveTab("friends")}
-                      className="mt-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-xs hover:bg-primary-container"
-                    >
-                      Search Friends by Username
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {friends.map((friend) => {
-                      // Find last message with this friend
-                      const friendMsgs = allMessages.filter(
-                        (m) =>
-                          (m.from_user_id === friend.id && m.to_user_id === (user?.id || "user-current")) ||
-                          (m.from_user_id === (user?.id || "user-current") && m.to_user_id === friend.id)
-                      );
-                      const lastMsg = friendMsgs[friendMsgs.length - 1];
+                ) : (() => {
+                    // Derive full list of conversation partners (friends + any external sender/recipient from allMessages)
+                    const currentUid = user?.id || "user-current";
+                    const conversationPartners: FriendUser[] = [...friends];
+                    allMessages.forEach((m) => {
+                      const partnerId = m.from_user_id === currentUid ? m.to_user_id : m.from_user_id;
+                      if (partnerId && partnerId !== currentUid && !conversationPartners.some((p) => p.id === partnerId)) {
+                        conversationPartners.push({
+                          id: partnerId,
+                          display_name: m.from_user_id === partnerId && m.text?.includes("💡") ? "Aspirant Suggestion" : "Study Partner",
+                          username: partnerId.replace(/^user-/, "aspirant_"),
+                          target_exam: "Indian Competitive Exams",
+                          status: "friend",
+                          streak_days: 1,
+                        });
+                      }
+                    });
 
+                    if (conversationPartners.length === 0) {
                       return (
-                        <div
-                          key={friend.id}
-                          onClick={() => setSelectedFriend(friend)}
-                          className="p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high/40 cursor-pointer transition-all flex items-center justify-between gap-3 shadow-xs active:scale-[0.99]"
-                        >
+                        <div className="p-8 rounded-2xl bg-surface-container-low text-center flex flex-col items-center gap-2 border border-surface-container-high/40">
+                          <span className="material-symbols-outlined text-[36px] text-primary/40">forum</span>
+                          <p className="font-bold text-sm text-on-surface">{t.noConversationsYet || "No conversations yet"}</p>
+                          <p className="text-xs text-secondary max-w-xs">
+                            {t.noConversationsDesc || "Switch to the Friends tab to search unique usernames and connect with study peers!"}
+                          </p>
+                          <button
+                            onClick={() => setActiveTab("friends")}
+                            className="mt-2 px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-xs hover:bg-primary-container"
+                          >
+                            {t.searchFriendsBtn || "Search Friends by Username"}
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="flex flex-col gap-2">
+                        {conversationPartners.map((friend) => {
+                          // Find last message with this friend
+                          const friendMsgs = allMessages.filter(
+                            (m) =>
+                              (m.from_user_id === friend.id && m.to_user_id === (user?.id || "user-current")) ||
+                              (m.from_user_id === (user?.id || "user-current") && m.to_user_id === friend.id)
+                          );
+                          const lastMsg = friendMsgs[friendMsgs.length - 1];
+
+                          return (
+                            <div
+                              key={friend.id}
+                              onClick={() => setSelectedFriend(friend)}
+                              className="p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high/40 cursor-pointer transition-all flex items-center justify-between gap-3 shadow-xs active:scale-[0.99]"
+                            >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="relative shrink-0">
                               <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high">
@@ -743,7 +775,12 @@ export const SocialView: React.FC = () => {
                                   lastMsg.question_id ? (
                                     <span className="text-primary font-semibold flex items-center gap-1">
                                       <span className="material-symbols-outlined text-[13px]">quiz</span>
-                                      Shared Quiz Challenge
+                                      {t.sharedQuizChallengeLabel || "Shared Quiz Challenge"}
+                                    </span>
+                                  ) : lastMsg.text?.includes("💡") ? (
+                                    <span className="text-amber-800 dark:text-amber-200 font-bold flex items-center gap-1">
+                                      <span>💡</span>
+                                      <span>{t.suggestCorrection || "Question Suggestion"}</span>
                                     </span>
                                   ) : (
                                     lastMsg.text
@@ -760,14 +797,15 @@ export const SocialView: React.FC = () => {
                               🔥 {friend.streak_days}d
                             </span>
                             <span className="text-[10px] text-secondary">
-                              {friend.last_active || "Active"}
+                              {friend.last_active || (t.activeNow || "Active")}
                             </span>
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                )}
+                );
+              })()}
               </div>
             )}
           </div>
@@ -782,7 +820,7 @@ export const SocialView: React.FC = () => {
             <div className="bg-surface-container-low p-4 rounded-2xl border border-surface-container-high/40 flex flex-col gap-3 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="font-label-md text-label-md font-bold text-on-surface">
-                  Find Aspirants by Unique Username
+                  {t.findAspirantsByHandle || "Find Aspirants by Unique Username"}
                 </span>
                 <span className="text-[11px] text-primary font-semibold">@username search</span>
               </div>
@@ -796,7 +834,7 @@ export const SocialView: React.FC = () => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by unique username (e.g. @amit_ssc)..."
+                    placeholder={t.searchHandlePlaceholder || "Search by unique username (e.g. @amit_ssc)..."}
                     className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface-container border border-surface-container-high/60 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -805,7 +843,7 @@ export const SocialView: React.FC = () => {
                   disabled={isSearching || !searchQuery.trim()}
                   className="px-3.5 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs disabled:opacity-40 hover:bg-primary-container active:scale-95 transition-all shadow-xs"
                 >
-                  {isSearching ? "Searching..." : "Search"}
+                  {isSearching ? (t.searchingBtn || "Searching...") : (t.searchBtn || "Search")}
                 </button>
               </form>
 
@@ -815,7 +853,7 @@ export const SocialView: React.FC = () => {
                   type="text"
                   value={addInput}
                   onChange={(e) => setAddInput(e.target.value)}
-                  placeholder="Direct connect: Enter @username..."
+                  placeholder={t.directConnectPlaceholder || "Direct connect: Enter @username..."}
                   className="flex-1 px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
                 />
                 <button
@@ -823,7 +861,7 @@ export const SocialView: React.FC = () => {
                   disabled={isAdding || !addInput.trim()}
                   className="px-3 py-1.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs disabled:opacity-40 hover:bg-primary transition-all shrink-0"
                 >
-                  {isAdding ? "Adding..." : "Send Request"}
+                  {isAdding ? (t.addingBtn || "Adding...") : (t.sendRequestBtn || "Send Request")}
                 </button>
               </div>
 
@@ -847,12 +885,12 @@ export const SocialView: React.FC = () => {
             {hasSearched && (
               <div className="flex flex-col gap-2">
                 <span className="font-label-sm text-label-sm text-secondary uppercase font-bold tracking-wider px-1">
-                  Search Results ({searchResults.length})
+                  {t.searchResultsTitle || "Search Results"} ({searchResults.length})
                 </span>
 
                 {searchResults.length === 0 ? (
                   <div className="p-6 rounded-2xl bg-surface-container-low text-center text-xs text-secondary border border-surface-container-high/40">
-                    No aspirants found with username &quot;{searchQuery}&quot;. Try searching another handle.
+                    {t.noAspirantsFound || `No aspirants found with username "${searchQuery}". Try searching another handle.`}
                   </div>
                 ) : (
                   searchResults.map((usr) => (
@@ -910,7 +948,7 @@ export const SocialView: React.FC = () => {
                           className="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 shadow-xs shrink-0"
                         >
                           <span className="material-symbols-outlined text-[15px]">chat</span>
-                          <span>Chat</span>
+                          <span>{t.chatSubTab || "Chat"}</span>
                         </button>
                       ) : (
                         <button
@@ -919,7 +957,7 @@ export const SocialView: React.FC = () => {
                           className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container active:scale-95 transition-all shadow-xs shrink-0 flex items-center gap-1"
                         >
                           <span className="material-symbols-outlined text-[15px]">person_add</span>
-                          <span>Add Friend</span>
+                          <span>{t.addFriendBtn || "Add Friend"}</span>
                         </button>
                       )}
                     </div>
@@ -932,14 +970,14 @@ export const SocialView: React.FC = () => {
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between px-1">
                 <span className="font-label-sm text-label-sm text-secondary uppercase font-bold tracking-wider">
-                  My Study Friends ({friends.length})
+                  {t.myStudyFriends || "My Study Friends"} ({friends.length})
                 </span>
-                <span className="text-[11px] text-secondary font-medium">Verified Aspirants</span>
+                <span className="text-[11px] text-secondary font-medium">{t.verifiedAspirants || "Verified Aspirants"}</span>
               </div>
 
               {friends.length === 0 ? (
                 <div className="p-8 rounded-2xl bg-surface-container-low text-center text-xs text-secondary border border-surface-container-high/40">
-                  You have not connected with any friends yet. Use the username search above!
+                  {t.noFriendsConnectedYet || "You have not connected with any friends yet. Use the username search above!"}
                 </div>
               ) : (
                 friends.map((friend) => (
@@ -983,10 +1021,10 @@ export const SocialView: React.FC = () => {
                           setActiveTab("chat");
                         }}
                         className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container active:scale-95 transition-all shadow-xs flex items-center gap-1"
-                        title="Start Chat with friend"
+                        title={t.chatSubTab || "Chat"}
                       >
                         <span className="material-symbols-outlined text-[15px]">chat</span>
-                        <span>Chat</span>
+                        <span>{t.chatSubTab || "Chat"}</span>
                       </button>
                     </div>
                   </div>
@@ -1005,8 +1043,8 @@ export const SocialView: React.FC = () => {
           <div className="w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col max-h-[80vh]">
             <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
               <div>
-                <h3 className="font-bold text-sm text-on-surface">Share Quiz to @{selectedFriend?.username}</h3>
-                <p className="text-xs text-secondary">Challenge your friend to solve it in Quiz Loop!</p>
+                <h3 className="font-bold text-sm text-on-surface">{t.shareQuizToFriendTitle || "Share Quiz to"} @{selectedFriend?.username}</h3>
+                <p className="text-xs text-secondary">{t.challengeFriendDesc || "Challenge your friend to solve it in Quiz Loop!"}</p>
               </div>
               <button
                 onClick={() => setShowQuickShareModal(false)}
@@ -1018,7 +1056,7 @@ export const SocialView: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto no-scrollbar py-3 flex flex-col gap-2.5">
               {isLoadingQuestions ? (
-                <div className="py-12 text-center text-xs text-secondary">Loading questions...</div>
+                <div className="py-12 text-center text-xs text-secondary">{t.loading || "Loading questions..."}</div>
               ) : (
                 feedQuestions.map((q) => (
                   <div
@@ -1038,7 +1076,7 @@ export const SocialView: React.FC = () => {
                       className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs shrink-0 shadow-xs hover:bg-primary-container active:scale-95 transition-all flex items-center gap-1"
                     >
                       <span className="material-symbols-outlined text-[14px]">send</span>
-                      <span>Send</span>
+                      <span>{t.sendDirectMessage || "Send"}</span>
                     </button>
                   </div>
                 ))
@@ -1062,7 +1100,7 @@ export const SocialView: React.FC = () => {
                   {practiceQuestion.subject_name || "General"}
                 </span>
                 <span className="text-xs text-secondary">•</span>
-                <span className="text-xs text-secondary font-medium">Shared Quiz</span>
+                <span className="text-xs text-secondary font-medium">{t.sharedQuizModalBadge || "Shared Quiz"}</span>
               </div>
 
               {/* Active Timer (Ticks immediately as in normal quiz loop!) */}
@@ -1073,7 +1111,7 @@ export const SocialView: React.FC = () => {
                       ? "bg-surface-container text-secondary"
                       : "bg-error-container/80 text-on-error-container animate-pulse-subtle"
                   }`}
-                  title="Practice Timer"
+                  title={t.practiceTimerLabel || "Practice Timer"}
                 >
                   <span className="material-symbols-outlined text-[15px]">timer</span>
                   <span>{practiceElapsedSeconds}s</span>
@@ -1083,9 +1121,9 @@ export const SocialView: React.FC = () => {
                 <button
                   onClick={handleClosePracticeQuiz}
                   className="px-2.5 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface text-xs font-semibold transition-colors"
-                  title="Ignore / Close quiz"
+                  title={t.ignoreBtn || "Ignore"}
                 >
-                  Ignore
+                  {t.ignoreBtn || "Ignore"}
                 </button>
               </div>
             </div>
@@ -1093,7 +1131,7 @@ export const SocialView: React.FC = () => {
             {/* Author Credit */}
             <div className="pt-3 pb-2 flex items-center gap-2">
               <span className="text-xs text-secondary">
-                Question by <strong className="font-semibold text-on-surface">{practiceQuestion.author_name || "Qz Loop Expert"}</strong>
+                {t.questionBy || "Question by"} <strong className="font-semibold text-on-surface">{practiceQuestion.author_name || "Qz Loop Expert"}</strong>
               </span>
             </div>
 
@@ -1107,17 +1145,17 @@ export const SocialView: React.FC = () => {
             {/* Community Metrics */}
             {practiceMetrics && (
               <div className="flex items-center gap-2 text-secondary text-[11px] py-1.5 px-3 rounded-xl bg-surface-container-low border border-surface-container-high/40 my-2">
-                <span className="font-medium text-on-surface">{practiceMetrics.attempts} attempts</span>
+                <span className="font-medium text-on-surface">{practiceMetrics.attempts} {t.attempts || "attempts"}</span>
                 <span>·</span>
                 <span className="font-medium text-tertiary">
-                  {practiceMetrics.attempts > 0 ? Math.round((practiceMetrics.correctAttempts / practiceMetrics.attempts) * 100) : 0}% acc
+                  {practiceMetrics.attempts > 0 ? Math.round((practiceMetrics.correctAttempts / practiceMetrics.attempts) * 100) : 0}% {t.accuracy || "acc"}
                 </span>
                 <span>·</span>
-                <span>{practiceMetrics.avgTimeSec}s avg</span>
+                <span>{practiceMetrics.avgTimeSec}s {t.avgSpeed || "avg"}</span>
                 {practiceMetrics.fastestSec && (
                   <>
                     <span>·</span>
-                    <span className="font-bold text-tertiary">⚡ {practiceMetrics.fastestSec}s fastest</span>
+                    <span className="font-bold text-tertiary">⚡ {practiceMetrics.fastestSec}s {t.fastest || "fastest"}</span>
                   </>
                 )}
               </div>
@@ -1182,16 +1220,16 @@ export const SocialView: React.FC = () => {
                     {practiceIsCorrect ? "check_circle" : "cancel"}
                   </span>
                   <span className="font-bold text-sm text-on-surface">
-                    {practiceIsCorrect ? "Correct Solution!" : `Incorrect — Correct Option is ${practiceCorrectOptionId}`}
+                    {practiceIsCorrect ? (t.correctSolutionFeedback || "Correct Solution!") : `${t.incorrectFeedbackPrefix || "Incorrect — Correct Option is"} ${practiceCorrectOptionId}`}
                   </span>
                   <span className="text-[11px] text-secondary ml-auto font-medium">
-                    Time: {practiceElapsedSeconds}s
+                    {t.timeElapsedLabel || "Time:"} {practiceElapsedSeconds}s
                   </span>
                 </div>
 
                 {practiceExplanation && (
                   <div className="mt-2 text-xs text-secondary leading-relaxed bg-surface-container p-2.5 rounded-xl border border-surface-container-high/40">
-                    <strong className="text-on-surface block mb-1">Quick Proof:</strong>
+                    <strong className="text-on-surface block mb-1">{t.quickProof || "Quick Proof"}:</strong>
                     {practiceExplanation}
                   </div>
                 )}
@@ -1201,13 +1239,13 @@ export const SocialView: React.FC = () => {
                     onClick={handleClosePracticeQuiz}
                     className="flex-1 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs hover:bg-primary-container"
                   >
-                    Back to Study Chat
+                    {t.backToStudyChat || "Back to Study Chat"}
                   </button>
                   <Link
                     href="/loop"
                     className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 shrink-0"
                   >
-                    <span>More in Quiz Loop</span>
+                    <span>{t.moreInQuizLoop || "More in Quiz Loop"}</span>
                     <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                   </Link>
                 </div>
@@ -1218,13 +1256,13 @@ export const SocialView: React.FC = () => {
             {!practiceIsAnswered && (
               <div className="mt-2 pt-3 border-t border-surface-container-high/40 flex items-center justify-between">
                 <span className="text-xs text-secondary">
-                  Tap an option to answer, or choose Ignore.
+                  {t.tapOptionOrIgnore || "Tap an option to answer, or choose Ignore."}
                 </span>
                 <button
                   onClick={handleClosePracticeQuiz}
                   className="text-xs text-error font-bold hover:underline"
                 >
-                  Ignore Question
+                  {t.ignoreQuestionBtn || "Ignore Question"}
                 </button>
               </div>
             )}

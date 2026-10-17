@@ -63,3 +63,30 @@ export async function PUT(
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    const currentUser = db.getCurrentUser();
+    const deleted = db.deleteQuestion(id, currentUser.id);
+
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, error: "Question not found or cannot be deleted" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Question deleted successfully",
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to delete question";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
+}
+

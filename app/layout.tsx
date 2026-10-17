@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { UsernameOnboardingModal } from "@/components/auth/UsernameOnboardingModal";
+import { InteractiveOnboardingModal } from "@/components/onboarding/InteractiveOnboardingModal";
 
 export const metadata: Metadata = {
   title: "Qz Loop — Scroll. Solve. Improve. Repeat.",
@@ -68,6 +69,7 @@ export default function RootLayout({
           {children}
           <AuthModal />
           <UsernameOnboardingModal />
+          <InteractiveOnboardingModal />
         </div>
       </body>
     </html>

@@ -754,8 +754,111 @@ async function runTests() {
     assert(Boolean(TRANSLATIONS.hi[key]), `Hindi dictionary contains '${key}'`);
   }
 
+  // Scenario 43: Instagram-Style Collections / Playlists & Independent Save
+  console.log("\n[Scenario 43] Instagram-Style Collections / Playlists & Independent Save");
+  const testStudentId = "user-student-collections-test";
+  const otherStudentId = "user-other-collections-test";
+
+  // Create playlist
+  const testCol43 = db.createCollection(testStudentId, "Maths Trigonometry Hacks", "Formulas and fast proofs");
+  assert(testCol43.name === "Maths Trigonometry Hacks", "Collection created with correct title");
+  assert(testCol43.user_id === testStudentId, "Collection assigned to target student");
+
+  // Independent quick save to 'Saved Questions'
+  const indepSave = db.saveQuestionToCollection(testStudentId, "q-rrb-01", "Saved Questions");
+  assert(indepSave.saved === true, "Question saved independently to 'Saved Questions'");
+
+  // Save to custom playlist
+  const customSave = db.saveQuestionToCollection(testStudentId, "q-rrb-01", "Maths Trigonometry Hacks");
+  assert(customSave.saved === true, "Question saved to custom playlist");
+
+  // Verify multiple collections contain the question
+  const activePlaylists = db.getQuestionCollections(testStudentId, "q-rrb-01");
+  assert(activePlaylists.includes("Saved Questions"), "Question indexed in Saved Questions");
+  assert(activePlaylists.includes("Maths Trigonometry Hacks"), "Question indexed in custom playlist");
+
+  // Verify user isolation: other student starts with 0 collections
+  const otherCols = db.getUserCollections(otherStudentId);
+  assert(otherCols.length === 0, "Other student's collections are completely isolated");
+
+  // Remove from collection
+  const removed = db.removeQuestionFromCollection(testStudentId, "q-rrb-01", "Maths Trigonometry Hacks");
+  assert(removed === true, "Question removed from custom playlist");
+  const remainingPlaylists = db.getQuestionCollections(testStudentId, "q-rrb-01");
+  assert(!remainingPlaylists.includes("Maths Trigonometry Hacks"), "Question no longer in custom playlist");
+  assert(remainingPlaylists.includes("Saved Questions"), "Independent quick save remains intact");
+
+  // Scenario 44: Direct Question Suggestion Delivery & Non-Friend Chat Inbox
+  console.log("\n[Scenario 44] Direct Question Suggestion Delivery & Non-Friend Chat Inbox");
+  const authorUserId = "user-creator-author-44";
+  const studentSuggestorId = "user-student-suggestor-44";
+
+  // Student is NOT friend of author
+  const authorFriends = db.getFriends(authorUserId);
+  assert(!authorFriends.some((f) => f.id === studentSuggestorId), "Suggestor is not in author's friends list");
+
+  // Student submits suggestion message
+  const suggestionText = "💡 Correction / Suggestion for Question: Option B formula should be 2*pi*r";
+  const testMsg44 = db.sendMessage({
+    fromUserId: studentSuggestorId,
+    toUserId: authorUserId,
+    text: suggestionText,
+    questionId: "q-rrb-01",
+  });
+  assert(testMsg44.id.startsWith("msg-"), "Suggestion direct message successfully created");
+
+  // Author retrieves all messages
+  const authorInbox = db.getAllMessagesForUser(authorUserId);
+  const foundSuggestion = authorInbox.find((m) => m.id === testMsg44.id);
+  assert(Boolean(foundSuggestion), "Author inbox receives non-friend question suggestion directly");
+  assert(foundSuggestion?.text?.includes("💡 Correction"), "Suggestion message body faithfully preserved");
+
+  // Scenario 45: Authored Questions Deletion & Store Clean-up
+  console.log("\n[Scenario 45] Authored Questions Deletion & Store Clean-up");
+  const authorQ = db.createQuestion({
+    subjectId: "subj-maths",
+    questionText: "Sample temporary authored question to be deleted by creator",
+    options: [
+      { id: "A", text: "Alpha" },
+      { id: "B", text: "Beta" },
+    ],
+    correctOptionId: "A",
+  });
+  assert(authorQ.id.startsWith("q-"), "Authored question created");
+
+  // Save into collection first
+  db.saveQuestionToCollection(testStudentId, authorQ.id, "Saved Questions");
+  assert(db.getQuestionCollections(testStudentId, authorQ.id).includes("Saved Questions"), "Question initially in Saved Questions");
+
+  // Delete question
+  const deleteSuccess = db.deleteQuestion(authorQ.id);
+  assert(deleteSuccess === true, "Author successfully deletes their created question");
+  assert(db.getQuestionById(authorQ.id) === undefined, "Deleted question no longer retrievable from questions store");
+  assert(!db.getQuestionCollections(testStudentId, authorQ.id).includes("Saved Questions"), "Deleted question purged from collections");
+
+  // Scenario 46: Complete i18n Parity & Daily Goal Tracker Translations
+  console.log("\n[Scenario 46] Complete i18n Parity & Localization Coverage");
+  const newlyVerifiedKeys = [
+    "dailyGoalReached",
+    "dailyGoalRemaining",
+    "exactDuplicateDetected",
+    "similarQuestionExists",
+    "loadingQuestionDetails",
+    "suggestCorrection",
+    "moreOptions",
+    "onboardingSlide1Title",
+    "onboardingSlide2Title",
+    "onboardingSlide3Title",
+    "onboardingSlide4Title",
+  ] as const;
+
+  for (const k of newlyVerifiedKeys) {
+    assert(Boolean(TRANSLATIONS.en[k]), `English dictionary contains '${k}'`);
+    assert(Boolean(TRANSLATIONS.hi[k]), `Hindi dictionary contains '${k}'`);
+  }
+
   console.log("\n=================================================");
-  console.log("   ALL 42 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 46 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

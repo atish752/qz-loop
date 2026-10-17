@@ -7,6 +7,7 @@ import { SavePlaylistModal } from "./SavePlaylistModal";
 import { CommentsModal } from "./CommentsModal";
 import { AuthorModal } from "../feed/AuthorModal";
 import { ReportModal } from "../feed/ReportModal";
+import { SuggestionModal } from "./SuggestionModal";
 import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
 import { getExamScoringRule } from "@/lib/utils/examScoring";
 import { useAppLanguage } from "@/lib/utils/i18n";
@@ -165,6 +166,8 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showAuthorModal, setShowAuthorModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showThreeDotMenu, setShowThreeDotMenu] = useState(false);
+  const [showSuggestionModal, setShowSuggestionModal] = useState(false);
 
   // Gesture refs
   const explanationRef = useRef<HTMLDivElement | null>(null);
@@ -536,19 +539,19 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             </span>
           </div>
 
-          {/* Report Button */}
+          {/* Three-Dot More Options Button (Report & Suggest Correction) */}
           <button
-            onClick={() => setShowReportModal(true)}
-            className="p-1 rounded-full text-secondary hover:text-error transition-colors"
-            title="Report question"
+            onClick={() => setShowThreeDotMenu(true)}
+            className="p-1 rounded-full text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"
+            title={t.moreOptions || "More options"}
           >
-            <span className="material-symbols-outlined text-[18px]">flag</span>
+            <span className="material-symbols-outlined text-[20px]">more_vert</span>
           </button>
         </div>
       </div>
 
       {/* 2. Main Question Card Body + Floating Action Bar on the Right */}
-      <div className="relative flex-1 flex flex-col justify-center py-2 pr-12 min-h-0 overflow-hidden">
+      <div className="relative flex-1 flex flex-col justify-center py-2 pr-16 sm:pr-20 min-h-0 overflow-hidden">
         {/* Author & Bilingual Toggle Row */}
         <div className="flex items-center justify-between mb-2 shrink-0">
           <button
@@ -597,46 +600,50 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           </div>
         </div>
 
-        {/* Question Statement */}
-        <div className="overflow-y-auto no-scrollbar max-h-[38vh] mb-2.5">
+        {/* Question Statement (Scrollable independently if large, perfectly centered if short) */}
+        <div
+          data-reel-scrollable="true"
+          className={`overflow-y-auto overscroll-contain no-scrollbar my-auto py-1 ${
+            showOptions || isAnswered ? "max-h-[34vh]" : "max-h-[58vh]"
+          } mb-2.5`}
+        >
           <h2 className="text-lg sm:text-xl font-bold text-on-surface tracking-tight leading-snug">
             {activeQuestionText}
           </h2>
         </div>
 
-        {/* Community Performance Metrics Bar */}
-        <div className="overflow-x-auto no-scrollbar py-1 mb-3 shrink-0">
-          <div className="flex items-center gap-2 text-secondary font-body-sm text-body-sm whitespace-nowrap bg-surface-container-low px-3 py-1.5 rounded-xl border border-surface-container-high/40">
+        {/* Community Performance Metrics Bar - Exactly Two Lines on Mobile */}
+        <div className="mb-2.5 shrink-0">
+          <div className="bg-surface-container-low px-3 py-2 rounded-xl border border-surface-container-high/40 flex flex-col gap-1 shadow-xs">
             {metrics.attempts > 0 ? (
               <>
-                <span className="flex items-center gap-1 font-medium text-on-surface">
-                  <span className="material-symbols-outlined text-[15px] text-primary">groups</span>
-                  {metrics.attempts.toLocaleString()} attempts
-                </span>
-                <span>·</span>
-                <span className="flex items-center gap-1 font-medium text-on-surface">
-                  <span className="material-symbols-outlined text-[15px] text-tertiary">target</span>
-                  {accuracyPercentage}% acc
-                </span>
-                <span>·</span>
-                <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[15px]">speed</span>
-                  {metrics.avgTimeSec}s avg
-                </span>
-                {metrics.fastestSec && (
-                  <>
-                    <span>·</span>
-                    <span className="flex items-center gap-1 text-tertiary font-semibold">
-                      <span className="material-symbols-outlined text-[15px]">bolt</span>
-                      {metrics.fastestSec}s fastest
-                    </span>
-                  </>
-                )}
+                {/* Line 1: Attempts + Accuracy */}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 font-medium text-on-surface">
+                    <span className="material-symbols-outlined text-[15px] text-primary">groups</span>
+                    <span>{metrics.attempts.toLocaleString()} {t.attempts || "attempts"}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 font-bold text-tertiary">
+                    <span className="material-symbols-outlined text-[15px]">target</span>
+                    <span>{accuracyPercentage}% {t.accuracy || "acc"}</span>
+                  </span>
+                </div>
+                {/* Line 2: Avg Speed + Fastest Speed */}
+                <div className="flex items-center justify-between text-[11px] text-secondary border-t border-surface-container-high/30 pt-1">
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">speed</span>
+                    <span>{metrics.avgTimeSec}s {t.avgSpeed || "avg speed"}</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-primary font-semibold">
+                    <span className="material-symbols-outlined text-[14px]">bolt</span>
+                    <span>{metrics.fastestSec ? `${metrics.fastestSec}s` : "—"} {t.fastest || "fastest"}</span>
+                  </span>
+                </div>
               </>
             ) : (
-              <span className="text-secondary italic text-xs flex items-center gap-1">
+              <span className="text-secondary italic text-xs flex items-center justify-center gap-1.5 py-0.5">
                 <span className="material-symbols-outlined text-[15px] text-primary">emoji_events</span>
-                {t.beFirstToSolve}
+                <span>{t.beFirstToSolve}</span>
               </span>
             )}
           </div>
@@ -960,16 +967,14 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             <span className="text-[10px] font-bold text-[#25D366] mt-0.5">WhatsApp</span>
           </button>
 
-          {/* Quick Revision Bookmark Button */}
+          {/* Instagram-Style Bookmark / Collection Button */}
           <button
-            onClick={handleQuickSave}
-            onContextMenu={(e) => {
-              e.preventDefault();
+            onClick={() => {
               if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
                 window.dispatchEvent(
                   new CustomEvent("open_auth_modal", {
                     detail: {
-                      reason: "Sign in required to create & manage question playlists",
+                      reason: "Sign in required to save questions & manage collections",
                       mode: "signup",
                     },
                   })
@@ -979,7 +984,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               setShowSaveModal(true);
             }}
             className="flex flex-col items-center group active:scale-90 transition-transform"
-            title="Quick Save to Revision (Right click for playlists)"
+            title={t.saveToCollection || "Save to Collection / Playlist"}
           >
             <div
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
@@ -995,7 +1000,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                 bookmark
               </span>
             </div>
-            <span className="text-[11px] font-bold text-secondary mt-0.5">{isSaved ? "Saved" : "Save"}</span>
+            <span className="text-[11px] font-bold text-secondary mt-0.5">{isSaved ? t.save : t.save}</span>
           </button>
         </div>
       </div>
@@ -1031,6 +1036,63 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         </div>
       </div>
 
+      {/* Three-Dot Options Modal / Bottom Sheet */}
+      {showThreeDotMenu && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setShowThreeDotMenu(false)}
+        >
+          <div
+            className="w-full max-w-xs bg-surface-container-lowest rounded-2xl p-4 shadow-xl border border-surface-container-high/60 flex flex-col gap-2 animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-surface-container-high/40">
+              <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
+                {t.moreOptions || "Options"}
+              </span>
+              <button
+                onClick={() => setShowThreeDotMenu(false)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-secondary hover:text-on-surface hover:bg-surface-container"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowThreeDotMenu(false);
+                setShowSuggestionModal(true);
+              }}
+              className="w-full p-2.5 rounded-xl flex items-center gap-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors"
+            >
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[18px]">rate_review</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold">{t.suggestCorrection || "Suggest Correction / Mistake"}</span>
+                <span className="text-[10px] text-secondary font-normal">Send directly to question author</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => {
+                setShowThreeDotMenu(false);
+                setShowReportModal(true);
+              }}
+              className="w-full p-2.5 rounded-xl flex items-center gap-2.5 text-left text-xs font-semibold text-error hover:bg-error-container/20 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-lg bg-error-container/30 text-error flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[18px]">flag</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold">{t.reportQuestionTitle || "Report Question"}</span>
+                <span className="text-[10px] text-secondary font-normal">Flag incorrect or inappropriate content</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
       <ShareFriendModal
         question={question}
@@ -1060,6 +1122,11 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
         onReportSubmitted={() => {}}
+      />
+      <SuggestionModal
+        question={question}
+        isOpen={showSuggestionModal}
+        onClose={() => setShowSuggestionModal(false)}
       />
     </div>
   );

@@ -5,19 +5,15 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const friendId = searchParams.get("friendId");
-    const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id");
-    if (!requestedUserId || requestedUserId === "guest") {
+    const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id") || request.cookies.get("qz_user_id")?.value;
+    if (requestedUserId === "guest") {
       return NextResponse.json({ success: true, messages: [], isGuest: true });
     }
+    const effectiveUserId = requestedUserId || db.getCurrentUser().id;
 
     if (!friendId) {
       // Return all messages involving requested user
-      const friends = db.getFriends(requestedUserId);
-      const allMsgs: any[] = [];
-      friends.forEach((f) => {
-        const msgs = db.getMessages(requestedUserId, f.id);
-        allMsgs.push(...msgs);
-      });
+      const allMsgs = db.getAllMessagesForUser(effectiveUserId);
       const enhanced = allMsgs.map((m) => {
         if (m.question_id) {
           const q = db.getQuestionById(m.question_id);
@@ -28,7 +24,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, messages: enhanced });
     }
 
-    const messages = db.getMessages(requestedUserId, friendId);
+    const messages = db.getMessages(effectiveUserId, friendId);
 
     // Enhance any question references with question preview
     const enhanced = messages.map((m) => {
@@ -53,7 +49,7 @@ export async function POST(request: NextRequest) {
     if (!toUserId) {
       return NextResponse.json({ success: false, error: "Recipient user ID is required" }, { status: 400 });
     }
-    const headerUserId = request.headers.get("x-user-id") || body.fromUserId;
+    const headerUserId = request.headers.get("x-user-id") || body.fromUserId || request.cookies.get("qz_user_id")?.value;
     const currentUser = headerUserId ? (db.getProfileById(headerUserId) || db.getCurrentUser()) : db.getCurrentUser();
     const message = db.sendMessage({
       fromUserId: currentUser.id,

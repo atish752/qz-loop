@@ -143,8 +143,13 @@ export const UsernameOnboardingModal: React.FC = () => {
       if (res.ok && data.success) {
         setUser(data.user);
         setAppLanguage(languagePref);
+        localStorage.setItem("qz_user_id", data.user.id);
+        localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
         localStorage.setItem("qz_quiz_lang", languagePref);
+        document.cookie = `qz_user_id=${data.user.id}; path=/; max-age=2592000; SameSite=Lax`;
         window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
+        window.dispatchEvent(new CustomEvent("qz_account_completed", { detail: { user: data.user } }));
+        window.dispatchEvent(new CustomEvent("open_onboarding_tour", { detail: { user: data.user } }));
         setIsOpen(false);
       } else {
         setError(data.error || "Failed to save profile. Please choose another username.");

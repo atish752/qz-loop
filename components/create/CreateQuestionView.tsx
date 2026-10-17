@@ -600,7 +600,7 @@ export const CreateQuestionView: React.FC = () => {
         />
         <div className="flex-1 flex items-center justify-center p-8 text-secondary">
           <span className="material-symbols-outlined animate-spin text-[32px] text-primary">sync</span>
-          <span className="ml-2 font-medium">Loading question details...</span>
+          <span className="ml-2 font-medium">{t.loadingQuestionDetails || "Loading question details..."}</span>
         </div>
       </div>
     );
@@ -624,9 +624,9 @@ export const CreateQuestionView: React.FC = () => {
                 <span className="material-symbols-outlined text-[22px]">edit_note</span>
               </div>
               <div className="flex flex-col min-w-0">
-                <h3 className="font-bold text-on-surface text-base">Creator Studio</h3>
+                <h3 className="font-bold text-on-surface text-base">{t.creatorStudioGuestTitle || "Creator Studio"}</h3>
                 <p className="text-xs text-secondary mt-0.5 leading-relaxed">
-                  Sign in or create your free account to publish verified MCQs, share shortcut tricks, and contribute to the community feed.
+                  {t.creatorStudioGuestDesc || "Sign in or create your free account to publish verified MCQs, share shortcut tricks, and contribute to the community feed."}
                 </p>
               </div>
             </div>
@@ -643,7 +643,7 @@ export const CreateQuestionView: React.FC = () => {
                 className="flex-1 py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary-container active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[16px]">login</span>
-                <span>Sign In / Sign Up to Publish</span>
+                <span>{t.signInToPublish || "Sign In / Sign Up to Publish"}</span>
               </button>
             </div>
           </div>
@@ -656,22 +656,22 @@ export const CreateQuestionView: React.FC = () => {
               </span>
             </div>
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface">
-              {isEditMode ? "Question Updated!" : "Question Published!"}
+              {isEditMode ? (t.questionUpdatedTitle || "Question Updated!") : (t.publishedSuccess || "Question Published!")}
             </h2>
             <p className="font-body-md text-body-md text-secondary">
               {isEditMode
-                ? "Your question revisions and bilingual solutions have been saved."
-                : "Your question is now live in the community feed for competitive aspirants."}
+                ? (t.questionUpdatedDesc || "Your question revisions and bilingual solutions have been saved.")
+                : (t.questionPublishedDesc || "Your question is now live in the community feed for competitive aspirants.")}
             </p>
 
             {/* Direct WhatsApp Challenge Sharing Card */}
             <div className="w-full bg-[#25D366]/10 border border-[#25D366]/30 rounded-2xl p-4 flex flex-col gap-3 my-2 text-left">
               <div className="flex items-center gap-2 text-[#25D366] font-bold text-sm">
                 <span className="material-symbols-outlined text-[20px]">share</span>
-                <span>Challenge Aspirants on WhatsApp</span>
+                <span>{t.challengeWhatsAppTitle || "Challenge Aspirants on WhatsApp"}</span>
               </div>
               <p className="text-xs text-on-surface/80 leading-relaxed">
-                Post this formatted challenge directly to your Telegram or WhatsApp study groups to test your peers!
+                {t.challengeWhatsAppDesc || "Post this formatted challenge directly to your Telegram or WhatsApp study groups to test your peers!"}
               </p>
               <div className="flex items-center gap-2 pt-1">
                 <button
@@ -680,7 +680,7 @@ export const CreateQuestionView: React.FC = () => {
                   className="flex-1 py-2.5 px-3 rounded-xl bg-[#25D366] text-white font-bold text-xs shadow-sm hover:bg-[#20ba59] active:scale-95 transition-all flex items-center justify-center gap-1.5"
                 >
                   <span className="material-symbols-outlined text-[18px]">chat</span>
-                  <span>Share to WhatsApp</span>
+                  <span>{t.shareToWhatsAppBtn || "Share to WhatsApp"}</span>
                 </button>
                 <button
                   type="button"
@@ -688,7 +688,7 @@ export const CreateQuestionView: React.FC = () => {
                   className="py-2.5 px-3 rounded-xl bg-surface-container font-semibold text-xs hover:bg-surface-container-high transition-colors text-on-surface flex items-center gap-1"
                 >
                   <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                  <span>{shareCopied ? "Copied!" : "Copy Text"}</span>
+                  <span>{shareCopied ? (t.copied || "Copied!") : (t.copyText || "Copy Text")}</span>
                 </button>
               </div>
             </div>
@@ -711,14 +711,14 @@ export const CreateQuestionView: React.FC = () => {
                   }}
                   className="flex-1 py-2.5 rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors"
                 >
-                  Add Another
+                  {t.addAnotherBtn || "Add Another"}
                 </button>
               )}
               <button
                 onClick={() => router.push("/")}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm hover:bg-primary-container transition-colors"
               >
-                Go to Feed
+                {t.goToFeedBtn || "Go to Feed"}
               </button>
             </div>
           </div>
@@ -732,9 +732,9 @@ export const CreateQuestionView: React.FC = () => {
                     history_edu
                   </span>
                   <div className="text-xs min-w-0">
-                    <span className="font-bold">Unfinished draft restored</span>
+                    <span className="font-bold">{t.draftRestoredTitle || "Unfinished draft restored"}</span>
                     <span className="text-secondary block text-[11px] truncate">
-                      Last autosaved at {draftSavedAt}
+                      {t.lastAutosavedAt || "Last autosaved at"} {draftSavedAt}
                     </span>
                   </div>
                 </div>
@@ -744,7 +744,7 @@ export const CreateQuestionView: React.FC = () => {
                     onClick={handleRestoreDraft}
                     className="px-2.5 py-1 rounded-lg bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 transition-colors"
                   >
-                    Load Draft
+                    {t.loadDraft || "Load Draft"}
                   </button>
                   <button
                     type="button"
@@ -762,7 +762,7 @@ export const CreateQuestionView: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h1 className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                  {isEditMode ? "Edit Question" : "Author New Question"}
+                  {isEditMode ? (t.editQuestionTitle || "Edit Question") : (t.createQuestionTitle || "Author New Question")}
                 </h1>
                 {isEditMode && (
                   <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-primary text-[10px] font-bold">
@@ -774,7 +774,7 @@ export const CreateQuestionView: React.FC = () => {
                 <div className="flex items-center gap-1.5 text-xs text-secondary">
                   {draftSavedAt && (
                     <span className="text-[11px] text-tertiary font-medium hidden sm:inline">
-                      Autosaved {draftSavedAt}
+                      {t.autosavedLabel || "Autosaved"} {draftSavedAt}
                     </span>
                   )}
                   <button
@@ -783,7 +783,7 @@ export const CreateQuestionView: React.FC = () => {
                     className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs flex items-center gap-1 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[14px]">save</span>
-                    <span>Save Draft</span>
+                    <span>{t.saveDraft || "Save Draft"}</span>
                   </button>
                 </div>
               )}
@@ -801,7 +801,7 @@ export const CreateQuestionView: React.FC = () => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[16px]">edit</span>
-                <span>Question Editor</span>
+                <span>{t.questionEditorTab || "Question Editor"}</span>
               </button>
               <button
                 type="button"
@@ -813,7 +813,7 @@ export const CreateQuestionView: React.FC = () => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[16px]">all_inclusive</span>
-                <span>Live Reel Preview</span>
+                <span>{t.liveReelPreviewTab || "Live Reel Preview"}</span>
               </button>
             </div>
 
@@ -824,16 +824,16 @@ export const CreateQuestionView: React.FC = () => {
                   {calculateQualityScore()}%
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-on-surface">Question Quality Index</div>
+                  <div className="text-xs font-bold text-on-surface">{t.questionQualityIndex || "Question Quality Index"}</div>
                   <div className="text-[10px] text-secondary">
                     {calculateQualityScore() >= 80
-                      ? "🔥 High-yield bilingual feed quality"
-                      : "Add Hindi translation or PYQ tag for max reach"}
+                      ? (t.qualityHighYield || "🔥 High-yield bilingual feed quality")
+                      : (t.qualityAddDetails || "Add Hindi translation or PYQ tag for max reach")}
                   </div>
                 </div>
               </div>
               <span className="text-[11px] font-bold text-primary px-2 py-0.5 rounded-full bg-primary-fixed/50">
-                Exam Ready
+                {t.examReadyBadge || "Exam Ready"}
               </span>
             </div>
 
@@ -938,7 +938,7 @@ export const CreateQuestionView: React.FC = () => {
                     onClick={() => setActiveTab("edit")}
                     className="px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-sm"
                   >
-                    Back to Edit
+                    {t.backToEdit}
                   </button>
                 </div>
               </div>
@@ -1092,9 +1092,9 @@ export const CreateQuestionView: React.FC = () => {
                     onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
                     className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface focus:outline-none self-start sm:self-auto"
                   >
-                    <option value="easy">Easy (-0.50 penalty)</option>
-                    <option value="medium">Medium (-0.50 penalty)</option>
-                    <option value="hard">Hard (-0.50 penalty)</option>
+                    <option value="easy">{t.easyPenalty}</option>
+                    <option value="medium">{t.mediumPenalty}</option>
+                    <option value="hard">{t.hardPenalty}</option>
                   </select>
                 </div>
 
@@ -1189,8 +1189,8 @@ export const CreateQuestionView: React.FC = () => {
                       <div className="flex flex-col min-w-0">
                         <span className="font-label-md text-label-md font-bold leading-tight">
                           {duplicateResult.is_exact_duplicate
-                            ? "Exact Duplicate Detected"
-                            : "Similar Question Exists"}
+                            ? (t.exactDuplicateDetected || "Exact Duplicate Detected")
+                            : (t.similarQuestionExists || "Similar Question Exists")}
                         </span>
                         <span className="font-body-sm text-body-sm line-clamp-1 opacity-90 mt-0.5">
                           {duplicateResult.matched_question?.question_text}
@@ -1202,7 +1202,7 @@ export const CreateQuestionView: React.FC = () => {
                       onClick={() => setShowDuplicateModal(true)}
                       className="px-3 py-1 rounded-lg bg-surface-container-lowest text-primary font-label-sm text-label-sm font-bold shadow-xs hover:bg-surface transition-colors shrink-0"
                     >
-                      View
+                      {t.view || "View"}
                     </button>
                   </div>
                 )}
@@ -1301,7 +1301,7 @@ export const CreateQuestionView: React.FC = () => {
 
                   <p className="font-body-sm text-body-sm text-secondary mt-1.5 px-1 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[15px] text-primary">touch_app</span>
-                    <span>Tap any option row to mark it as the correct answer.</span>
+                    <span>{t.tapOptionHint}</span>
                   </p>
                 </section>
 
@@ -1316,7 +1316,7 @@ export const CreateQuestionView: React.FC = () => {
                       <textarea
                         value={explanation}
                         onChange={(e) => setExplanation(e.target.value)}
-                        placeholder="Include key formula, shortcut, or reason for students..."
+                        placeholder={t.explanationPlaceholder}
                         rows={2}
                         maxLength={800}
                         className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none"
@@ -1333,7 +1333,7 @@ export const CreateQuestionView: React.FC = () => {
                       <textarea
                         value={hindiExplanation}
                         onChange={(e) => setHindiExplanation(e.target.value)}
-                        placeholder="हिन्दी में स्पष्टीकरण या शॉर्ट ट्रिक लिखें..."
+                        placeholder={t.hindiExplanationPlaceholder}
                         rows={2}
                         maxLength={800}
                         className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none"
@@ -1353,7 +1353,7 @@ export const CreateQuestionView: React.FC = () => {
                         {t.joinOfficialWhatsAppGroup}
                       </span>
                       <span className="text-[11px] text-secondary truncate">
-                        Share questions & get peer solutions
+                        {t.whatsappShareCommunityDesc}
                       </span>
                     </div>
                   </div>
@@ -1363,7 +1363,7 @@ export const CreateQuestionView: React.FC = () => {
                     rel="noopener noreferrer"
                     className="px-3 py-1.5 rounded-xl bg-[#25D366] text-white font-bold text-xs shadow-xs hover:bg-[#20ba59] active:scale-95 transition-all shrink-0"
                   >
-                    Join
+                    {t.joinGroupBtn}
                   </a>
                 </div>
 
@@ -1392,17 +1392,17 @@ export const CreateQuestionView: React.FC = () => {
                     <span>
                       {isSubmitting
                         ? isEditMode
-                          ? "Updating..."
-                          : "Publishing..."
+                          ? t.updatingBtn
+                          : t.publishing
                         : isCheckingDuplicate
-                        ? "Checking Duplicates..."
+                        ? t.checkingDuplicates
                         : isEditMode
-                        ? "Update Question"
-                        : "Publish Question"}
+                        ? t.updateQuestionBtn
+                        : t.publishButton}
                     </span>
                   </button>
                   <p className="text-center font-label-sm text-label-sm text-secondary mt-2">
-                    Subject to community peer review and quality verification
+                    {t.peerReviewNote}
                   </p>
                 </section>
               </form>
@@ -1417,7 +1417,7 @@ export const CreateQuestionView: React.FC = () => {
           <div className="w-full max-w-sm bg-surface-container-lowest rounded-2xl p-5 shadow-xl border border-surface-container-high/50 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="font-headline-sm text-headline-sm font-bold text-on-surface">
-                Existing Match Found
+                {t.existingMatchFound}
               </span>
               <button
                 onClick={() => setShowDuplicateModal(false)}
@@ -1437,14 +1437,14 @@ export const CreateQuestionView: React.FC = () => {
               <div className="flex items-center gap-2 text-secondary font-label-sm text-label-sm">
                 <span>By {duplicateResult.matched_question.author_name || "Rahul S."}</span>
                 <span>·</span>
-                <span>{duplicateResult.matched_question.total_attempts} attempts</span>
+                <span>{duplicateResult.matched_question.total_attempts} {t.attempts}</span>
                 <span>·</span>
-                <span>{duplicateResult.matched_question.accuracy_percentage}% accuracy</span>
+                <span>{duplicateResult.matched_question.accuracy_percentage}% {t.accuracy}</span>
               </div>
             </div>
 
             <p className="font-body-sm text-body-sm text-secondary">
-              To keep practice feeds high quality, identical questions are merged.
+              {t.duplicateMergeNote}
             </p>
 
             <button
@@ -1454,7 +1454,7 @@ export const CreateQuestionView: React.FC = () => {
               }}
               className="w-full py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm"
             >
-              View Existing in Feed
+              {t.viewExistingInFeed}
             </button>
           </div>
         </div>

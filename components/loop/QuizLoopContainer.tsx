@@ -68,6 +68,39 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   // Streak & Dopamine combo tracking
   const [comboCount, setComboCount] = useState<number>(0);
   const [comboToast, setComboToast] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
+  // Synchronize theme with TopHeader and system preference
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("qz_theme");
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setIsDarkMode(savedTheme === "dark" || (!savedTheme && prefersDark));
+    }
+    const handleThemeChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isDark: boolean }>;
+      if (customEvent.detail && typeof customEvent.detail.isDark === "boolean") {
+        setIsDarkMode(customEvent.detail.isDark);
+      }
+    };
+    window.addEventListener("qz_theme_changed", handleThemeChange);
+    return () => window.removeEventListener("qz_theme_changed", handleThemeChange);
+  }, []);
+
+  const toggleDarkModeInLoop = () => {
+    const nextMode = !isDarkMode;
+    setIsDarkMode(nextMode);
+    if (typeof window !== "undefined") {
+      if (nextMode) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("qz_theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("qz_theme", "light");
+      }
+      window.dispatchEvent(new CustomEvent("qz_theme_changed", { detail: { isDark: nextMode } }));
+    }
+  };
 
   // Track session displayed question IDs to avoid repeats
   const displayedQuestionIdsRef = useRef<Set<string>>(new Set());
@@ -291,27 +324,27 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
     const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
 
-    // Check if touch was inside the Explanation & Quick Proof container
+    // Check if touch was inside a scrollable container (Question Statement or Explanation)
     const targetEl = touchTargetRef.current as HTMLElement | null;
-    const explanationEl = targetEl?.closest("[data-reel-explanation='true']");
-    if (explanationEl) {
-      const isScrollable = explanationEl.scrollHeight > explanationEl.clientHeight + 4;
+    const scrollableEl = targetEl?.closest("[data-reel-scrollable='true'], [data-reel-explanation='true']");
+    if (scrollableEl) {
+      const isScrollable = scrollableEl.scrollHeight > scrollableEl.clientHeight + 4;
       if (isScrollable) {
-        // Swiping UP inside explanation (deltaY < -40):
+        // Swiping UP inside scrollable (deltaY < -40):
         // Only trigger next reel if already scrolled to the very bottom!
         if (deltaY < -40) {
           const atBottom =
-            explanationEl.scrollTop + explanationEl.clientHeight >= explanationEl.scrollHeight - 8;
+            scrollableEl.scrollTop + scrollableEl.clientHeight >= scrollableEl.scrollHeight - 8;
           if (!atBottom) {
-            // Let the explanation scroll naturally so user can view it full
+            // Let the container scroll naturally so user can view it full
             touchStartYRef.current = null;
             touchStartXRef.current = null;
             touchTargetRef.current = null;
             return;
           }
         } else if (deltaY > 40) {
-          // Swiping DOWN inside explanation: only trigger prev reel if at top
-          const atTop = explanationEl.scrollTop <= 8;
+          // Swiping DOWN inside scrollable: only trigger prev reel if at top
+          const atTop = scrollableEl.scrollTop <= 8;
           if (!atTop) {
             touchStartYRef.current = null;
             touchStartXRef.current = null;
@@ -338,25 +371,25 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     touchTargetRef.current = null;
   };
 
-  // Mouse Wheel Navigation with Explanation Scroll Isolation & 400ms debounce
+  // Mouse Wheel Navigation with Explanation/Question Scroll Isolation & 400ms debounce
   const lastWheelTimeRef = useRef<number>(0);
   const handleWheel = (e: React.WheelEvent) => {
     const targetEl = e.target as HTMLElement | null;
-    const explanationEl = targetEl?.closest("[data-reel-explanation='true']");
-    if (explanationEl) {
-      const isScrollable = explanationEl.scrollHeight > explanationEl.clientHeight + 4;
+    const scrollableEl = targetEl?.closest("[data-reel-scrollable='true'], [data-reel-explanation='true']");
+    if (scrollableEl) {
+      const isScrollable = scrollableEl.scrollHeight > scrollableEl.clientHeight + 4;
       if (isScrollable) {
         if (e.deltaY > 0) {
           const atBottom =
-            explanationEl.scrollTop + explanationEl.clientHeight >= explanationEl.scrollHeight - 8;
+            scrollableEl.scrollTop + scrollableEl.clientHeight >= scrollableEl.scrollHeight - 8;
           if (!atBottom) {
-            // Allow native scrolling inside explanation
+            // Allow native scrolling inside question or explanation
             return;
           }
         } else if (e.deltaY < 0) {
-          const atTop = explanationEl.scrollTop <= 8;
+          const atTop = scrollableEl.scrollTop <= 8;
           if (!atTop) {
-            // Allow native scrolling inside explanation
+            // Allow native scrolling inside question or explanation
             return;
           }
         }
@@ -479,6 +512,17 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               Infinite reel-style practice feed. Choose your subject flow, swipe questions, and train your brain.
             </p>
           </div>
+
+          {/* Prominent Start CTA Button at the Very Top Side (Above Select Subject Flow) */}
+          <button
+            onClick={handleStartLoop}
+            className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-base shadow-lg hover:shadow-xl active:scale-[0.99] transition-all flex items-center justify-center gap-2 group mb-5"
+          >
+            <span className="material-symbols-outlined text-[24px] transition-transform group-hover:scale-125">
+              play_circle
+            </span>
+            <span>{t.startQuiz}</span>
+          </button>
 
           {/* Subject Flow Multi-Selector */}
           <div className="bg-surface-container-low rounded-2xl p-4 border border-surface-container-high/60 shadow-xs mb-5">
@@ -680,7 +724,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           <span className="material-symbols-outlined text-[13px] text-secondary">expand_more</span>
         </button>
 
-        {/* Combo Streak / Dopamine Badge */}
+        {/* Right Section: Theme Toggle, Combo Streak, and Question Counter */}
         <div className="flex items-center gap-2">
           {comboCount >= 2 && (
             <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[11px] font-bold animate-pulse">
@@ -690,6 +734,16 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           <span className="text-secondary font-mono text-xs">
             {currentIndex + 1}/{questions.length}
           </span>
+          <button
+            onClick={toggleDarkModeInLoop}
+            className="p-1 rounded-full text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"
+            title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
+            aria-label="Toggle Night Mode"
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {isDarkMode ? "light_mode" : "dark_mode"}
+            </span>
+          </button>
         </div>
       </div>
 
