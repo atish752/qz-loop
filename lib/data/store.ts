@@ -341,7 +341,21 @@ class DataStore {
     return true;
   }
 
-  public updateProfile(updates: Partial<UserProfile>, targetUserId?: string): UserProfile {
+  public updateProfile(
+    updatesOrId: Partial<UserProfile> | string,
+    targetUserIdOrUpdates?: string | Partial<UserProfile>
+  ): UserProfile {
+    let updates: Partial<UserProfile>;
+    let targetUserId: string | undefined;
+
+    if (typeof updatesOrId === "string") {
+      targetUserId = updatesOrId;
+      updates = (targetUserIdOrUpdates as Partial<UserProfile>) || {};
+    } else {
+      updates = updatesOrId || {};
+      targetUserId = typeof targetUserIdOrUpdates === "string" ? targetUserIdOrUpdates : undefined;
+    }
+
     const user =
       (targetUserId ? this.profiles.find((p) => p.id === targetUserId) : null) ||
       (updates.id ? this.profiles.find((p) => p.id === updates.id) : null) ||
@@ -391,6 +405,7 @@ class DataStore {
     preferred_examination_id?: string;
     avatar_url?: string;
     email?: string;
+    language_preference?: 'en' | 'hi';
   }): UserProfile {
     const cleanUsername = data.username.trim().toLowerCase().replace(/^@+/, "");
     if (!this.isUsernameAvailable(cleanUsername)) {
@@ -413,6 +428,8 @@ class DataStore {
       target_exam: targetExam,
       preferred_examination_id: examId,
       avatar_url: data.avatar_url || "",
+      email: data.email?.trim() || undefined,
+      language_preference: data.language_preference || "en",
       role: "student",
       current_streak: 0, // Starts at zero scratch!
       last_active_date: undefined, // undefined until first practice attempt
@@ -479,6 +496,7 @@ class DataStore {
     target_exam?: string;
     preferred_examination_id?: string;
     avatar_url?: string | null;
+    email?: string;
   }): UserProfile {
     let existing = this.profiles.find((p) => p.id === data.id);
     if (!existing) {
@@ -489,6 +507,7 @@ class DataStore {
         target_exam: data.target_exam || "Railways (RRB NTPC & Group D)",
         preferred_examination_id: data.preferred_examination_id || "exam-railway-ntpc",
         avatar_url: data.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
+        email: data.email || undefined,
         role: "student",
         current_streak: 0,
         daily_goal: 10,
@@ -504,6 +523,7 @@ class DataStore {
       if (data.target_exam) existing.target_exam = data.target_exam;
       if (data.preferred_examination_id) existing.preferred_examination_id = data.preferred_examination_id;
       if (data.avatar_url) existing.avatar_url = data.avatar_url;
+      if (data.email) existing.email = data.email;
     }
     this.currentUserId = data.id;
     return existing;
@@ -528,6 +548,7 @@ class DataStore {
     subjectSlug?: string;
     subjectSlugs?: string[];
     sessionExcludedIds?: string[];
+    language?: 'en' | 'hi' | 'all';
     limit?: number;
   }): Question[] {
     const userId = options.userId || this.currentUserId;
@@ -535,6 +556,7 @@ class DataStore {
     const subjectSlug = options.subjectSlug || "all";
     const sessionExcludedIds = new Set(options.sessionExcludedIds || []);
     const limit = options.limit || 10;
+    const lang = options.language || "all";
 
     // 1. Exclude questions hidden by user
     const userHiddenIds = new Set(
@@ -555,7 +577,7 @@ class DataStore {
       (q) => q.examination_id === examId && q.publication_status === "published" && q.moderation_status === "active"
     );
 
-    // Filter by exam and subject
+    // Filter by exam, subject, and language
     let pool = this.questions.filter((q) => {
       if (hasSpecificQuestions && q.examination_id !== examId) return false;
       if (q.publication_status !== "published" || q.moderation_status !== "active") return false;
@@ -563,6 +585,15 @@ class DataStore {
       if (sessionExcludedIds.has(q.id)) return false;
       const repeatPref = this.repeatPreferences.get(`${userId}:${q.id}`);
       if (repeatPref?.interval === "never") return false;
+
+      // Language filter
+      if (lang === "hi") {
+        const hasHindi = q.language === "hi" || Boolean(q.hindi_question_text);
+        if (!hasHindi) return false;
+      } else if (lang === "en") {
+        const hasEnglish = q.language === "en" || (Boolean(q.question_text) && !q.question_text.match(/^[\u0900-\u097F\s.,!?:;0-9\-—]+$/));
+        if (!hasEnglish) return false;
+      }
 
       if (!filterAll) {
         const matchingSubjIds = new Set(
@@ -879,21 +910,33 @@ class DataStore {
     hindiExplanation?: string;
     difficulty?: "easy" | "medium" | "hard";
     syllabusTag?: string;
+    targetTopic?: string;
     pyqInfo?: string;
   }): Question {
     const author = this.getCurrentUser();
-    const cleanedText = cleanText(params.questionText);
+    const effectiveText = (params.questionText || params.hindiQuestionText || "").trim();
+    const cleanedText = cleanText(effectiveText);
     const fingerprint = normalizeTextFingerprint(cleanedText);
 
     if (!cleanedText || cleanedText.length < 5) {
       throw new Error("Question text must be at least 5 characters long");
     }
 
-    if (!params.options || params.options.length < 2) {
+    if (cleanedText.length > 600) {
+      throw new Error("Question text cannot exceed 600 characters");
+    }
+
+    const sanitizedOptions = params.options.map((o) => ({
+      id: o.id,
+      text: (o.text || o.hindi_text || "").trim(),
+      hindi_text: o.hindi_text ? o.hindi_text.trim() : undefined,
+    }));
+
+    if (!sanitizedOptions || sanitizedOptions.length < 2) {
       throw new Error("Question must have at least 2 options");
     }
 
-    const hasCorrect = params.options.some((o) => o.id === params.correctOptionId);
+    const hasCorrect = sanitizedOptions.some((o) => o.id === params.correctOptionId);
     if (!hasCorrect) {
       throw new Error("Correct option must be one of the provided options");
     }
@@ -907,6 +950,13 @@ class DataStore {
     const subj = this.subjects.find((s) => s.id === params.subjectId);
     const examId = params.examinationId || subj?.examination_id || "exam-ssc-cgl";
 
+    let finalSyllabusTag = params.syllabusTag?.trim() || "";
+    if (params.targetTopic?.trim()) {
+      finalSyllabusTag = finalSyllabusTag
+        ? `${params.targetTopic.trim()} · ${finalSyllabusTag}`
+        : params.targetTopic.trim();
+    }
+
     const newQuestion: Question = {
       id: `q-usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       author_id: author.id,
@@ -919,12 +969,12 @@ class DataStore {
       question_text: cleanedText,
       hindi_question_text: params.hindiQuestionText?.trim() || undefined,
       language: params.language || "en",
-      options: params.options,
+      options: sanitizedOptions,
       correct_option_id: params.correctOptionId,
       explanation: params.explanation?.trim() || undefined,
       hindi_explanation: params.hindiExplanation?.trim() || undefined,
       difficulty: params.difficulty || "medium",
-      syllabus_tag: params.syllabusTag || undefined,
+      syllabus_tag: finalSyllabusTag || undefined,
       pyq_info: params.pyqInfo || undefined,
       quality_upvotes: 1,
       quality_downvotes: 0,

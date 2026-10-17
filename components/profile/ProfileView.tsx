@@ -1,11 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { UserProfile, Question, Examination } from "@/types/database";
 import { TopHeader } from "../layout/TopHeader";
 import { ExamSwitchModal } from "../feed/ExamSwitchModal";
-import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
+import {
+  formatWhatsAppChallenge,
+  openWhatsAppShare,
+  FOUNDER_NAME,
+  FOUNDER_PHONE,
+  FOUNDER_EMAIL,
+  FOUNDER_WHATSAPP_LINK,
+  OFFICIAL_WHATSAPP_GROUP_URL,
+} from "@/lib/utils/whatsapp";
+import { compressImageClientSide } from "@/lib/utils/imageCompression";
+import { setAppLanguage, useAppLanguage } from "@/lib/utils/i18n";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -13,6 +23,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export const ProfileView: React.FC = () => {
+  const { lang, t } = useAppLanguage();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [exams, setExams] = useState<Examination[]>([]);
   const [hiddenQuestions, setHiddenQuestions] = useState<Question[]>([]);
@@ -28,6 +39,13 @@ export const ProfileView: React.FC = () => {
   const [editName, setEditName] = useState<string>("");
   const [editUsername, setEditUsername] = useState<string>("");
   const [editExamId, setEditExamId] = useState<string>("");
+  const [editEmail, setEditEmail] = useState<string>("");
+  const [editAvatarUrl, setEditAvatarUrl] = useState<string>("");
+  const [editAvatarSizeKb, setEditAvatarSizeKb] = useState<number | null>(null);
+  const [isCompressingEditAvatar, setIsCompressingEditAvatar] = useState<boolean>(false);
+  const [editLanguagePref, setEditLanguagePref] = useState<"en" | "hi">("en");
+  const editFileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [usernameStatus, setUsernameStatus] = useState<{
     checking: boolean;
     available: boolean | null;
@@ -56,6 +74,7 @@ export const ProfileView: React.FC = () => {
               setEditName(data.user.display_name || "");
               setEditUsername(data.user.username || "");
               setEditExamId(data.user.preferred_examination_id || "exam-ssc-cgl");
+              setEditEmail(data.user.email || "");
 
               // Onboarding prompt if username has not been chosen yet and user is logged in
               if (uid && !data.user.username) {
@@ -109,10 +128,31 @@ export const ProfileView: React.FC = () => {
     if (user) {
       setEditName(user.display_name);
       setEditUsername(user.username || "");
-      setEditExamId(user.preferred_examination_id || "exam-ssc-cgl");
+      setEditExamId(user.preferred_examination_id || "exam-railway-ntpc");
+      setEditEmail(user.email || "");
+      setEditAvatarUrl(user.avatar_url || "");
+      setEditAvatarSizeKb(null);
+      setEditLanguagePref(user.language_preference || "en");
       setUsernameStatus({ checking: false, available: null, message: "" });
       setEditError(null);
       setShowEditProfileModal(true);
+    }
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressingEditAvatar(true);
+    setEditError(null);
+    try {
+      const result = await compressImageClientSide(file, 256, 0.7);
+      setEditAvatarUrl(result.dataUrl);
+      setEditAvatarSizeKb(result.sizeKb);
+    } catch {
+      setEditError("Failed to process photo. Please choose another.");
+    } finally {
+      setIsCompressingEditAvatar(false);
     }
   };
 
@@ -181,12 +221,18 @@ export const ProfileView: React.FC = () => {
           display_name: editName.trim(),
           username: editUsername.trim().toLowerCase(),
           preferred_examination_id: editExamId,
-          target_exam: selectedExam?.name || "SSC CGL",
+          target_exam: selectedExam?.name || "Railways (RRB NTPC & Group D)",
+          avatar_url: editAvatarUrl || undefined,
+          email: editEmail.trim() || undefined,
+          language_preference: editLanguagePref,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setUser(data.user);
+        setAppLanguage(editLanguagePref);
+        localStorage.setItem("qz_quiz_lang", editLanguagePref);
+        window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
         setShowEditProfileModal(false);
       } else {
         setEditError(data.error || "Failed to update profile");
@@ -460,6 +506,14 @@ export const ProfileView: React.FC = () => {
                   <span className="font-body-sm text-body-sm text-secondary truncate">
                     {user?.target_exam || activeExam?.name || "SSC CGL"}
                   </span>
+                  {user?.email && (
+                    <>
+                      <span className="text-secondary text-xs">•</span>
+                      <span className="font-body-sm text-xs text-secondary truncate">
+                        {user.email}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -879,6 +933,73 @@ export const ProfileView: React.FC = () => {
           )}
         </div>
 
+        {/* Founder Direct Feedback & Aspirants WhatsApp Community */}
+        <div className="rounded-2xl bg-surface-container-lowest p-4 border border-surface-container-high/60 shadow-xs flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-[20px]">support_agent</span>
+              <h3 className="font-headline-sm text-sm font-bold text-on-surface">Founder Support & Community</h3>
+            </div>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary">
+              Direct Contact
+            </span>
+          </div>
+          <p className="text-xs text-secondary leading-relaxed">
+            Qz Loop is built with heart by {FOUNDER_NAME} for serious Indian competitive exam aspirants. Have a question, syllabus suggestion, or found a bug? Connect directly!
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            {/* WhatsApp Founder Direct */}
+            <a
+              href={FOUNDER_WHATSAPP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 p-2.5 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#128C7E] dark:text-[#25D366] transition-all font-semibold text-xs"
+            >
+              <div className="w-7 h-7 rounded-lg bg-[#25D366] text-white flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[16px]">chat</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[11px] font-bold text-on-surface">WhatsApp Founder</span>
+                <span className="text-[10px] text-secondary truncate">{FOUNDER_PHONE}</span>
+              </div>
+            </a>
+
+            {/* Email Founder Direct */}
+            <a
+              href={`mailto:${FOUNDER_EMAIL}?subject=Qz%20Loop%20Feedback`}
+              className="flex items-center gap-2.5 p-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary transition-all font-semibold text-xs"
+            >
+              <div className="w-7 h-7 rounded-lg bg-primary text-on-primary flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[16px]">mail</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[11px] font-bold text-on-surface">Email {FOUNDER_NAME}</span>
+                <span className="text-[10px] text-secondary truncate">{FOUNDER_EMAIL}</span>
+              </div>
+            </a>
+          </div>
+
+          {/* Aspirants Official WhatsApp Study Group */}
+          <a
+            href={OFFICIAL_WHATSAPP_GROUP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 font-bold text-xs transition-all group"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[20px]">group</span>
+              <div>
+                <p className="font-bold text-on-surface text-xs">Join Aspirants WhatsApp Study Group</p>
+                <p className="text-[10px] text-secondary font-normal">Daily PYQs, exam updates & peer discussion</p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold group-hover:scale-105 transition-transform">
+              Join Group
+            </span>
+          </a>
+        </div>
+
         {/* Demo Switcher for Verification & Multi-user Testing */}
         <div className="px-1 pb-1">
           <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider font-bold">
@@ -1012,6 +1133,51 @@ export const ProfileView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveProfile} className="py-4 flex flex-col gap-3.5">
+              {/* Profile Photo */}
+              <div className="flex items-center gap-3.5 p-2.5 rounded-2xl bg-surface-container-low/70 border border-surface-container-high/50">
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-full overflow-hidden bg-surface-container-high border-2 border-primary/20 flex items-center justify-center shrink-0">
+                    {editAvatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={editAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="material-symbols-outlined text-[28px] text-secondary">account_circle</span>
+                    )}
+                  </div>
+                  {isCompressingEditAvatar && (
+                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1 flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-sm text-xs font-bold text-on-surface">Profile Picture</span>
+                    {editAvatarSizeKb !== null && (
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-full">
+                        {editAvatarSizeKb} KB · Compressed
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => editFileInputRef.current?.click()}
+                    className="mt-0.5 text-left text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">photo_camera</span>
+                    <span>{editAvatarUrl ? "Change Photo" : "Upload Photo (~20 KB)"}</span>
+                  </button>
+                  <input
+                    ref={editFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarFileChange}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
               {/* Display Name */}
               <div className="flex flex-col gap-1">
                 <label className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
@@ -1096,6 +1262,58 @@ export const ProfileView: React.FC = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Email Address */}
+              <div className="flex flex-col gap-1">
+                <label className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
+                  {t.emailLabel || "Email Address"} (Optional)
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="aspirant@gmail.com"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-sm font-semibold text-on-surface focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              {/* Study Language Preference */}
+              <div className="flex flex-col gap-1.5 p-2.5 rounded-2xl bg-surface-container-low/70 border border-surface-container-high/50">
+                <div className="flex items-center justify-between">
+                  <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
+                    Study Language Preference
+                  </label>
+                  <span className="text-[10px] text-secondary">Switch anytime</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditLanguagePref("en")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                      editLanguagePref === "en"
+                        ? "bg-primary text-on-primary border-primary shadow-xs"
+                        : "bg-surface-container-lowest text-secondary border-surface-container-high/60 hover:text-on-surface"
+                    }`}
+                  >
+                    <span>🇬🇧</span>
+                    <span>English</span>
+                    {editLanguagePref === "en" && <span className="material-symbols-outlined text-[14px]">check</span>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditLanguagePref("hi")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                      editLanguagePref === "hi"
+                        ? "bg-primary text-on-primary border-primary shadow-xs"
+                        : "bg-surface-container-lowest text-secondary border-surface-container-high/60 hover:text-on-surface"
+                    }`}
+                  >
+                    <span>🇮🇳</span>
+                    <span>हिन्दी (Hindi)</span>
+                    {editLanguagePref === "hi" && <span className="material-symbols-outlined text-[14px]">check</span>}
+                  </button>
+                </div>
               </div>
 
               {editError && (

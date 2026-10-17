@@ -9,11 +9,13 @@ export async function GET(request: NextRequest) {
     const examId = searchParams.get("examId") || user?.preferred_examination_id || "exam-ssc-cgl";
     const excludedParam = searchParams.get("excludedIds");
     const sessionExcludedIds = excludedParam ? excludedParam.split(",") : [];
+    const langParam = (searchParams.get("lang") || searchParams.get("language") || "all") as "en" | "hi" | "all";
 
     const questions = db.getFeedQuestions({
       examId,
       subjectSlug,
       sessionExcludedIds,
+      language: langParam,
       limit: 10,
     });
 

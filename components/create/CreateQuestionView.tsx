@@ -2,10 +2,13 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { TopHeader } from "../layout/TopHeader";
 import { DuplicateCheckResult, Question, UserProfile } from "@/types/database";
-import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
+import { formatWhatsAppChallenge, openWhatsAppShare, OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
 import { getExamScoringRule } from "@/lib/utils/examScoring";
+import { getTopicsForSubject } from "@/lib/data/topics";
+import { useAppLanguage } from "@/lib/utils/i18n";
 
 export const EXAMS_LIST = [
   { id: "exam-railway-ntpc", name: "Railways (RRB NTPC & Group D)", shortName: "Railways RRB" },
@@ -88,6 +91,7 @@ export const CreateQuestionView: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams ? searchParams.get("edit") : null;
+  const { lang, t } = useAppLanguage();
 
   // User & Auth State
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -115,15 +119,16 @@ export const CreateQuestionView: React.FC = () => {
     return () => window.removeEventListener("qz_auth_changed", checkAuth);
   }, []);
 
-  // Form states
-  const [selectedExamId, setSelectedExamId] = useState<string>("exam-ssc-cgl");
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("subj-gk");
-  const [targetTopic, setTargetTopic] = useState<string>("Arithmetic & Profit");
+  // Form states - Auto defaults to user's preferred examination from profile
+  const [selectedExamId, setSelectedExamId] = useState<string>("exam-railway-ntpc");
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("subj-rrb-maths");
+  const [targetTopic, setTargetTopic] = useState<string>("Percentage, Profit & Loss");
   const [syllabusTag, setSyllabusTag] = useState<string>("");
   const [pyqInfo, setPyqInfo] = useState<string>("");
   const [questionText, setQuestionText] = useState<string>("");
   const [hindiQuestionText, setHindiQuestionText] = useState<string>("");
   const [language, setLanguage] = useState<"en" | "hi">("en");
+  const [languageFormat, setLanguageFormat] = useState<"en" | "hi" | "bilingual">("en");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
 
   const [options, setOptions] = useState<[string, string, string, string]>([
@@ -276,13 +281,58 @@ export const CreateQuestionView: React.FC = () => {
     hindiExplanation,
   ]);
 
+  // Target examination automatically bound from user profile
+  const effectiveExamId = user?.preferred_examination_id || selectedExamId || "exam-railway-ntpc";
+  const currentExamObj = EXAMS_LIST.find((e) => e.id === effectiveExamId) || EXAMS_LIST[0];
+  const currentExamSubjects = EXAM_SUBJECTS_MAP[effectiveExamId] || EXAM_SUBJECTS_MAP["exam-railway-ntpc"];
+  const currentSubjectObj = currentExamSubjects.find((s) => s.id === selectedSubjectId) || currentExamSubjects[0];
+  const dynamicTopics = getTopicsForSubject(currentSubjectObj?.slug, currentSubjectObj?.name);
+
+  // Sync exam & subjects from user profile automatically
+  useEffect(() => {
+    if (user?.preferred_examination_id) {
+      setSelectedExamId(user.preferred_examination_id);
+      const subjs = EXAM_SUBJECTS_MAP[user.preferred_examination_id] || EXAM_SUBJECTS_MAP["exam-railway-ntpc"];
+      if (subjs && subjs.length > 0) {
+        const stillValid = subjs.some((s) => s.id === selectedSubjectId);
+        const activeSub = stillValid ? subjs.find((s) => s.id === selectedSubjectId)! : subjs[0];
+        if (!stillValid) setSelectedSubjectId(subjs[0].id);
+        const topics = getTopicsForSubject(activeSub?.slug, activeSub?.name);
+        if (topics.length > 0 && !topics.includes(targetTopic)) {
+          setTargetTopic(topics[0]);
+        }
+      }
+    }
+    if (user?.language_preference === "hi") {
+      setLanguageFormat("hi");
+      setLanguage("hi");
+    }
+  }, [user]);
+
+  // Keep targetTopic in sync with dynamic topics whenever subject changes
+  useEffect(() => {
+    if (dynamicTopics.length > 0 && !dynamicTopics.includes(targetTopic)) {
+      setTargetTopic(dynamicTopics[0]);
+    }
+  }, [dynamicTopics, targetTopic]);
+
+  const handleSubjectSelect = (subId: string) => {
+    setSelectedSubjectId(subId);
+    const sub = currentExamSubjects.find((s) => s.id === subId);
+    const topics = getTopicsForSubject(sub?.slug, sub?.name);
+    if (topics.length > 0) {
+      setTargetTopic(topics[0]);
+    }
+  };
+
   const handleExamChange = (examId: string) => {
     setSelectedExamId(examId);
-    const subjs = EXAM_SUBJECTS_MAP[examId] || EXAM_SUBJECTS_MAP["exam-ssc-cgl"];
+    const subjs = EXAM_SUBJECTS_MAP[examId] || EXAM_SUBJECTS_MAP["exam-railway-ntpc"];
     if (subjs && subjs.length > 0) {
-      const stillValid = subjs.some((s) => s.id === selectedSubjectId);
-      if (!stillValid) {
-        setSelectedSubjectId(subjs[0].id);
+      setSelectedSubjectId(subjs[0].id);
+      const topics = getTopicsForSubject(subjs[0].slug, subjs[0].name);
+      if (topics.length > 0) {
+        setTargetTopic(topics[0]);
       }
     }
   };
@@ -411,13 +461,31 @@ export const CreateQuestionView: React.FC = () => {
       return;
     }
 
-    if (!questionText.trim()) {
-      setErrorMsg("Please enter the question statement");
-      return;
+    const isHindiOnly = languageFormat === "hi";
+
+    if (isHindiOnly) {
+      if (!hindiQuestionText.trim()) {
+        setErrorMsg(lang === "hi" ? "कृपया प्रश्न का विवरण दर्ज करें" : "Please enter the Hindi question statement");
+        return;
+      }
+      if (hindiOptions.some((opt) => !opt.trim())) {
+        setErrorMsg(lang === "hi" ? "कृपया सभी 4 विकल्प भरें" : "Please fill in all 4 Hindi answer choices");
+        return;
+      }
+    } else {
+      if (!questionText.trim()) {
+        setErrorMsg(lang === "hi" ? "कृपया प्रश्न का विवरण दर्ज करें" : "Please enter the question statement");
+        return;
+      }
+      if (options.some((opt) => !opt.trim())) {
+        setErrorMsg(lang === "hi" ? "कृपया सभी 4 विकल्प भरें" : "Please fill in all 4 answer options");
+        return;
+      }
     }
 
-    if (options.some((opt) => !opt.trim())) {
-      setErrorMsg("Please fill in all 4 answer options");
+    const effectiveQText = (isHindiOnly ? hindiQuestionText : questionText).trim();
+    if (effectiveQText.length > 600) {
+      setErrorMsg(lang === "hi" ? "प्रश्न विवरण 600 अक्षरों से अधिक नहीं हो सकता" : "Question statement cannot exceed 600 characters");
       return;
     }
 
@@ -429,24 +497,41 @@ export const CreateQuestionView: React.FC = () => {
     setIsSubmitting(true);
     try {
       const formattedOptions = [
-        { id: "A", text: options[0].trim(), hindi_text: hindiOptions[0]?.trim() || undefined },
-        { id: "B", text: options[1].trim(), hindi_text: hindiOptions[1]?.trim() || undefined },
-        { id: "C", text: options[2].trim(), hindi_text: hindiOptions[2]?.trim() || undefined },
-        { id: "D", text: options[3].trim(), hindi_text: hindiOptions[3]?.trim() || undefined },
+        {
+          id: "A",
+          text: (isHindiOnly ? hindiOptions[0] : options[0]).trim(),
+          hindi_text: hindiOptions[0]?.trim() || undefined,
+        },
+        {
+          id: "B",
+          text: (isHindiOnly ? hindiOptions[1] : options[1]).trim(),
+          hindi_text: hindiOptions[1]?.trim() || undefined,
+        },
+        {
+          id: "C",
+          text: (isHindiOnly ? hindiOptions[2] : options[2]).trim(),
+          hindi_text: hindiOptions[2]?.trim() || undefined,
+        },
+        {
+          id: "D",
+          text: (isHindiOnly ? hindiOptions[3] : options[3]).trim(),
+          hindi_text: hindiOptions[3]?.trim() || undefined,
+        },
       ];
 
       const payload = {
-        examinationId: selectedExamId,
-        subjectId: selectedSubjectId,
-        questionText: questionText.trim(),
+        examinationId: effectiveExamId,
+        subjectId: currentSubjectObj.id,
+        questionText: (isHindiOnly ? hindiQuestionText : questionText).trim(),
         hindiQuestionText: hindiQuestionText.trim() || undefined,
-        language,
+        language: isHindiOnly ? "hi" : "en",
         options: formattedOptions,
         correctOptionId,
-        explanation: explanation.trim() || undefined,
+        explanation: (isHindiOnly ? hindiExplanation : explanation).trim() || undefined,
         hindiExplanation: hindiExplanation.trim() || undefined,
         difficulty,
         syllabusTag: syllabusTag.trim() || undefined,
+        targetTopic: targetTopic.trim() || undefined,
         pyqInfo: pyqInfo.trim() || undefined,
       };
 
@@ -859,43 +944,36 @@ export const CreateQuestionView: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handlePublish} className="flex flex-col gap-4">
-                {/* Target Examination Selector */}
-                <section>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-                      Target Examination
-                    </span>
-                    <span className="font-label-sm text-label-sm text-primary flex items-center gap-1 font-bold">
-                      <span className="material-symbols-outlined text-[14px]">school</span>
-                      Multi-Exam Mode
-                    </span>
+                {/* Auto Target Examination Info Badge (from Profile) */}
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 shadow-xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
+                      <span className="material-symbols-outlined text-[20px]">school</span>
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-label-sm text-[10px] uppercase tracking-wider text-secondary font-bold">
+                        {t.postingUnderExam}
+                      </span>
+                      <span className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface truncate">
+                        {currentExamObj.name}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-                    {EXAMS_LIST.map((exam) => {
-                      const isSelected = selectedExamId === exam.id;
-                      return (
-                        <button
-                          key={exam.id}
-                          type="button"
-                          onClick={() => handleExamChange(exam.id)}
-                          className={`px-3 py-1.5 rounded-full font-label-md text-label-md transition-all shrink-0 ${
-                            isSelected
-                              ? "bg-primary text-on-primary shadow-sm font-bold scale-[1.02]"
-                              : "bg-surface-container text-secondary hover:text-on-surface"
-                          }`}
-                        >
-                          {exam.shortName}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
+                  <Link
+                    href="/profile"
+                    className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs shrink-0 transition-colors flex items-center gap-1"
+                    title="Change target exam in your profile"
+                  >
+                    <span>{t.changeInProfile}</span>
+                    <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                  </Link>
+                </div>
 
-                {/* Subject Selector Filter Row */}
+                {/* Subject Selector Filter Row (Target Domain) */}
                 <section>
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-                      Target Domain
+                      {t.targetDomain}
                     </span>
                     <span className="font-label-sm text-label-sm text-primary flex items-center gap-1 font-bold">
                       <span className="material-symbols-outlined text-[14px]">bolt</span>
@@ -903,16 +981,16 @@ export const CreateQuestionView: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-                    {(EXAM_SUBJECTS_MAP[selectedExamId] || EXAM_SUBJECTS_MAP["exam-ssc-cgl"]).map((s) => {
+                    {currentExamSubjects.map((s) => {
                       const isSelected = selectedSubjectId === s.id;
                       return (
                         <button
                           key={s.id}
                           type="button"
-                          onClick={() => setSelectedSubjectId(s.id)}
+                          onClick={() => handleSubjectSelect(s.id)}
                           className={`px-3.5 py-2 rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 shrink-0 ${
                             isSelected
-                              ? "bg-primary-container text-on-primary shadow-sm font-bold scale-[1.02]"
+                              ? "bg-primary text-on-primary shadow-sm font-bold scale-[1.02]"
                               : "bg-surface-container text-secondary hover:text-on-surface"
                           }`}
                         >
@@ -929,7 +1007,7 @@ export const CreateQuestionView: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
-                        Syllabus Tag
+                        {t.syllabusTag}
                       </label>
                       <input
                         type="text"
@@ -941,7 +1019,7 @@ export const CreateQuestionView: React.FC = () => {
                     </div>
                     <div>
                       <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
-                        PYQ Exam & Year Info
+                        {t.pyqInfo}
                       </label>
                       <input
                         type="text"
@@ -955,57 +1033,64 @@ export const CreateQuestionView: React.FC = () => {
 
                   <div>
                     <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
-                      Topic / Subtopic Target
+                      {t.selectTopic}
                     </label>
                     <select
                       value={targetTopic}
                       onChange={(e) => setTargetTopic(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-semibold focus:outline-none focus:border-primary"
                     >
-                      <option value="Arithmetic & Profit">Arithmetic & Profit & Loss</option>
-                      <option value="Geometry & Trigonometry">Geometry & Trigonometry</option>
-                      <option value="Syllogisms & Logic">Syllogisms & Analytical Logic</option>
-                      <option value="Grammar & Spotting Errors">Grammar & Spotting Errors</option>
-                      <option value="Vocabulary & Idioms">Vocabulary & Idioms</option>
-                      <option value="Indian Polity & History">Indian Polity & Modern History</option>
-                      <option value="Current Affairs & Science">Current Affairs & Science</option>
-                      <option value="Banking Reasoning & Puzzles">Banking Reasoning & Puzzles</option>
-                      <option value="Data Interpretation">Data Interpretation & Charts</option>
+                      {dynamicTopics.map((top) => (
+                        <option key={top} value={top}>
+                          {top}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </section>
 
-                {/* Primary Language & Difficulty */}
-                <div className="flex items-center justify-between gap-2">
+                {/* Language Format & Difficulty */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl">
                     <button
                       type="button"
-                      onClick={() => setLanguage("en")}
-                      className={`px-2.5 py-1 rounded-lg text-label-sm font-semibold transition-all ${
-                        language === "en"
+                      onClick={() => { setLanguageFormat("en"); setLanguage("en"); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        languageFormat === "en"
                           ? "bg-surface-container-lowest text-primary shadow-xs"
-                          : "text-secondary"
+                          : "text-secondary hover:text-on-surface"
                       }`}
                     >
-                      English Primary
+                      {t.formatEnglish}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setLanguage("hi")}
-                      className={`px-2.5 py-1 rounded-lg text-label-sm font-semibold transition-all ${
-                        language === "hi"
+                      onClick={() => { setLanguageFormat("hi"); setLanguage("hi"); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        languageFormat === "hi"
                           ? "bg-surface-container-lowest text-primary shadow-xs"
-                          : "text-secondary"
+                          : "text-secondary hover:text-on-surface"
                       }`}
                     >
-                      हिंदी Primary
+                      {t.formatHindi}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setLanguageFormat("bilingual"); setLanguage("en"); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        languageFormat === "bilingual"
+                          ? "bg-surface-container-lowest text-primary shadow-xs"
+                          : "text-secondary hover:text-on-surface"
+                      }`}
+                    >
+                      {t.formatBilingual}
                     </button>
                   </div>
 
                   <select
                     value={difficulty}
                     onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
-                    className="px-2.5 py-1 rounded-xl bg-surface-container-low border border-surface-container-high text-label-sm font-medium text-on-surface focus:outline-none"
+                    className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface focus:outline-none self-start sm:self-auto"
                   >
                     <option value="easy">Easy (-0.50 penalty)</option>
                     <option value="medium">Medium (-0.50 penalty)</option>
@@ -1013,73 +1098,76 @@ export const CreateQuestionView: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Question Input Card (English) */}
-                <section className="bg-surface-container-low rounded-xl p-3.5 border border-surface-container-high/40 shadow-xs">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold">
-                      <span className="material-symbols-outlined text-[16px]">help</span>
-                      <span>Question Statement (English)</span>
-                    </label>
-                    <span className="font-label-sm text-label-sm text-secondary">
-                      {questionText.length} / 400
-                    </span>
-                  </div>
-                  <textarea
-                    value={questionText}
-                    onChange={(e) => setQuestionText(e.target.value)}
-                    placeholder="Type question statement in English..."
-                    rows={3}
-                    maxLength={400}
-                    className="w-full bg-transparent font-headline-sm text-headline-sm text-on-surface focus:outline-none resize-none leading-snug placeholder:text-secondary/50"
-                  />
-                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-surface-container-high/30 text-secondary">
-                    <button
-                      type="button"
-                      onClick={() => setQuestionText((prev) => prev + "² ")}
-                      className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
-                      title="Superscript"
-                    >
-                      x²
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuestionText((prev) => prev + "√ ")}
-                      className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
-                      title="Square root"
-                    >
-                      √
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuestionText((prev) => prev + "₹ ")}
-                      className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
-                      title="Rupee symbol"
-                    >
-                      ₹
-                    </button>
-                  </div>
-                </section>
+                {/* Question Statement Input - Adapts to English, Hindi Only, or Bilingual */}
+                {(languageFormat === "en" || languageFormat === "bilingual") && (
+                  <section className="bg-surface-container-low rounded-xl p-3.5 border border-surface-container-high/40 shadow-xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold">
+                        <span className="material-symbols-outlined text-[16px]">help</span>
+                        <span>{t.questionStatementEn}</span>
+                      </label>
+                      <span className="font-label-sm text-label-sm text-secondary">
+                        {questionText.length} / 600
+                      </span>
+                    </div>
+                    <textarea
+                      value={questionText}
+                      onChange={(e) => setQuestionText(e.target.value)}
+                      placeholder="Type question statement in English (up to 600 characters)..."
+                      rows={3}
+                      maxLength={600}
+                      className="w-full bg-transparent font-headline-sm text-headline-sm text-on-surface focus:outline-none resize-none leading-snug placeholder:text-secondary/50"
+                    />
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-surface-container-high/30 text-secondary">
+                      <button
+                        type="button"
+                        onClick={() => setQuestionText((prev) => prev + "² ")}
+                        className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
+                        title="Superscript"
+                      >
+                        x²
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuestionText((prev) => prev + "√ ")}
+                        className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
+                        title="Square root"
+                      >
+                        √
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuestionText((prev) => prev + "₹ ")}
+                        className="px-2 py-0.5 rounded text-xs hover:bg-surface-container transition-colors"
+                        title="Rupee symbol"
+                      >
+                        ₹
+                      </button>
+                    </div>
+                  </section>
+                )}
 
-                {/* Bilingual Hindi Question Card (Optional) */}
-                <section className="bg-surface-container-low rounded-xl p-3.5 border border-surface-container-high/40 shadow-xs">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold">
-                      <span className="material-symbols-outlined text-[16px] text-primary">translate</span>
-                      <span>Hindi Question Statement (हिन्दी अनुवाद - Optional)</span>
-                    </label>
-                    <span className="font-label-sm text-label-sm text-secondary">
-                      {hindiQuestionText.length} / 400
-                    </span>
-                  </div>
-                  <textarea
-                    value={hindiQuestionText}
-                    onChange={(e) => setHindiQuestionText(e.target.value)}
-                    placeholder="प्रश्न का हिन्दी अनुवाद यहाँ लिखें..."
-                    rows={2}
-                    maxLength={400}
-                    className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none leading-snug placeholder:text-secondary/50"
-                  />
-                </section>
+                {(languageFormat === "hi" || languageFormat === "bilingual") && (
+                  <section className="bg-surface-container-low rounded-xl p-3.5 border border-surface-container-high/40 shadow-xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold">
+                        <span className="material-symbols-outlined text-[16px] text-primary">translate</span>
+                        <span>{t.questionStatementHi}</span>
+                      </label>
+                      <span className="font-label-sm text-label-sm text-secondary">
+                        {hindiQuestionText.length} / 600
+                      </span>
+                    </div>
+                    <textarea
+                      value={hindiQuestionText}
+                      onChange={(e) => setHindiQuestionText(e.target.value)}
+                      placeholder="प्रश्न का विवरण यहाँ लिखें... (अधिकतम 600 अक्षर)"
+                      rows={3}
+                      maxLength={600}
+                      className="w-full bg-transparent font-headline-sm text-headline-sm text-on-surface focus:outline-none resize-none leading-snug placeholder:text-secondary/50"
+                    />
+                  </section>
+                )}
 
                 {/* Real-Time Duplicate Warning Banner */}
                 {duplicateResult?.is_similar && !isEditMode && (
@@ -1123,11 +1211,11 @@ export const CreateQuestionView: React.FC = () => {
                 <section>
                   <div className="flex items-center justify-between mb-1.5 px-0.5">
                     <span className="font-label-md text-label-md text-secondary font-semibold">
-                      Answer Choices & Hindi Options
+                      {t.optionsLabel} {languageFormat === "hi" ? "(हिन्दी विकल्प)" : ""}
                     </span>
                     <span className="font-label-sm text-label-sm text-tertiary font-bold flex items-center gap-1">
                       <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                      Option {correctOptionId} marked correct
+                      Option {correctOptionId} {t.correct}
                     </span>
                   </div>
 
@@ -1155,21 +1243,34 @@ export const CreateQuestionView: React.FC = () => {
                               >
                                 {letter}
                               </div>
-                              <input
-                                type="text"
-                                value={options[idx]}
-                                onChange={(e) => handleOptionChange(idx, e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder={`Option ${letter} (English)...`}
-                                className="bg-transparent font-body-md text-body-md text-on-surface focus:outline-none w-full"
-                              />
+                              {languageFormat === "hi" ? (
+                                <input
+                                  type="text"
+                                  value={hindiOptions[idx]}
+                                  onChange={(e) => handleHindiOptionChange(idx, e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  placeholder={`विकल्प ${letter} (हिन्दी)...`}
+                                  maxLength={300}
+                                  className="bg-transparent font-body-md text-body-md text-on-surface focus:outline-none w-full"
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={options[idx]}
+                                  onChange={(e) => handleOptionChange(idx, e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  placeholder={`Option ${letter} (English)...`}
+                                  maxLength={300}
+                                  className="bg-transparent font-body-md text-body-md text-on-surface focus:outline-none w-full"
+                                />
+                              )}
                             </div>
 
                             <div className="flex items-center pl-2 shrink-0">
                               {isCorrect ? (
                                 <span className="flex items-center gap-1 text-tertiary font-label-sm text-label-sm font-bold">
                                   <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                                  <span>Correct</span>
+                                  <span>{t.correct}</span>
                                 </span>
                               ) : (
                                 <span className="material-symbols-outlined text-[18px] text-secondary opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1179,17 +1280,20 @@ export const CreateQuestionView: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* Optional Hindi Option input */}
-                          <div className="pl-10">
-                            <input
-                              type="text"
-                              value={hindiOptions[idx]}
-                              onChange={(e) => handleHindiOptionChange(idx, e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder={`Option ${letter} Hindi (हिन्दी अनुवाद - Optional)...`}
-                              className="bg-transparent text-xs text-secondary placeholder:text-secondary/40 focus:outline-none w-full border-t border-surface-container-high/30 pt-1"
-                            />
-                          </div>
+                          {/* Bilingual secondary option input */}
+                          {languageFormat === "bilingual" && (
+                            <div className="pl-10">
+                              <input
+                                type="text"
+                                value={hindiOptions[idx]}
+                                onChange={(e) => handleHindiOptionChange(idx, e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder={`विकल्प ${letter} (हिन्दी अनुवाद - Optional)...`}
+                                maxLength={300}
+                                className="bg-transparent text-xs text-secondary placeholder:text-secondary/40 focus:outline-none w-full border-t border-surface-container-high/30 pt-1"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1203,34 +1307,65 @@ export const CreateQuestionView: React.FC = () => {
 
                 {/* Explanation Fields (English & Hindi) */}
                 <section className="bg-surface-container-low rounded-xl p-3 border border-surface-container-high/40 flex flex-col gap-2.5">
-                  <div>
-                    <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold mb-1">
-                      <span className="material-symbols-outlined text-[16px] text-primary">lightbulb</span>
-                      <span>Quick Explanation / Solution Proof (English - Optional)</span>
-                    </label>
-                    <textarea
-                      value={explanation}
-                      onChange={(e) => setExplanation(e.target.value)}
-                      placeholder="Include key formula, shortcut, or reason for students..."
-                      rows={2}
-                      className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none"
-                    />
-                  </div>
+                  {(languageFormat === "en" || languageFormat === "bilingual") && (
+                    <div>
+                      <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold mb-1">
+                        <span className="material-symbols-outlined text-[16px] text-primary">lightbulb</span>
+                        <span>{t.explanationProof} (English - Optional)</span>
+                      </label>
+                      <textarea
+                        value={explanation}
+                        onChange={(e) => setExplanation(e.target.value)}
+                        placeholder="Include key formula, shortcut, or reason for students..."
+                        rows={2}
+                        maxLength={800}
+                        className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none"
+                      />
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold mb-1">
-                      <span className="material-symbols-outlined text-[16px] text-primary">translate</span>
-                      <span>Hindi Explanation (हिन्दी व्याख्या - Optional)</span>
-                    </label>
-                    <textarea
-                      value={hindiExplanation}
-                      onChange={(e) => setHindiExplanation(e.target.value)}
-                      placeholder="हिन्दी में स्पष्टीकरण या शॉर्ट ट्रिक..."
-                      rows={2}
-                      className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none"
-                    />
-                  </div>
+                  {(languageFormat === "hi" || languageFormat === "bilingual") && (
+                    <div>
+                      <label className="font-label-md text-label-md text-secondary flex items-center gap-1 font-semibold mb-1">
+                        <span className="material-symbols-outlined text-[16px] text-primary">translate</span>
+                        <span>{t.explanationProof} (हिन्दी व्याख्या - {languageFormat === "hi" ? "Optional" : "वैकल्पिक"})</span>
+                      </label>
+                      <textarea
+                        value={hindiExplanation}
+                        onChange={(e) => setHindiExplanation(e.target.value)}
+                        placeholder="हिन्दी में स्पष्टीकरण या शॉर्ट ट्रिक लिखें..."
+                        rows={2}
+                        maxLength={800}
+                        className="w-full bg-transparent font-body-md text-body-md text-on-surface focus:outline-none resize-none"
+                      />
+                    </div>
+                  )}
                 </section>
+
+                {/* Join WhatsApp Study Community Banner */}
+                <div className="p-3.5 rounded-2xl bg-[#25D366]/10 border border-[#25D366]/30 flex items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[18px]">groups</span>
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-bold text-xs text-on-surface truncate">
+                        {t.joinOfficialWhatsAppGroup}
+                      </span>
+                      <span className="text-[11px] text-secondary truncate">
+                        Share questions & get peer solutions
+                      </span>
+                    </div>
+                  </div>
+                  <a
+                    href={OFFICIAL_WHATSAPP_GROUP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-[#25D366] text-white font-bold text-xs shadow-xs hover:bg-[#20ba59] active:scale-95 transition-all shrink-0"
+                  >
+                    Join
+                  </a>
+                </div>
 
                 {/* Error Message Banner */}
                 {errorMsg && (

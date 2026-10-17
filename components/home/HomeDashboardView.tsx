@@ -6,9 +6,11 @@ import { MatrixStats, UserProfile, HabitSettings, Examination } from "@/types/da
 import { TopHeader } from "../layout/TopHeader";
 import { ExamSwitchModal } from "../feed/ExamSwitchModal";
 import { calculateNetScore, getExamScoringRule } from "@/lib/utils/examScoring";
-import { formatWhatsAppScorecard, openWhatsAppShare } from "@/lib/utils/whatsapp";
+import { formatWhatsAppScorecard, openWhatsAppShare, OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
+import { useAppLanguage } from "@/lib/utils/i18n";
 
 export const HomeDashboardView: React.FC = () => {
+  const { lang, t } = useAppLanguage();
   const [period, setPeriod] = useState<"today" | "week" | "month" | "lifetime">("today");
   const [stats, setStats] = useState<MatrixStats | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -166,12 +168,12 @@ export const HomeDashboardView: React.FC = () => {
       streakDays: isLoggedIn ? (user?.current_streak ?? 0) : 0,
       periodLabel:
         period === "today"
-          ? "Today"
+          ? t.periodToday
           : period === "week"
-          ? "This Week"
+          ? t.periodWeek
           : period === "month"
-          ? "This Month"
-          : "Overall",
+          ? t.periodMonth
+          : t.periodLifetime,
       netMarks: scoring.netScore,
     });
     openWhatsAppShare(cardText);
@@ -209,9 +211,9 @@ export const HomeDashboardView: React.FC = () => {
                 <span className="material-symbols-outlined text-[22px]">account_circle</span>
               </div>
               <div className="flex flex-col min-w-0">
-                <h3 className="font-bold text-on-surface text-base">Welcome Aspirant!</h3>
+                <h3 className="font-bold text-on-surface text-base">{t.welcomeAspirant}</h3>
                 <p className="text-xs text-secondary mt-0.5 leading-relaxed">
-                  Sign in or create your free account to track practice streaks, analyze subject accuracy matrix, and climb All India Ranks.
+                  {t.guestHomeBannerDesc}
                 </p>
               </div>
             </div>
@@ -227,13 +229,13 @@ export const HomeDashboardView: React.FC = () => {
                 className="flex-1 py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs hover:bg-primary-container active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[16px]">login</span>
-                <span>Sign In / Sign Up</span>
+                <span>{t.signInSignUp}</span>
               </button>
               <Link
                 href="/loop"
                 className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs flex items-center gap-1 transition-colors"
               >
-                <span>Browse Loop</span>
+                <span>{t.browseLoop}</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </Link>
             </div>
@@ -246,22 +248,22 @@ export const HomeDashboardView: React.FC = () => {
             <div className="flex items-center gap-2 mb-2">
               <span className="px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider flex items-center gap-1">
                 <span>🔥</span>
-                <span>Infinite Habit Loop</span>
+                <span>{t.infiniteHabitLoop}</span>
               </span>
-              <span className="text-xs text-white/80 font-medium">Reel Study Mode</span>
+              <span className="text-xs text-white/80 font-medium">{t.reelStudyMode}</span>
             </div>
             <h2 className="text-xl font-bold tracking-tight mb-1">
-              Ready for the Quiz Loop?
+              {t.readyForQuizLoop}
             </h2>
             <p className="text-sm text-white/90 mb-4 max-w-xs leading-relaxed">
-              Dopamine-driven vertical reels for SSC CGL. Swipe questions, master shortcuts, build unstoppable streaks.
+              {t.heroDescription}
             </p>
             <Link
               href="/loop"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-primary font-bold shadow-md hover:bg-white/95 active:scale-95 transition-all text-sm group-hover:shadow-lg"
             >
               <span className="material-symbols-outlined text-[20px] text-primary">play_arrow</span>
-              <span>Enter Qz Loop</span>
+              <span>{t.enterQzLoop}</span>
             </Link>
           </div>
           {/* Aesthetic background glow & watermark */}
@@ -269,6 +271,37 @@ export const HomeDashboardView: React.FC = () => {
             <span className="material-symbols-outlined text-[130px]">all_inclusive</span>
           </div>
         </div>
+
+        {/* Aspirants WhatsApp Community Banner */}
+        <a
+          href={OFFICIAL_WHATSAPP_GROUP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between p-3.5 mb-4 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-teal-500/15 border border-emerald-500/30 text-emerald-950 dark:text-emerald-100 hover:shadow-md transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#25D366] text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[24px]">group</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-headline-sm text-sm font-bold text-on-surface">
+                  {t.joinWhatsAppCommunityBanner}
+                </span>
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-emerald-600 text-white">
+                  {t.liveBadge}
+                </span>
+              </div>
+              <p className="text-xs text-secondary mt-0.5">
+                {t.communityBannerDesc}
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 group-hover:translate-x-0.5 transition-transform">
+            <span>{t.joinFree}</span>
+            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </div>
+        </a>
 
         {/* 2. Habit & Dopamine Engine Widgets: /goal, /schedule, /boost */}
         <div className="grid grid-cols-2 gap-2.5 mb-4">
@@ -280,13 +313,13 @@ export const HomeDashboardView: React.FC = () => {
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5 text-secondary">
                 <span className="material-symbols-outlined text-[18px] text-primary">flag</span>
-                <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider">Goal</span>
+                <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider">{t.goalWidget}</span>
               </div>
-              <span className="text-[11px] font-bold text-primary group-hover:underline">Edit</span>
+              <span className="text-[11px] font-bold text-primary group-hover:underline">{t.editBtn}</span>
             </div>
             <div className="flex items-baseline gap-1 my-0.5">
               <span className="text-xl font-bold text-on-surface">{solvedToday}</span>
-              <span className="text-xs text-secondary">/ {dailyGoal} solved</span>
+              <span className="text-xs text-secondary">/ {dailyGoal} {t.solvedOutOf}</span>
             </div>
             {/* Goal Progress Bar */}
             <div className="w-full bg-surface-container-highest rounded-full h-2 mt-2 overflow-hidden">
@@ -305,7 +338,7 @@ export const HomeDashboardView: React.FC = () => {
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5 text-secondary">
                 <span className="material-symbols-outlined text-[18px] text-tertiary">bolt</span>
-                <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider">Boost</span>
+                <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider">{t.boostWidget}</span>
               </div>
               <span className="px-1.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-bold">
                 2x XP
@@ -313,10 +346,10 @@ export const HomeDashboardView: React.FC = () => {
             </div>
             <div>
               <div className="text-sm font-bold text-on-surface flex items-center gap-1">
-                <span>🔥 {isLoggedIn ? (user?.current_streak ?? 0) : 0}d Streak</span>
+                <span>🔥 {isLoggedIn ? (user?.current_streak ?? 0) : 0}d {t.practiceStreak}</span>
               </div>
               <p className="text-[11px] text-secondary mt-0.5">
-                Speed streak bonus active
+                {t.speedStreakBonus}
               </p>
             </div>
           </Link>
@@ -326,10 +359,10 @@ export const HomeDashboardView: React.FC = () => {
         <div className="flex items-center justify-between pb-2 pt-1">
           <div>
             <h1 className="font-headline-sm text-headline-sm font-bold text-on-surface tracking-tight">
-              Study Matrix
+              {t.studyMatrixTitle}
             </h1>
             <p className="font-body-sm text-body-sm text-secondary">
-              Personal Performance • Real Asia/Kolkata Drill Data
+              {t.studyMatrixSubtitle}
             </p>
           </div>
           <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface font-semibold text-label-sm">
@@ -343,10 +376,10 @@ export const HomeDashboardView: React.FC = () => {
           {(["today", "week", "month", "lifetime"] as const).map((p) => {
             const isSelected = period === p;
             const labels = {
-              today: "Today",
-              week: "Week",
-              month: "Month",
-              lifetime: "Lifetime",
+              today: t.periodToday,
+              week: t.periodWeek,
+              month: t.periodMonth,
+              lifetime: t.periodLifetime,
             };
             return (
               <button
@@ -369,7 +402,7 @@ export const HomeDashboardView: React.FC = () => {
           {/* 1. Solved */}
           <div className="bg-surface-container-low rounded-xl p-3 flex flex-col justify-between shadow-xs border border-surface-container-high/40">
             <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-              Solved
+              {t.metricSolved}
             </span>
             <div className="my-1">
               <span className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface tracking-tight">
@@ -377,14 +410,14 @@ export const HomeDashboardView: React.FC = () => {
               </span>
             </div>
             <span className="font-label-sm text-label-sm text-secondary">
-              Questions
+              {t.questionsLabel}
             </span>
           </div>
 
           {/* 2. Accuracy */}
           <div className="bg-surface-container-low rounded-xl p-3 flex flex-col justify-between shadow-xs border border-surface-container-high/40">
             <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-              Accuracy
+              {t.metricAccuracy}
             </span>
             <div className="my-1">
               <span className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-tertiary tracking-tight">
@@ -401,7 +434,7 @@ export const HomeDashboardView: React.FC = () => {
           {/* 3. Correct vs Incorrect Breakdown */}
           <div className="bg-surface-container-low rounded-xl p-3 flex flex-col justify-between shadow-xs border border-surface-container-high/40">
             <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-              Results
+              {t.metricResults}
             </span>
             <div className="my-1 flex items-baseline gap-1">
               <span className="font-headline-sm text-headline-sm font-bold text-tertiary">
@@ -413,7 +446,7 @@ export const HomeDashboardView: React.FC = () => {
               </span>
             </div>
             <span className="font-label-sm text-label-sm text-secondary truncate">
-              Correct / Wrong
+              {t.correctWrong}
             </span>
           </div>
         </div>
@@ -423,7 +456,7 @@ export const HomeDashboardView: React.FC = () => {
           {/* 4. Total Time Spent */}
           <div className="bg-surface-container-low rounded-xl p-3 flex flex-col justify-between shadow-xs border border-surface-container-high/40">
             <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-              Total Time
+              {t.metricTotalTime}
             </span>
             <div className="my-1">
               <span className="font-headline-sm text-headline-sm font-bold text-on-surface tracking-tight">
@@ -437,14 +470,14 @@ export const HomeDashboardView: React.FC = () => {
               </span>
             </div>
             <span className="font-label-sm text-label-sm text-secondary">
-              Drill duration
+              {t.drillDuration}
             </span>
           </div>
 
           {/* 5. Average Speed */}
           <div className="bg-surface-container-low rounded-xl p-3 flex flex-col justify-between shadow-xs border border-surface-container-high/40">
             <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-              Avg Time
+              {t.metricAvgTime}
             </span>
             <div className="my-1">
               <span className="font-headline-sm text-headline-sm font-bold text-primary tracking-tight">
@@ -452,14 +485,14 @@ export const HomeDashboardView: React.FC = () => {
               </span>
             </div>
             <span className="font-label-sm text-label-sm text-secondary">
-              Per question
+              {t.perQuestion}
             </span>
           </div>
 
           {/* 6. Fastest Correct */}
           <div className="bg-surface-container-low rounded-xl p-3 flex flex-col justify-between shadow-xs border border-surface-container-high/40">
             <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-              Fastest
+              {t.metricFastest}
             </span>
             <div className="my-1">
               <span className="font-headline-sm text-headline-sm font-bold text-tertiary tracking-tight">
@@ -468,7 +501,7 @@ export const HomeDashboardView: React.FC = () => {
             </div>
             <span className="font-label-sm text-label-sm text-tertiary flex items-center gap-0.5 truncate">
               <span className="material-symbols-outlined text-[13px]">bolt</span>
-              Top recall
+              {t.topRecall}
             </span>
           </div>
         </div>
@@ -479,7 +512,7 @@ export const HomeDashboardView: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[20px]">calculate</span>
               <span className="font-label-md text-label-md font-bold text-on-surface">
-                Exam Scoring & Negative Marking Impact
+                {t.examScoringTitle}
               </span>
             </div>
             <button
@@ -493,32 +526,32 @@ export const HomeDashboardView: React.FC = () => {
 
           <div className="grid grid-cols-3 gap-2 my-2 text-center">
             <div className="bg-surface-container-lowest/80 p-2.5 rounded-xl border border-surface-container-high/30">
-              <div className="text-[10px] uppercase font-bold text-secondary">Gross Earned</div>
+              <div className="text-[10px] uppercase font-bold text-secondary">{t.grossEarned}</div>
               <div className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                 +{scoring.grossMarks}
               </div>
-              <div className="text-[10px] text-secondary">+{scoring.scoringRule.marksPerCorrect} / correct</div>
+              <div className="text-[10px] text-secondary">+{scoring.scoringRule.marksPerCorrect} {t.marksPerCorrect}</div>
             </div>
 
             <div className="bg-surface-container-lowest/80 p-2.5 rounded-xl border border-surface-container-high/30">
-              <div className="text-[10px] uppercase font-bold text-secondary">Penalty Cut</div>
+              <div className="text-[10px] uppercase font-bold text-secondary">{t.penaltyCut}</div>
               <div className="text-base font-bold text-rose-600 dark:text-rose-400 mt-0.5">
                 -{scoring.penaltyDeducted}
               </div>
-              <div className="text-[10px] text-secondary">-{scoring.scoringRule.penaltyPerWrong} / wrong</div>
+              <div className="text-[10px] text-secondary">-{scoring.scoringRule.penaltyPerWrong} {t.negativeMarking}</div>
             </div>
 
             <div className="bg-surface-container-lowest/80 p-2.5 rounded-xl border border-primary/30 bg-primary/5">
-              <div className="text-[10px] uppercase font-bold text-primary">Net Score</div>
+              <div className="text-[10px] uppercase font-bold text-primary">{t.netScore}</div>
               <div className="text-lg font-bold text-primary mt-0.5">
                 {scoring.netScore}
               </div>
-              <div className="text-[10px] text-secondary">out of {scoring.maxPossibleMarks}</div>
+              <div className="text-[10px] text-secondary">{t.outOf} {scoring.maxPossibleMarks}</div>
             </div>
           </div>
 
           <p className="text-[11px] text-secondary mt-1">
-            Official formula: {scoring.scoringRule.description}
+            {t.officialFormula} {scoring.scoringRule.description}
           </p>
         </div>
 
@@ -526,10 +559,10 @@ export const HomeDashboardView: React.FC = () => {
         <div className="bg-surface-container-low rounded-xl p-3.5 mb-4 shadow-xs border border-surface-container-high/40">
           <div className="flex items-center justify-between mb-2">
             <span className="font-label-md text-label-md text-on-surface font-semibold">
-              Past 7 Days Practice Rhythm
+              {t.past7DaysRhythm}
             </span>
             <span className="font-label-sm text-label-sm text-secondary">
-              Asia/Kolkata cycle
+              {t.asiaKolkataCycle}
             </span>
           </div>
           <div className="flex items-end justify-between h-14 pt-2 px-1 gap-2">
@@ -557,10 +590,10 @@ export const HomeDashboardView: React.FC = () => {
         {/* Subject Breakdown Matrix */}
         <div className="flex items-center justify-between mb-2 px-0.5">
           <span className="font-headline-sm text-headline-sm font-bold text-on-surface">
-            Subject Performance Matrix
+            {t.subjectMatrix}
           </span>
           <span className="font-label-sm text-label-sm text-secondary">
-            Tier-1 Subjects
+            {t.tier1Subjects}
           </span>
         </div>
 
@@ -618,9 +651,7 @@ export const HomeDashboardView: React.FC = () => {
         {/* Clear Color Legend */}
         <div className="p-2.5 rounded-xl bg-surface-container-low text-secondary font-label-sm text-label-sm border border-surface-container-high/40 mb-4 flex items-center gap-2">
           <span className="material-symbols-outlined text-[16px] text-primary shrink-0">info</span>
-          <span>
-            <strong>Status Guide:</strong> Green = Strong (≥75%) · Amber = Balanced (50–74%) · Red = Needs Practice (&lt;50%)
-          </span>
+          <span>{t.statusGuide}</span>
         </div>
 
         {/* Share Achievements Actions */}
@@ -630,7 +661,7 @@ export const HomeDashboardView: React.FC = () => {
             className="w-full h-12 rounded-xl bg-[#25D366] text-white font-label-lg text-label-lg font-bold hover:bg-[#20ba59] transition-all flex items-center justify-center gap-2 active:scale-98 shadow-sm"
           >
             <span className="material-symbols-outlined text-[20px]">chat</span>
-            <span>Share Scorecard on WhatsApp</span>
+            <span>{t.shareOnWhatsApp}</span>
           </button>
 
           <button
@@ -638,7 +669,7 @@ export const HomeDashboardView: React.FC = () => {
             className="w-full h-11 rounded-xl bg-surface-container text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-container-high transition-all flex items-center justify-center gap-2 active:scale-98"
           >
             <span className="material-symbols-outlined text-[18px]">share</span>
-            <span>{shareSuccess ? "Summary Copied to Clipboard!" : "Copy Practice Record"}</span>
+            <span>{shareSuccess ? t.copiedToClipboard : t.copyPracticeRecord}</span>
           </button>
         </div>
       </div>
@@ -659,7 +690,7 @@ export const HomeDashboardView: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[24px]">flag</span>
-                <h3 className="text-lg font-bold text-on-surface">Daily Practice Goal</h3>
+                <h3 className="text-lg font-bold text-on-surface">{t.dailyPracticeGoalModalTitle}</h3>
               </div>
               <button
                 onClick={() => setShowGoalModal(false)}
@@ -669,7 +700,7 @@ export const HomeDashboardView: React.FC = () => {
               </button>
             </div>
             <p className="text-sm text-secondary">
-              Commit to a daily target to form an unstoppable study habit.
+              {t.commitDailyTarget}
             </p>
             <div className="grid grid-cols-4 gap-2">
               {[15, 25, 50, 100].map((g) => (
@@ -691,13 +722,13 @@ export const HomeDashboardView: React.FC = () => {
                 onClick={() => setShowGoalModal(false)}
                 className="flex-1 py-2.5 rounded-xl bg-surface-container text-secondary font-semibold text-sm"
               >
-                Cancel
+                {t.cancel}
               </button>
               <button
                 onClick={handleSaveGoal}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-sm shadow-sm hover:bg-primary-container"
               >
-                Save Goal
+                {t.saveGoalBtn}
               </button>
             </div>
           </div>

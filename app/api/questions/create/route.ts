@@ -16,12 +16,21 @@ export async function POST(request: NextRequest) {
       hindiExplanation,
       difficulty,
       syllabusTag,
+      targetTopic,
       pyqInfo,
     } = body;
 
-    if (!subjectId || !questionText || !options || !correctOptionId) {
+    const effectiveQuestionText = (questionText || hindiQuestionText || "").trim();
+    if (!subjectId || !effectiveQuestionText || !options || !correctOptionId) {
       return NextResponse.json(
         { success: false, error: "Please fill in all required question fields" },
+        { status: 400 }
+      );
+    }
+
+    if (effectiveQuestionText.length > 600) {
+      return NextResponse.json(
+        { success: false, error: "Question statement cannot exceed 600 characters" },
         { status: 400 }
       );
     }
@@ -38,6 +47,7 @@ export async function POST(request: NextRequest) {
       hindiExplanation,
       difficulty,
       syllabusTag,
+      targetTopic,
       pyqInfo,
     });
 

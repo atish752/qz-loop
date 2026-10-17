@@ -15,6 +15,8 @@ export async function POST(request: NextRequest) {
       avatar_url,
       avatarUrl,
       email,
+      language_preference,
+      languagePreference,
     } = body;
 
     const name = (display_name || displayName || "").trim();
@@ -22,6 +24,7 @@ export async function POST(request: NextRequest) {
     const exam = target_exam || targetExam || "Railways (RRB NTPC & Group D)";
     const examId = preferred_examination_id || preferredExaminationId || "exam-railway-ntpc";
     const avatar = avatar_url || avatarUrl || "";
+    const lang = (language_preference || languagePreference || "en") === "hi" ? "hi" : "en";
 
     if (!name) {
       return NextResponse.json({ success: false, error: "Display name is required" }, { status: 400 });
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest) {
       preferred_examination_id: examId,
       avatar_url: avatar,
       email,
+      language_preference: lang,
     });
 
     return NextResponse.json({

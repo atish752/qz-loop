@@ -75,6 +75,76 @@ html.dark .border-surface-container-high {
   border-color: #263046 !important;
 }
 
+/* Dark Mode light purple overrides: makes dark purple buttons radiant & easily visible */
+html.dark .bg-primary {
+  background-color: #a855f7 !important;
+  color: #ffffff !important;
+}
+
+html.dark .bg-primary-container {
+  background-color: #c084fc !important;
+  color: #1a042e !important;
+}
+
+html.dark .text-primary {
+  color: #c084fc !important;
+}
+
+html.dark .text-on-primary {
+  color: #ffffff !important;
+}
+
+html.dark .border-primary {
+  border-color: #c084fc !important;
+}
+
+html.dark .bg-primary-fixed {
+  background-color: rgba(192, 132, 252, 0.22) !important;
+  color: #f3e8ff !important;
+}
+
+html.dark .bg-primary-fixed-dim {
+  background-color: rgba(192, 132, 252, 0.35) !important;
+  color: #f3e8ff !important;
+}
+
+html.dark .bg-primary\/10 {
+  background-color: rgba(168, 85, 247, 0.18) !important;
+}
+
+html.dark .bg-primary\/15 {
+  background-color: rgba(168, 85, 247, 0.22) !important;
+}
+
+html.dark .bg-primary\/20 {
+  background-color: rgba(168, 85, 247, 0.28) !important;
+}
+
+html.dark .border-primary\/20,
+html.dark .border-primary\/30,
+html.dark .border-primary\/40 {
+  border-color: rgba(192, 132, 252, 0.35) !important;
+}
+
+html.dark .from-primary {
+  --tw-gradient-from: #a855f7 var(--tw-gradient-from-position) !important;
+}
+
+html.dark .to-primary-container {
+  --tw-gradient-to: #c084fc var(--tw-gradient-to-position) !important;
+}
+
+html.dark button.bg-primary:hover,
+html.dark .bg-primary:hover {
+  background-color: #c084fc !important;
+  color: #ffffff !important;
+}
+
+html.dark button.bg-primary-container:hover,
+html.dark .bg-primary-container:hover {
+  background-color: #d8b4fe !important;
+}
+
 /* Hide scrollbars for clean mobile feel */
 ::-webkit-scrollbar {
   display: none;

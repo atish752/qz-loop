@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { UserProfile } from "@/types/database";
+import { useAppLanguage } from "@/lib/utils/i18n";
+import { OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
 
 interface TopHeaderProps {
   currentTab?: "home" | "matrix" | "create" | "loop" | "social" | "leaderboard" | "profile";
@@ -21,6 +23,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onSelectExam,
   onOpenAuth,
 }) => {
+  const { lang, setLanguage, t } = useAppLanguage();
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   // Initialize theme from localStorage or system preference on mount
@@ -89,13 +92,37 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </button>
         </div>
 
-        {/* Right side: Dark Mode toggle + Streak + Auth / Profile Avatar */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right side: Language Switcher + WhatsApp Group + Dark Mode toggle + Streak + Auth / Profile Avatar */}
+        <div className="flex items-center gap-1.5 xs:gap-2 shrink-0">
+          {/* Top Language Switcher: EN to Hindi & Hindi to EN */}
+          <button
+            onClick={() => setLanguage(lang === "en" ? "hi" : "en")}
+            className="flex items-center gap-1 px-2 py-1 rounded-full bg-surface-container-low hover:bg-surface-container-high border border-surface-container-high/60 text-on-surface transition-all active:scale-95"
+            title={lang === "en" ? "हिन्दी में बदलें (Switch to Hindi)" : "Switch to English"}
+            aria-label="Switch Language"
+          >
+            <span className="text-[11px] font-extrabold text-primary">{lang === "en" ? "EN" : "अ"}</span>
+            <span className="text-[10px] text-secondary">|</span>
+            <span className="text-[11px] font-bold">{lang === "en" ? "हिन्दी" : "Eng"}</span>
+          </button>
+
+          {/* Direct WhatsApp Group Button */}
+          <a
+            href={OFFICIAL_WHATSAPP_GROUP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] transition-all border border-[#25D366]/30 active:scale-95"
+            title={t.joinWhatsAppCommunity}
+            aria-label="Join Official WhatsApp Group"
+          >
+            <span className="material-symbols-outlined text-[17px]">groups</span>
+          </a>
+
           {/* Night Mode Moon/Sun Toggle Switch */}
           <button
             onClick={toggleDarkMode}
             className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-container-low hover:bg-surface-container-high text-on-surface transition-colors border border-surface-container-high/40"
-            title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
+            title={isDarkMode ? t.dayMode : t.nightMode}
             aria-label="Toggle Night Mode"
           >
             <span className="material-symbols-outlined text-[18px]">

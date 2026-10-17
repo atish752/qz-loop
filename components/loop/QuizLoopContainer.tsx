@@ -6,25 +6,29 @@ import { QuestionReelCard, AnswerRecord } from "./QuestionReelCard";
 import { StudyChatModal } from "./StudyChatModal";
 import { TopHeader } from "../layout/TopHeader";
 import { ExamSwitchModal } from "../feed/ExamSwitchModal";
+import { OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
+import { useAppLanguage, LANGUAGE_CHANGE_EVENT } from "@/lib/utils/i18n";
 
 interface QuizLoopContainerProps {
   initialExams?: Examination[];
 }
 
 const AVAILABLE_SUBJECTS = [
-  { slug: "all", label: "All Subjects", icon: "auto_awesome" },
-  { slug: "maths", label: "Maths (Quantitative)", icon: "calculate" },
-  { slug: "reasoning", label: "Reasoning (Logic)", icon: "psychology" },
-  { slug: "english", label: "English Comprehension", icon: "spellcheck" },
-  { slug: "gk", label: "General Knowledge (GK)", icon: "public" },
+  { slug: "all", labelKey: "subjAll" as const, defaultLabel: "All Subjects", icon: "auto_awesome" },
+  { slug: "maths", labelKey: "subjMaths" as const, defaultLabel: "Maths (Quantitative)", icon: "calculate" },
+  { slug: "reasoning", labelKey: "subjReasoning" as const, defaultLabel: "Reasoning (Logic)", icon: "psychology" },
+  { slug: "english", labelKey: "subjEnglish" as const, defaultLabel: "English Comprehension", icon: "spellcheck" },
+  { slug: "gk", labelKey: "subjGK" as const, defaultLabel: "General Knowledge (GK)", icon: "public" },
 ];
 
 export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   initialExams = [],
 }) => {
+  const { lang, t } = useAppLanguage();
   // Session Start State (Spec: When a user goes to quiz loop tab, it does NOT automatically start)
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(["all"]);
+  const [quizLanguage, setQuizLanguage] = useState<"all" | "hi" | "en">("all");
 
   // Exam & User State
   const [currentExamId, setCurrentExamId] = useState<string>("exam-ssc-cgl");
@@ -72,6 +76,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   useEffect(() => {
     const checkAuthAndLoad = () => {
       if (typeof window !== "undefined") {
+        const savedLang = localStorage.getItem("qz_quiz_lang");
+        if (savedLang === "hi" || savedLang === "en" || savedLang === "all") {
+          setQuizLanguage(savedLang);
+        }
+
         const uid = localStorage.getItem("qz_user_id");
         if (uid) {
           fetch(`/api/profile?userId=${encodeURIComponent(uid)}`)
@@ -84,6 +93,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 }
                 if (data.user?.preferred_examination_id) {
                   setCurrentExamId(data.user.preferred_examination_id);
+                }
+                if (!savedLang && data.user?.language_preference) {
+                  setQuizLanguage(data.user.language_preference);
                 }
               }
             })
@@ -104,7 +116,20 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
     checkAuthAndLoad();
     window.addEventListener("qz_auth_changed", checkAuthAndLoad);
-    return () => window.removeEventListener("qz_auth_changed", checkAuthAndLoad);
+
+    const handleLangChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ lang?: "en" | "hi" }>;
+      if (customEvent.detail?.lang) {
+        setQuizLanguage(customEvent.detail.lang);
+        localStorage.setItem("qz_quiz_lang", customEvent.detail.lang);
+      }
+    };
+    window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLangChange);
+
+    return () => {
+      window.removeEventListener("qz_auth_changed", checkAuthAndLoad);
+      window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLangChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -127,16 +152,16 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     }
   }, []);
 
-  // Fetch Questions for the chosen subject flow
+  // Fetch Questions for the chosen subject flow and language
   const loadFeedQuestions = useCallback(
-    async (subjects = selectedSubjects, exam = currentExamId, reset = false) => {
+    async (subjects = selectedSubjects, exam = currentExamId, lang = quizLanguage, reset = false) => {
       setIsLoading(true);
       setError(null);
 
       try {
         const subjectsParam = subjects.includes("all") ? "all" : subjects.join(",");
         const excludedList = Array.from(displayedQuestionIdsRef.current).join(",");
-        const url = `/api/feed?subjects=${subjectsParam}&examId=${exam}&excludedIds=${reset ? "" : excludedList}`;
+        const url = `/api/feed?subjects=${subjectsParam}&examId=${exam}&lang=${lang}&excludedIds=${reset ? "" : excludedList}`;
 
         const res = await fetch(url);
         const data = await res.json();
@@ -164,7 +189,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         setIsLoading(false);
       }
     },
-    [selectedSubjects, currentExamId]
+    [selectedSubjects, currentExamId, quizLanguage]
   );
 
   // Subject Flow Multi-Select toggle handler
@@ -190,7 +215,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   // Start Button Clicked
   const handleStartLoop = () => {
     setIsStarted(true);
-    loadFeedQuestions(selectedSubjects, currentExamId, true);
+    loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, true);
   };
 
   // Move to Next Reel with Synchronized Reel Physics Animation (Current goes UP, New comes from DOWN to CENTER)
@@ -205,7 +230,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         const next = prev + 1;
         // Auto prefetch when remaining queue is low
         if (next >= questions.length - 3) {
-          loadFeedQuestions(selectedSubjects, currentExamId, false);
+          loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, false);
         }
         return next;
       });
@@ -213,9 +238,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         isTransitioningRef.current = false;
       }, 360);
     } else {
-      loadFeedQuestions(selectedSubjects, currentExamId, false);
+      loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, false);
     }
-  }, [currentIndex, questions.length, loadFeedQuestions, selectedSubjects, currentExamId]);
+  }, [currentIndex, questions.length, loadFeedQuestions, selectedSubjects, currentExamId, quizLanguage]);
 
   // Move to Previous Reel with Reel Physics Animation (Current goes DOWN, Previous comes from UP to CENTER)
   const executePrevQuestion = useCallback(() => {
@@ -421,7 +446,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           target_exam: exam.name,
         }),
       });
-      loadFeedQuestions(selectedSubjects, exam.id, true);
+      loadFeedQuestions(selectedSubjects, exam.id, quizLanguage, true);
     } catch {
       // optimistic
     }
@@ -459,10 +484,10 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           <div className="bg-surface-container-low rounded-2xl p-4 border border-surface-container-high/60 shadow-xs mb-5">
             <div className="flex items-center justify-between mb-3">
               <span className="font-bold text-xs uppercase tracking-wider text-secondary">
-                Select Subject Flow
+                {t.selectSubjectFlow}
               </span>
               <span className="text-[11px] font-semibold text-primary">
-                Multi-select enabled
+                {t.multiSelectEnabled}
               </span>
             </div>
 
@@ -493,7 +518,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                           {subj.icon}
                         </span>
                       </div>
-                      <span className="text-sm">{subj.label}</span>
+                      <span className="text-sm">{t[subj.labelKey] || subj.defaultLabel}</span>
                     </div>
 
                     <div className="shrink-0">
@@ -516,18 +541,99 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           {/* Session Overview Badges */}
           <div className="grid grid-cols-2 gap-2 mb-5 text-center">
             <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40">
-              <span className="text-secondary text-[11px] font-semibold uppercase">Practice Streak</span>
+              <span className="text-secondary text-[11px] font-semibold uppercase">{t.practiceStreak}</span>
               <div className="text-base font-bold text-on-surface mt-0.5">
-                🔥 {user?.current_streak ?? 0} Days
+                🔥 {user?.current_streak ?? 0} {t.daysUnit}
               </div>
             </div>
             <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40">
-              <span className="text-secondary text-[11px] font-semibold uppercase">Daily Goal</span>
+              <span className="text-secondary text-[11px] font-semibold uppercase">{t.dailyGoal}</span>
               <div className="text-base font-bold text-primary mt-0.5">
-                {user?.today_solved_count ?? 0} / {user?.daily_goal ?? 10} Solved
+                {user?.today_solved_count ?? 0} / {user?.daily_goal ?? 10} {t.solvedOutOf}
               </div>
             </div>
           </div>
+
+          {/* Question Language Preference Selector */}
+          <div className="bg-surface-container-low rounded-2xl p-4 border border-surface-container-high/60 shadow-xs mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-bold text-xs uppercase tracking-wider text-secondary">
+                {t.questionLanguagePref}
+              </span>
+              <span className="text-[10px] font-bold text-primary">
+                {quizLanguage === "hi" ? t.langHindiOnly : quizLanguage === "en" ? t.langEnglishOnly : t.langBilingual}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setQuizLanguage("en");
+                  localStorage.setItem("qz_quiz_lang", "en");
+                }}
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 border ${
+                  quizLanguage === "en"
+                    ? "bg-primary text-on-primary border-primary shadow-xs"
+                    : "bg-surface-container/60 hover:bg-surface-container border-transparent text-secondary hover:text-on-surface"
+                }`}
+              >
+                <span>🇬🇧</span>
+                <span>{t.formatEnglish}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuizLanguage("hi");
+                  localStorage.setItem("qz_quiz_lang", "hi");
+                }}
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 border ${
+                  quizLanguage === "hi"
+                    ? "bg-primary text-on-primary border-primary shadow-xs"
+                    : "bg-surface-container/60 hover:bg-surface-container border-transparent text-secondary hover:text-on-surface"
+                }`}
+              >
+                <span>🇮🇳</span>
+                <span>{t.formatHindi}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuizLanguage("all");
+                  localStorage.setItem("qz_quiz_lang", "all");
+                }}
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 border ${
+                  quizLanguage === "all"
+                    ? "bg-primary text-on-primary border-primary shadow-xs"
+                    : "bg-surface-container/60 hover:bg-surface-container border-transparent text-secondary hover:text-on-surface"
+                }`}
+              >
+                <span>🌐</span>
+                <span>{t.langBilingual}</span>
+              </button>
+            </div>
+            <p className="text-[10px] text-secondary mt-2 text-center">
+              {t.questionLangSelectorDesc}
+            </p>
+          </div>
+
+          {/* Aspirants WhatsApp Study Group CTA */}
+          <a
+            href={OFFICIAL_WHATSAPP_GROUP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold text-xs mb-4 transition-all group"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[20px]">group</span>
+              <div>
+                <p className="text-xs font-bold text-on-surface">{t.joinWhatsAppCommunityBanner}</p>
+                <p className="text-[10px] text-secondary font-normal">{t.communityBannerDesc}</p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold group-hover:scale-105 transition-transform">
+              {t.joinFree}
+            </span>
+          </a>
 
           {/* Prominent High-Energy Start CTA Button */}
           <button
@@ -537,7 +643,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             <span className="material-symbols-outlined text-[24px] transition-transform group-hover:scale-125">
               play_circle
             </span>
-            <span>Start Qz Loop 🚀</span>
+            <span>{t.startQuiz}</span>
           </button>
         </div>
 
@@ -615,7 +721,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             <span className="material-symbols-outlined text-[44px] text-error">wifi_off</span>
             <p className="text-sm font-bold text-on-surface">{error}</p>
             <button
-              onClick={() => loadFeedQuestions(selectedSubjects, currentExamId, true)}
+              onClick={() => loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, true)}
               className="px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-sm"
             >
               Retry
@@ -669,6 +775,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                     }
                   }}
                   onOpenChatWithFriend={(friend) => setActiveChatFriend(friend)}
+                  preferredLanguage={quizLanguage}
                 />
               </div>
             ))}
@@ -685,9 +792,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             </div>
 
             <div>
-              <h3 className="font-bold text-on-surface text-base">Answer or Skip?</h3>
+              <h3 className="font-bold text-on-surface text-base">{t.skipQuestion}</h3>
               <p className="text-xs text-secondary mt-1">
-                You clicked Answer on this question! Would you like to submit your answer or skip to the next reel?
+                {lang === "hi"
+                  ? "आपने इस प्रश्न पर उत्तर देना चुना था। क्या आप उत्तर सबमिट करना चाहते हैं या अगला प्रश्न देखना चाहते हैं?"
+                  : "You clicked Answer on this question! Would you like to submit your answer or skip to the next reel?"}
               </p>
             </div>
 
@@ -704,7 +813,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                <span>Answer</span>
+                <span>{t.answerNow}</span>
               </button>
 
               {/* Skip Button in RED */}
@@ -719,7 +828,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-98 text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[18px]">skip_next</span>
-                <span>Skip</span>
+                <span>{t.skip}</span>
               </button>
 
               <button
@@ -729,7 +838,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 }}
                 className="py-2 text-xs text-secondary hover:text-on-surface font-semibold"
               >
-                Cancel
+                {t.cancel}
               </button>
             </div>
           </div>

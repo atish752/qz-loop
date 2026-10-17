@@ -1,15 +1,24 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { UserProfile, Examination } from "@/types/database";
+import { compressImageClientSide } from "@/lib/utils/imageCompression";
+import { setAppLanguage, useAppLanguage } from "@/lib/utils/i18n";
+import { OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
 
 export const UsernameOnboardingModal: React.FC = () => {
+  const { lang, t } = useAppLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [exams, setExams] = useState<Examination[]>([]);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
-  const [examId, setExamId] = useState("exam-ssc-cgl");
+  const [examId, setExamId] = useState("exam-railway-ntpc");
+  const [email, setEmail] = useState("");
+  const [languagePref, setLanguagePref] = useState<"en" | "hi">("en");
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [avatarSizeKb, setAvatarSizeKb] = useState<number | null>(null);
+  const [isCompressingAvatar, setIsCompressingAvatar] = useState(false);
   const [status, setStatus] = useState<{
     checking: boolean;
     available: boolean | null;
@@ -17,6 +26,8 @@ export const UsernameOnboardingModal: React.FC = () => {
   }>({ checking: false, available: null, message: "" });
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetch("/api/profile")
@@ -26,16 +37,43 @@ export const UsernameOnboardingModal: React.FC = () => {
           setUser(data.user);
           setExams(data.exams || []);
           setName(data.user.display_name || "");
-          setExamId(data.user.preferred_examination_id || "exam-ssc-cgl");
+          setExamId(data.user.preferred_examination_id || "exam-railway-ntpc");
+          if (data.user.language_preference) {
+            setLanguagePref(data.user.language_preference);
+          }
+          if (data.user.avatar_url) {
+            setAvatarUrl(data.user.avatar_url);
+          }
+          if (data.user.email) {
+            setEmail(data.user.email);
+          }
 
-          // Open onboarding if user does not have a username set
-          if (!data.user.username || data.user.username.trim() === "") {
+          // Open onboarding if user does not have a finalized username
+          const uname = (data.user.username || "").trim();
+          if (!uname || uname.startsWith("user-") || uname.startsWith("aspirant_") || uname.startsWith("user_")) {
             setIsOpen(true);
           }
         }
       })
       .catch(() => {});
   }, []);
+
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressingAvatar(true);
+    setError(null);
+    try {
+      const result = await compressImageClientSide(file, 256, 0.7);
+      setAvatarUrl(result.dataUrl);
+      setAvatarSizeKb(result.sizeKb);
+    } catch {
+      setError("Failed to process photo. Please choose another.");
+    } finally {
+      setIsCompressingAvatar(false);
+    }
+  };
 
   const handleUsernameChange = (val: string) => {
     const clean = val.toLowerCase().replace(/[^a-z0-9_.]/g, "");
@@ -95,15 +133,21 @@ export const UsernameOnboardingModal: React.FC = () => {
           display_name: name.trim(),
           username: username.trim().toLowerCase(),
           preferred_examination_id: examId,
-          target_exam: selectedExam?.name || "SSC CGL",
+          target_exam: selectedExam?.name || "Railways (RRB NTPC & Group D)",
+          language_preference: languagePref,
+          avatar_url: avatarUrl || undefined,
+          email: email.trim() || undefined,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setUser(data.user);
+        setAppLanguage(languagePref);
+        localStorage.setItem("qz_quiz_lang", languagePref);
+        window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
         setIsOpen(false);
       } else {
-        setError(data.error || "Failed to save username. Please choose another.");
+        setError(data.error || "Failed to save profile. Please choose another username.");
       }
     } catch {
       setError("Network error while creating profile");
@@ -116,7 +160,7 @@ export const UsernameOnboardingModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in">
-      <div className="w-full max-w-sm bg-surface-container-lowest rounded-3xl p-6 shadow-2xl border border-surface-container-high/60 flex flex-col gap-4 animate-in zoom-in-95">
+      <div className="w-full max-w-sm max-h-[92vh] overflow-y-auto bg-surface-container-lowest rounded-3xl p-6 shadow-2xl border border-surface-container-high/60 flex flex-col gap-4 animate-in zoom-in-95">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center gap-2">
           <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md border-2 border-primary/20 bg-primary">
@@ -126,16 +170,60 @@ export const UsernameOnboardingModal: React.FC = () => {
           <h2 className="font-headline-sm text-headline-sm font-bold text-on-surface">
             Welcome to Qz Loop!
           </h2>
-          <p className="font-body-sm text-body-sm text-secondary">
-            Set up your Instagram-style unique username, name, and target exam to start practicing.
+          <p className="font-body-sm text-xs text-secondary leading-snug">
+            Set up your Instagram-style unique username, target exam, and study language preference.
           </p>
         </div>
 
-        <form onSubmit={handleSave} className="flex flex-col gap-3.5 pt-1">
+        <form onSubmit={handleSave} className="flex flex-col gap-3 pt-1">
+          {/* Avatar Picture */}
+          <div className="flex items-center gap-3 p-2 rounded-2xl bg-surface-container-low/70 border border-surface-container-high/50">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-container-high border-2 border-primary/20 flex items-center justify-center shrink-0">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="material-symbols-outlined text-[24px] text-secondary">account_circle</span>
+                )}
+              </div>
+              {isCompressingAvatar && (
+                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-on-surface">Profile Picture</span>
+                {avatarSizeKb !== null && (
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-full">
+                    {avatarSizeKb} KB
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-left text-xs font-bold text-primary hover:underline flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[14px]">photo_camera</span>
+                <span>{avatarUrl ? "Change Photo" : "Upload Photo (~20 KB)"}</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFile}
+                className="hidden"
+              />
+            </div>
+          </div>
+
           {/* Full Name */}
           <div className="flex flex-col gap-1">
-            <label className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
-              Your Name
+            <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
+              Your Name *
             </label>
             <input
               type="text"
@@ -143,27 +231,27 @@ export const UsernameOnboardingModal: React.FC = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Rahul Sharma"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-sm font-medium text-on-surface focus:outline-none focus:border-primary"
+              className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs font-medium text-on-surface focus:outline-none focus:border-primary"
             />
           </div>
 
           {/* Unique Username */}
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between">
-              <label className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
-                Unique Username
+              <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
+                Unique Username *
               </label>
-              <span className="text-[11px] text-secondary">Must be unique</span>
+              <span className="text-[10px] text-secondary">Instagram-style @handle</span>
             </div>
             <div className="relative">
-              <span className="absolute left-3.5 top-2.5 font-bold text-secondary text-sm">@</span>
+              <span className="absolute left-3 top-2 font-bold text-secondary text-xs">@</span>
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => handleUsernameChange(e.target.value)}
                 placeholder="choose_username"
-                className={`w-full pl-8 pr-10 py-2.5 rounded-xl bg-surface-container-low border text-sm font-bold tracking-wide focus:outline-none ${
+                className={`w-full pl-7 pr-8 py-2 rounded-xl bg-surface-container-low border text-xs font-bold tracking-wide focus:outline-none ${
                   status.available === true
                     ? "border-emerald-600 text-emerald-950 dark:text-emerald-100"
                     : status.available === false
@@ -172,22 +260,22 @@ export const UsernameOnboardingModal: React.FC = () => {
                 }`}
               />
               {status.checking && (
-                <div className="absolute right-3.5 top-3 w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <div className="absolute right-2.5 top-2.5 w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               )}
               {status.available === true && (
-                <span className="material-symbols-outlined absolute right-3 top-2.5 text-emerald-600 text-[20px]">
+                <span className="material-symbols-outlined absolute right-2.5 top-2 text-emerald-600 text-[18px]">
                   check_circle
                 </span>
               )}
               {status.available === false && (
-                <span className="material-symbols-outlined absolute right-3 top-2.5 text-error text-[20px]">
+                <span className="material-symbols-outlined absolute right-2.5 top-2 text-error text-[18px]">
                   cancel
                 </span>
               )}
             </div>
             {status.message && (
               <p
-                className={`text-[11px] font-medium mt-0.5 ${
+                className={`text-[10px] font-medium mt-0.5 ${
                   status.available === true
                     ? "text-emerald-600"
                     : status.available === false
@@ -202,13 +290,13 @@ export const UsernameOnboardingModal: React.FC = () => {
 
           {/* Target Exam */}
           <div className="flex flex-col gap-1">
-            <label className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
-              Target Examination
+            <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
+              Target Examination *
             </label>
             <select
               value={examId}
               onChange={(e) => setExamId(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-sm font-semibold text-on-surface focus:outline-none focus:border-primary"
+              className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs font-semibold text-on-surface focus:outline-none focus:border-primary"
             >
               {exams.length > 0 ? (
                 exams.map((ex) => (
@@ -217,9 +305,61 @@ export const UsernameOnboardingModal: React.FC = () => {
                   </option>
                 ))
               ) : (
-                <option value="exam-ssc-cgl">SSC CGL</option>
+                <option value="exam-railway-ntpc">Railways (RRB NTPC & Group D)</option>
               )}
             </select>
+          </div>
+
+          {/* Email Address */}
+          <div className="flex flex-col gap-1">
+            <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
+              {t.emailLabel || "Email Address"} (Optional)
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="aspirant@gmail.com"
+              className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs font-semibold text-on-surface focus:outline-none focus:border-primary"
+            />
+          </div>
+
+          {/* Study Language Preference */}
+          <div className="flex flex-col gap-1.5 p-2 rounded-2xl bg-surface-container-low/70 border border-surface-container-high/50">
+            <div className="flex items-center justify-between">
+              <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
+                Study Language Preference *
+              </label>
+              <span className="text-[10px] text-secondary">Switch anytime</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setLanguagePref("en")}
+                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                  languagePref === "en"
+                    ? "bg-primary text-on-primary border-primary shadow-xs"
+                    : "bg-surface-container-lowest text-secondary border-surface-container-high/60 hover:text-on-surface"
+                }`}
+              >
+                <span>🇬🇧</span>
+                <span>English</span>
+                {languagePref === "en" && <span className="material-symbols-outlined text-[14px]">check</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLanguagePref("hi")}
+                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                  languagePref === "hi"
+                    ? "bg-primary text-on-primary border-primary shadow-xs"
+                    : "bg-surface-container-lowest text-secondary border-surface-container-high/60 hover:text-on-surface"
+                }`}
+              >
+                <span>🇮🇳</span>
+                <span>हिन्दी (Hindi)</span>
+                {languagePref === "hi" && <span className="material-symbols-outlined text-[14px]">check</span>}
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -232,11 +372,27 @@ export const UsernameOnboardingModal: React.FC = () => {
           <button
             type="submit"
             disabled={isSaving || status.available === false || !username.trim()}
-            className="w-full mt-2 py-3 rounded-xl bg-primary text-on-primary font-bold text-sm shadow-md hover:bg-primary-container active:scale-95 transition-all disabled:opacity-40"
+            className="w-full mt-1 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-md hover:bg-primary-container active:scale-95 transition-all disabled:opacity-40"
           >
-            {isSaving ? "Creating Profile..." : "Claim Username & Start"}
+            {isSaving ? "Saving Profile..." : "Claim Username & Start Practice"}
           </button>
         </form>
+
+        {/* WhatsApp Aspirants Study Group Link */}
+        <a
+          href={OFFICIAL_WHATSAPP_GROUP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-semibold group"
+        >
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[16px]">group</span>
+            <span className="text-[11px] font-bold">Join Aspirants WhatsApp Study Group</span>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+            Join
+          </span>
+        </a>
       </div>
     </div>
   );

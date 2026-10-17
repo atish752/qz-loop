@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { UserProfile, Examination, Subject } from "@/types/database";
 import { compressImageClientSide } from "@/lib/utils/imageCompression";
 import { createClient } from "@/lib/supabase/client";
+import { setAppLanguage, useAppLanguage } from "@/lib/utils/i18n";
+import { OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
 
 interface AuthModalProps {
   isOpen?: boolean;
@@ -18,9 +20,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   reason: propReason,
   onSuccess,
 }) => {
+  const { lang, t } = useAppLanguage();
   const [isOpen, setIsOpen] = useState<boolean>(Boolean(propIsOpen));
   const [reason, setReason] = useState<string>(propReason || "Sign in to answer questions and track your rank");
   const [mode, setMode] = useState<"signup" | "signin">("signup");
+  const [signupStep, setSignupStep] = useState<1 | 2>(1);
 
   // Form Fields
   const [name, setName] = useState("");
@@ -33,6 +37,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isCompressingAvatar, setIsCompressingAvatar] = useState(false);
   const [email, setEmail] = useState("");
   const [signinIdentifier, setSigninIdentifier] = useState("");
+  const [languagePref, setLanguagePref] = useState<"en" | "hi">("en");
 
   // Validation & Loading
   const [usernameStatus, setUsernameStatus] = useState<{
@@ -163,6 +168,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleClose = () => {
     setIsOpen(false);
+    setSignupStep(1);
     if (propOnClose) propOnClose();
   };
 
@@ -192,27 +198,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      // Mock fallback for local offline testing if Supabase keys are not set
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          isGoogle: true,
-          googleName: "Aspirant " + Math.floor(Math.random() * 900 + 100),
-          googleEmail: `aspirant_${Date.now()}@gmail.com`,
-          googleAvatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuB3HxZXij6KtfCXo9mnvLQmf4xUsXoNd9KYNpxhrXS0hc02n1JzIsvrW-LFeO4nmNG3zK39luMh3NymOFBjqDa61rhZjz-N11uCG0H6OiyRiviC5HoEaoCxkVH2kipgc0lyZV-a2AkiY3-rBiWZ_1M9A9shscNshOvHhAv8wopIWqnnnXs_wik3Iiro6SCPvBqjWIGmZsNa_1TgM4fq1GbohC-Unw4xMnx2mHoKFIwfx9roU33xDEPfTQ",
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success && data.user) {
-        localStorage.setItem("qz_user_id", data.user.id);
-        localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
-        window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
-        if (onSuccess) onSuccess(data.user);
-        handleClose();
-      } else {
-        setError(data.error || "Google Sign-In failed. Please try again.");
-      }
+      // Mock fallback: prefill Google credentials and transition to Step 2
+      const randNum = Math.floor(Math.random() * 900 + 100);
+      const googleName = "Aspirant " + randNum;
+      const googleEmail = `aspirant_${Date.now()}@gmail.com`;
+      const googleAvatar = "https://lh3.googleusercontent.com/aida-public/AB6AXuB3HxZXij6KtfCXo9mnvLQmf4xUsXoNd9KYNpxhrXS0hc02n1JzIsvrW-LFeO4nmNG3zK39luMh3NymOFBjqDa61rhZjz-N11uCG0H6OiyRiviC5HoEaoCxkVH2kipgc0lyZV-a2AkiY3-rBiWZ_1M9A9shscNshOvHhAv8wopIWqnnnXs_wik3Iiro6SCPvBqjWIGmZsNa_1TgM4fq1GbohC-Unw4xMnx2mHoKFIwfx9roU33xDEPfTQ";
+      setName(googleName);
+      setEmail(googleEmail);
+      setAvatarDataUrl(googleAvatar);
+      handleUsernameChange(`aspirant_${randNum}`);
+      setSignupStep(2);
+      setIsLoading(false);
+      return;
     } catch {
       setError("Network error connecting to Google Sign-In.");
     } finally {
@@ -251,6 +248,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           target_exam: selectedExam?.name || "Railways (RRB NTPC & Group D)",
           avatar_url: avatarDataUrl || "",
           email: email.trim() || undefined,
+          language_preference: languagePref,
         }),
       });
 
@@ -258,6 +256,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (res.ok && data.success && data.user) {
         localStorage.setItem("qz_user_id", data.user.id);
         localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
+        localStorage.setItem("qz_quiz_lang", languagePref);
+        setAppLanguage(languagePref);
         window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
         if (onSuccess) onSuccess(data.user);
         handleClose();
@@ -346,66 +346,95 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="grid grid-cols-2 p-1 bg-surface-container-low rounded-xl text-xs font-semibold">
           <button
             type="button"
-            onClick={() => { setMode("signup"); setError(null); }}
+            onClick={() => { setMode("signup"); setSignupStep(1); setError(null); }}
             className={`py-2 rounded-lg transition-all ${
               mode === "signup"
                 ? "bg-surface-container-lowest text-primary shadow-xs font-bold"
                 : "text-secondary hover:text-on-surface"
             }`}
           >
-            Create Fresh Account
+            {t.createFreshAccount || "Create Fresh Account"}
           </button>
           <button
             type="button"
-            onClick={() => { setMode("signin"); setError(null); }}
+            onClick={() => { setMode("signin"); setSignupStep(1); setError(null); }}
             className={`py-2 rounded-lg transition-all ${
               mode === "signin"
                 ? "bg-surface-container-lowest text-primary shadow-xs font-bold"
                 : "text-secondary hover:text-on-surface"
             }`}
           >
-            Sign In
+            {t.signIn || "Sign In"}
           </button>
         </div>
 
-        {/* 1. Official Google Sign-In Button */}
-        <button
-          type="button"
-          onClick={handleGoogleSignIn}
-          disabled={isLoading}
-          className="w-full py-2.5 px-4 rounded-xl border border-surface-container-high/80 bg-surface-container-lowest hover:bg-surface-container-low active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-xs font-bold text-on-surface shadow-xs disabled:opacity-50"
-        >
-          {/* Google SVG Logo */}
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-            <path
-              fill="#4285F4"
-              d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.66-5.17 3.66-9.12z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.13C3.27 21.36 7.34 24 12 24z"
-            />
-            <path
-              fill="#FBBC05"
-              d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.57H1.26C.46 8.16 0 9.98 0 12s.46 3.84 1.26 5.43l4.02-3.14z"
-            />
-            <path
-              fill="#EA4335"
-              d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.27 2.64 1.26 6.57l4.02 3.14c.95-2.83 3.6-4.96 6.72-4.96z"
-            />
-          </svg>
-          <span>Continue with Google</span>
-        </button>
+        {/* 1. SIGN UP: STEP 1 (Ultra-clean Apple-style Google ID first) */}
+        {mode === "signup" && signupStep === 1 && (
+          <div className="flex flex-col gap-3 py-1">
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+              className="w-full py-3.5 px-4 rounded-2xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container-low active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-xs font-bold text-on-surface shadow-xs disabled:opacity-50"
+            >
+              {/* Google SVG Logo */}
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.66-5.17 3.66-9.12z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.13C3.27 21.36 7.34 24 12 24z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.57H1.26C.46 8.16 0 9.98 0 12s.46 3.84 1.26 5.43l4.02-3.14z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.27 2.64 1.26 6.57l4.02 3.14c.95-2.83 3.6-4.96 6.72-4.96z"
+                />
+              </svg>
+              <span>{t.continueWithGoogle || "Continue with Google ID"}</span>
+            </button>
 
-        <div className="flex items-center gap-2 my-0.5">
-          <div className="flex-1 h-px bg-surface-container-high/60" />
-          <span className="text-[10px] uppercase font-bold text-secondary tracking-wider">or with username</span>
-          <div className="flex-1 h-px bg-surface-container-high/60" />
-        </div>
+            <div className="flex items-center gap-2 my-0.5">
+              <div className="flex-1 h-px bg-surface-container-high/60" />
+              <span className="text-[10px] uppercase font-bold text-secondary tracking-wider">or</span>
+              <div className="flex-1 h-px bg-surface-container-high/60" />
+            </div>
 
-        {/* 2. SIGN UP FORM */}
-        {mode === "signup" && (
+            <button
+              type="button"
+              onClick={() => { setSignupStep(2); setError(null); }}
+              className="w-full py-2.5 px-4 rounded-xl border border-surface-container-high/70 bg-surface-container-low hover:bg-surface-container active:scale-[0.98] transition-all flex items-center justify-between text-xs font-bold text-on-surface"
+            >
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[17px]">edit_note</span>
+                <span>{t.continueWithEmail || "Choose Handle & Details Manually"}</span>
+              </div>
+              <span className="material-symbols-outlined text-[15px] text-secondary">arrow_forward</span>
+            </button>
+          </div>
+        )}
+
+        {/* 2. SIGN UP: STEP 2 (Fill Profile: Name, Handle, Exam, Language, Photo, Email) */}
+        {mode === "signup" && signupStep === 2 && (
           <form onSubmit={handleSignUpSubmit} className="flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-1 border-b border-surface-container-high/30">
+              <button
+                type="button"
+                onClick={() => { setSignupStep(1); setError(null); }}
+                className="flex items-center gap-1 text-xs font-bold text-secondary hover:text-on-surface transition-colors"
+              >
+                <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                <span>{t.back || "Back"}</span>
+              </button>
+              <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-primary-fixed px-2 py-0.5 rounded-full">
+                Step 2: Profile Details
+              </span>
+            </div>
             {/* Avatar Upload with ~20 KB Client Compression */}
             <div className="flex items-center gap-3.5 p-2.5 rounded-2xl bg-surface-container-low/70 border border-surface-container-high/50">
               <div className="relative">
@@ -558,6 +587,44 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
             </div>
 
+            {/* Study Language Preference (Apple-style segmented toggle) */}
+            <div className="flex flex-col gap-1.5 p-2.5 rounded-2xl bg-surface-container-low/70 border border-surface-container-high/50">
+              <div className="flex items-center justify-between">
+                <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
+                  Question & App Language *
+                </label>
+                <span className="text-[10px] text-secondary">Can change anytime</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLanguagePref("en")}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                    languagePref === "en"
+                      ? "bg-primary text-on-primary border-primary shadow-xs"
+                      : "bg-surface-container-lowest text-secondary border-surface-container-high/60 hover:text-on-surface"
+                  }`}
+                >
+                  <span>🇬🇧</span>
+                  <span>English</span>
+                  {languagePref === "en" && <span className="material-symbols-outlined text-[14px]">check</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLanguagePref("hi")}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                    languagePref === "hi"
+                      ? "bg-primary text-on-primary border-primary shadow-xs"
+                      : "bg-surface-container-lowest text-secondary border-surface-container-high/60 hover:text-on-surface"
+                  }`}
+                >
+                  <span>🇮🇳</span>
+                  <span>हिन्दी (Hindi)</span>
+                  {languagePref === "hi" && <span className="material-symbols-outlined text-[14px]">check</span>}
+                </button>
+              </div>
+            </div>
+
             {/* Optional Email */}
             <div className="flex flex-col gap-1">
               <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
@@ -592,6 +659,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* 3. SIGN IN FORM */}
         {mode === "signin" && (
           <form onSubmit={handleSignInSubmit} className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+              className="w-full py-2.5 px-4 rounded-xl border border-surface-container-high bg-surface-container-lowest hover:bg-surface-container-low active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-xs font-bold text-on-surface shadow-xs disabled:opacity-50"
+            >
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.66-5.17 3.66-9.12z" />
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.13C3.27 21.36 7.34 24 12 24z" />
+                <path fill="#FBBC05" d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.57H1.26C.46 8.16 0 9.98 0 12s.46 3.84 1.26 5.43l4.02-3.14z" />
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.27 2.64 1.26 6.57l4.02 3.14c.95-2.83 3.6-4.96 6.72-4.96z" />
+              </svg>
+              <span>{t.continueWithGoogle || "Continue with Google ID"}</span>
+            </button>
+
+            <div className="flex items-center gap-2 my-0.5">
+              <div className="flex-1 h-px bg-surface-container-high/60" />
+              <span className="text-[10px] uppercase font-bold text-secondary tracking-wider">or with handle</span>
+              <div className="flex-1 h-px bg-surface-container-high/60" />
+            </div>
+
             <div className="flex flex-col gap-1">
               <label className="font-label-sm text-[11px] text-secondary font-bold uppercase tracking-wider">
                 Username or Email
@@ -633,6 +721,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             Your streak starts at 0, your solved count starts at 0, and your study matrix is 100% clean and personalized.
           </p>
         </div>
+
+        {/* WhatsApp Community CTA */}
+        <a
+          href={OFFICIAL_WHATSAPP_GROUP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between p-2.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 transition-all text-xs font-semibold group"
+        >
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[18px]">group</span>
+            <span className="text-[11px] font-bold">Join Aspirants WhatsApp Study Group</span>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white group-hover:scale-105 transition-transform">
+            Join
+          </span>
+        </a>
       </div>
     </div>
   );

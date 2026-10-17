@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { UsernameOnboardingModal } from "@/components/auth/UsernameOnboardingModal";
 
 export const metadata: Metadata = {
   title: "Qz Loop — Scroll. Solve. Improve. Repeat.",
@@ -66,6 +67,7 @@ export default function RootLayout({
         <div className="w-full max-w-[480px] min-h-screen bg-surface-container-lowest flex flex-col relative shadow-[0_0_24px_rgba(0,0,0,0.06)] md:border-x md:border-surface-container-high/60">
           {children}
           <AuthModal />
+          <UsernameOnboardingModal />
         </div>
       </body>
     </html>

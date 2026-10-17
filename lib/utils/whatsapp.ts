@@ -1,5 +1,12 @@
 import { Question } from "@/types/database";
 
+export const OFFICIAL_WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/JaluiYU8C6nKGrr3YXBn6L";
+export const FOUNDER_NAME = "Atish Kumar";
+export const FOUNDER_PHONE = "+91 9798482404";
+export const FOUNDER_WHATSAPP_NUMBER = "+91 9798482404";
+export const FOUNDER_WHATSAPP_LINK = "https://wa.me/919798482404?text=Hi%20Atish,%20I%20have%20feedback/suggestion%20for%20Qz%20Loop";
+export const FOUNDER_EMAIL = "atish2k22@gmail.com";
+
 /**
  * Format a rich WhatsApp challenge message for Indian competitive exam aspirants.
  * WhatsApp supports *bold*, _italics_, ~strikethrough~, and `code`.

@@ -9,6 +9,7 @@ import { AuthorModal } from "../feed/AuthorModal";
 import { ReportModal } from "../feed/ReportModal";
 import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
 import { getExamScoringRule } from "@/lib/utils/examScoring";
+import { useAppLanguage } from "@/lib/utils/i18n";
 import confetti from "canvas-confetti";
 
 export interface AnswerRecord {
@@ -47,6 +48,7 @@ interface QuestionReelCardProps {
     submitCurrentOption: () => void;
   }) => void;
   onOpenChatWithFriend?: (friend: FriendUser) => void;
+  preferredLanguage?: "en" | "hi" | "all";
 }
 
 export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
@@ -61,11 +63,28 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   onPrevQuestion,
   onRegisterAnsweringStatus,
   onOpenChatWithFriend,
+  preferredLanguage,
 }) => {
+  const { lang, t } = useAppLanguage();
   // Bilingual display language toggle ('en' | 'hi')
-  const [displayLang, setDisplayLang] = useState<"en" | "hi">(
-    question.language === "hi" ? "hi" : "en"
-  );
+  const [displayLang, setDisplayLang] = useState<"en" | "hi">(() => {
+    const effectivePref = preferredLanguage || lang;
+    if (effectivePref === "hi" && (question.hindi_question_text || question.language === "hi")) {
+      return "hi";
+    }
+    if (effectivePref === "en" && question.question_text) {
+      return "en";
+    }
+    return question.language === "hi" ? "hi" : "en";
+  });
+
+  useEffect(() => {
+    if (preferredLanguage === "hi" && (question.hindi_question_text || question.language === "hi")) {
+      setDisplayLang("hi");
+    } else if (preferredLanguage === "en" && question.question_text) {
+      setDisplayLang("en");
+    }
+  }, [preferredLanguage, question]);
 
   // Quality peer verification votes
   const [upvotes, setUpvotes] = useState<number>(question.quality_upvotes || 94);
@@ -617,7 +636,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             ) : (
               <span className="text-secondary italic text-xs flex items-center gap-1">
                 <span className="material-symbols-outlined text-[15px] text-primary">emoji_events</span>
-                Be the first to solve! Building statistics
+                {t.beFirstToSolve}
               </span>
             )}
           </div>
@@ -633,7 +652,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               <span className="material-symbols-outlined text-[20px] transition-transform group-hover:scale-110">
                 touch_app
               </span>
-              <span>Answer Question</span>
+              <span>{t.answerQuestion}</span>
             </button>
           ) : (
             <div className="flex flex-col gap-2 animate-in fade-in duration-200">
@@ -708,7 +727,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
               <div className="flex items-center gap-1 text-primary font-bold text-xs">
                 <span className="material-symbols-outlined text-[16px]">bolt</span>
-                <span>Explanation & Quick Proof</span>
+                <span>{t.quickProof}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span
@@ -719,8 +738,8 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                   }`}
                 >
                   {isCorrect
-                    ? `+${scoringRule.marksPerCorrect.toFixed(2)} Marks`
-                    : `-${scoringRule.penaltyPerWrong.toFixed(2)} Marks (Penalty)`}
+                    ? `+${scoringRule.marksPerCorrect.toFixed(2)} ${t.marksPlus}`
+                    : `-${scoringRule.penaltyPerWrong.toFixed(2)} ${t.marksPenalty}`}
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -729,7 +748,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                       : "bg-rose-500/15 text-rose-800 dark:text-rose-200"
                   }`}
                 >
-                  {isCorrect ? "Correct!" : "Review Solution"}
+                  {isCorrect ? t.correctFeedback : t.reviewSolution}
                 </span>
               </div>
             </div>
@@ -742,7 +761,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             <div className="flex items-center justify-between py-1.5 border-t border-surface-container-high/40 text-xs mb-2">
               <span className="text-secondary text-[11px] font-medium flex items-center gap-1">
                 <span className="material-symbols-outlined text-[14px] text-primary">verified</span>
-                Peer Verified PYQ
+                {t.peerVerifiedPYQ}
               </span>
               <div className="flex items-center gap-1">
                 <button
@@ -777,7 +796,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1 text-secondary text-xs font-semibold">
                   <span className="material-symbols-outlined text-[14px] text-primary">history</span>
-                  <span>Repeat:</span>
+                  <span>{t.repeatPrompt}</span>
                 </div>
                 {repeatSavedBadge && (
                   <span className="text-[10px] text-tertiary font-bold animate-in fade-in">
@@ -788,10 +807,10 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               <div className="grid grid-cols-4 gap-1.5">
                 {(
                   [
-                    { id: "day", label: "< 1 Day", tip: "Quick" },
-                    { id: "week", label: "< 1 Week", tip: "Week" },
-                    { id: "month", label: "< 1 Month", tip: "Month" },
-                    { id: "never", label: "Never", tip: "Mastered" },
+                    { id: "day", label: t.repeatDay, tip: "Quick" },
+                    { id: "week", label: t.repeatWeek, tip: "Week" },
+                    { id: "month", label: t.repeatMonth, tip: "Month" },
+                    { id: "never", label: t.repeatNever, tip: "Mastered" },
                   ] as const
                 ).map((item) => {
                   const isChosen = repeatInterval === item.id;
@@ -989,7 +1008,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           title="Exclude from future feed"
         >
           <span className="material-symbols-outlined text-[15px]">visibility_off</span>
-          <span>I Know This · Hide</span>
+          <span>{t.hideQuestion}</span>
         </button>
 
         <div className="flex items-center gap-1 text-secondary text-xs">
@@ -1001,7 +1020,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           >
             <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
           </button>
-          <span className="font-mono text-[11px]">Swipe</span>
+          <span className="font-mono text-[11px]">{t.swipeLabel}</span>
           <button
             onClick={onNextQuestion}
             className="p-1 rounded-full hover:text-primary transition-colors"

@@ -1,9 +1,14 @@
 // Automated Acceptance Test Suite for Qz Loop
 // Validates all requirements and scenarios end-to-end
 
+import fs from "fs";
+import path from "path";
 import { db } from "../lib/data/store";
 import { normalizeTextFingerprint } from "../lib/utils/fingerprint";
 import { checkSimilarity } from "../lib/utils/similarity";
+import { getTopicsForSubject } from "../lib/data/topics";
+import { OFFICIAL_WHATSAPP_GROUP_URL, FOUNDER_PHONE, FOUNDER_EMAIL, FOUNDER_WHATSAPP_LINK } from "../lib/utils/whatsapp";
+import { TRANSLATIONS } from "../lib/utils/i18n";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -554,8 +559,203 @@ async function runTests() {
   }
   assert(collisionBlocked, "Duplicate signup strictly blocked with collision rejection");
 
+  // Scenario 35: Pure Hindi Question Creation & Character Limit (up to 600 chars)
+  console.log("\n[Scenario 35] Pure Hindi Question Creation & Character Limit");
+  const hindiQuestionText = "भारतीय संविधान का कौन सा अनुच्छेद अस्पृश्यता के उन्मूलन से संबंधित है और इसका किसी भी रूप में आचरण निषिद्ध करता है? यह मौलिक अधिकारों के तहत समानता के अधिकार का एक अभिन्न अंग है।";
+  assert(hindiQuestionText.length > 5, "Hindi question text is long and valid");
+  assert(hindiQuestionText.length <= 600, "Hindi question within 600 character limit");
+
+  const createdHindiQ = db.createQuestion({
+    examinationId: "exam-railway-ntpc",
+    subjectId: "subj-railway-gk",
+    questionText: "", // Empty English!
+    hindiQuestionText: hindiQuestionText,
+    language: "hi",
+    options: [
+      { id: "A", text: "अनुच्छेद 14", hindi_text: "अनुच्छेद 14" },
+      { id: "B", text: "अनुच्छेद 17", hindi_text: "अनुच्छेद 17" },
+      { id: "C", text: "अनुच्छेद 19", hindi_text: "अनुच्छेद 19" },
+      { id: "D", text: "अनुच्छेद 21", hindi_text: "अनुच्छेद 21" },
+    ],
+    correctOptionId: "B",
+    explanation: "",
+    hindiExplanation: "अनुच्छेद 17 अस्पृश्यता का अंत करता है और इसका अभ्यास निषिद्ध बनाता है।",
+    difficulty: "medium",
+    syllabusTag: "Polity · Fundamental Rights",
+  });
+  assert(createdHindiQ.id.startsWith("q-"), "Hindi-only question successfully created in store");
+  assert(createdHindiQ.language === "hi", "Question language registered as 'hi'");
+  assert(createdHindiQ.hindi_question_text === hindiQuestionText, "Hindi question text faithfully preserved");
+  assert(createdHindiQ.question_text === hindiQuestionText, "Question text fallback populated with Hindi text");
+
+  // Scenario 36: Dynamic Subject Topics Mapping (getTopicsForSubject)
+  console.log("\n[Scenario 36] Dynamic Subject Topics & Subtopics Mapping");
+  const gkTopics = getTopicsForSubject("gk");
+  assert(gkTopics.some((t) => t.includes("Polity")), "GK includes Indian Polity");
+  assert(gkTopics.some((t) => t.includes("History")), "GK includes Indian History");
+
+  const mathsTopics = getTopicsForSubject("maths");
+  assert(mathsTopics.some((t) => t.includes("Profit & Loss")), "Maths includes Profit & Loss");
+  assert(mathsTopics.some((t) => t.includes("Algebra")), "Maths includes Algebra");
+
+  const bioTopics = getTopicsForSubject("biology");
+  assert(bioTopics.some((t) => t.includes("Human Physiology")), "Biology includes Human Physiology");
+
+  // Scenario 37: User Profile Language Preference & Feed Filtering
+  console.log("\n[Scenario 37] User Profile Language Preference & Feed Filtering");
+  const hindiUser = db.signUpUser({
+    display_name: "Vikram Kumar",
+    username: "vikram_hindi_aspirant",
+    preferred_examination_id: "exam-railway-ntpc",
+    language_preference: "hi",
+  });
+  assert(hindiUser.language_preference === "hi", "User saved with Hindi language preference");
+
+  const hindiFeed = db.getFeedQuestions({
+    examId: "exam-railway-ntpc",
+    language: "hi",
+  });
+  assert(hindiFeed.length > 0, "Feed returned questions for Hindi filter");
+  assert(
+    hindiFeed.every((q) => q.language === "hi" || Boolean(q.hindi_question_text)),
+    "Every question in Hindi feed carries Hindi text or Hindi flag"
+  );
+
+  const englishFeed = db.getFeedQuestions({
+    examId: "exam-railway-ntpc",
+    language: "en",
+  });
+  assert(englishFeed.length > 0, "Feed returned questions for English filter");
+
+  // Scenario 38: WhatsApp Group URL, Founder Contact & Central i18n
+  console.log("\n[Scenario 38] WhatsApp Community & Founder Direct Support");
+  assert(OFFICIAL_WHATSAPP_GROUP_URL === "https://chat.whatsapp.com/JaluiYU8C6nKGrr3YXBn6L", "Official WhatsApp group URL verified");
+  assert(FOUNDER_PHONE === "+91 9798482404", "Founder phone contact verified");
+  assert(FOUNDER_EMAIL === "atish2k22@gmail.com", "Founder email contact verified");
+  assert(FOUNDER_WHATSAPP_LINK.includes("919798482404"), "Founder direct WhatsApp link verified");
+  assert(TRANSLATIONS.en.startQuiz === "Start Qz Loop 🚀", "English i18n translation verified");
+  assert(TRANSLATIONS.hi.startQuiz === "क्विज़ लूप शुरू करें 🚀", "Hindi i18n translation verified");
+  assert(TRANSLATIONS.en.joinWhatsAppCommunity === "Join WhatsApp Group", "WhatsApp community English string verified");
+  assert(TRANSLATIONS.hi.joinWhatsAppCommunity === "व्हाट्सएप ग्रुप से जुड़ें", "WhatsApp community Hindi string verified");
+
+  // Scenario 39: 2-step Signup with Google ID, Handle & Email Persistence
+  console.log("\n[Scenario 39] 2-step Signup with Google ID, Handle & Email Persistence");
+  const stepTwoUser = db.signUpUser({
+    display_name: "Pooja Verma",
+    username: "pooja_railway_2026",
+    target_exam: "Railways (RRB NTPC & Group D)",
+    preferred_examination_id: "exam-railway-ntpc",
+    email: "pooja.verma@example.com",
+    language_preference: "hi",
+  });
+  assert(stepTwoUser.email === "pooja.verma@example.com", "User email saved during signup");
+  assert(stepTwoUser.language_preference === "hi", "User study language preference saved during signup");
+
+  const updatedStepTwoProfile = db.updateProfile(stepTwoUser.id, {
+    email: "pooja.updated@example.com",
+    display_name: "Pooja V.",
+  });
+  assert(updatedStepTwoProfile.email === "pooja.updated@example.com", "User email editable and updated in Profile");
+  assert(updatedStepTwoProfile.display_name === "Pooja V.", "Display name updated in Profile");
+
+  const syncedUser = db.syncUserFromAuth({
+    id: "user-google-oauth-test",
+    display_name: "Google Aspirant",
+    username: "google_aspirant_99",
+    email: "google.oauth@gmail.com",
+    target_exam: "NEET UG (Medical Entrance)",
+    preferred_examination_id: "exam-neet-ug",
+  });
+  assert(syncedUser.email === "google.oauth@gmail.com", "OAuth sync persists student email");
+
+  // Scenario 40: Creator Studio 600-Character Ceiling Enforcement & Overlength Rejection
+  console.log("\n[Scenario 40] Creator Studio 600-Character Limit Enforcement");
+  const validLongQText = "A".repeat(595);
+  const validLongQ = db.createQuestion({
+    subjectId: "subj-maths",
+    questionText: validLongQText,
+    options: [
+      { id: "A", text: "Option A" },
+      { id: "B", text: "Option B" },
+      { id: "C", text: "Option C" },
+      { id: "D", text: "Option D" },
+    ],
+    correctOptionId: "A",
+  });
+  assert(validLongQ.question_text.length === 595, "Question with 595 chars accepted");
+
+  let overlengthRejected = false;
+  try {
+    db.createQuestion({
+      subjectId: "subj-maths",
+      questionText: "B".repeat(605),
+      options: [
+        { id: "A", text: "Option A" },
+        { id: "B", text: "Option B" },
+      ],
+      correctOptionId: "A",
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("600 characters")) {
+      overlengthRejected = true;
+    }
+  }
+  assert(overlengthRejected === true, "Question exceeding 600 characters strictly rejected with error");
+
+  // Scenario 41: Dynamic Subject Topics Mapping & Target Topic Persistence
+  console.log("\n[Scenario 41] Dynamic Subject Topics Mapping & Target Topic Persistence");
+  const neetBioTopics = getTopicsForSubject("biology");
+  assert(neetBioTopics.some((t) => t.includes("Genetics")), "NEET Biology includes Genetics");
+
+  const neetPhyTopics = getTopicsForSubject("physics");
+  assert(neetPhyTopics.some((t) => t.includes("Optics") || t.includes("Mechanics")), "NEET Physics includes Optics/Mechanics");
+
+  const neetChemTopics = getTopicsForSubject("chemistry");
+  assert(neetChemTopics.some((t) => t.includes("Organic Chemistry")), "NEET Chemistry includes Organic Chemistry");
+
+  const qWithTopic = db.createQuestion({
+    subjectId: "subj-neet-bio",
+    questionText: "Which organelle is known as the powerhouse of the cell?",
+    targetTopic: "Cell Structure & Function",
+    syllabusTag: "Cytology",
+    options: [
+      { id: "A", text: "Mitochondria" },
+      { id: "B", text: "Ribosome" },
+      { id: "C", text: "Golgi Apparatus" },
+      { id: "D", text: "Nucleus" },
+    ],
+    correctOptionId: "A",
+  });
+  assert(Boolean(qWithTopic.syllabus_tag?.includes("Cell Structure & Function")), "Target topic is persisted in syllabus_tag");
+
+  // Scenario 42: Dark Mode Light Purple Contrast & i18n Dictionary Parity
+  console.log("\n[Scenario 42] Dark Mode Contrast & Comprehensive i18n Coverage");
+  const globalsCss = fs.readFileSync(path.join(__dirname, "../app/globals.css"), "utf8");
+  assert(globalsCss.includes("#a855f7") || globalsCss.includes("#c084fc"), "Dark mode globals.css has light purple contrast overrides (#a855f7 / #c084fc)");
+
+  const requiredI18nKeys = [
+    "metricSolved",
+    "metricAccuracy",
+    "metricResults",
+    "metricTotalTime",
+    "metricAvgTime",
+    "metricFastest",
+    "examScoringTitle",
+    "hideQuestion",
+    "repeatPrompt",
+    "welcomeAspirant",
+    "startQuiz",
+    "skipQuestion",
+    "joinWhatsAppCommunityBanner",
+  ] as const;
+
+  for (const key of requiredI18nKeys) {
+    assert(Boolean(TRANSLATIONS.en[key]), `English dictionary contains '${key}'`);
+    assert(Boolean(TRANSLATIONS.hi[key]), `Hindi dictionary contains '${key}'`);
+  }
+
   console.log("\n=================================================");
-  console.log("   ALL 34 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 42 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

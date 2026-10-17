@@ -3,9 +3,11 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAppLanguage } from "@/lib/utils/i18n";
 
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
+  const { t } = useAppLanguage();
 
   const isHome = pathname === "/" || pathname === "/home";
   const isCreate = pathname === "/create" || pathname === "/add";
@@ -30,7 +32,7 @@ export const BottomNav: React.FC = () => {
             >
               home
             </span>
-            <span className="font-label-sm text-label-sm">Home</span>
+            <span className="font-label-sm text-label-sm">{t.navHome}</span>
           </Link>
 
           {/* 2. Plus / Create (Second Tab) */}
@@ -46,7 +48,7 @@ export const BottomNav: React.FC = () => {
             >
               add_circle
             </span>
-            <span className="font-label-sm text-label-sm">Create</span>
+            <span className="font-label-sm text-label-sm">{t.navCreate}</span>
           </Link>
 
           {/* 3. Center Highlight: Qz Loop (Purple Background Main Highlight with Brand Icon) */}
@@ -93,7 +95,7 @@ export const BottomNav: React.FC = () => {
             >
               forum
             </span>
-            <span className="font-label-sm text-label-sm">Social</span>
+            <span className="font-label-sm text-label-sm">{t.navSocial}</span>
           </Link>
 
           {/* 5. Profile (with entry to Ranks / Leaderboard) */}
@@ -109,7 +111,7 @@ export const BottomNav: React.FC = () => {
             >
               person
             </span>
-            <span className="font-label-sm text-label-sm">Profile</span>
+            <span className="font-label-sm text-label-sm">{t.navProfile}</span>
           </Link>
         </div>
       </div>

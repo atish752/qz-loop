@@ -108,7 +108,9 @@ export interface UserProfile {
   username: string; // Unique Instagram-style username (e.g., rahul_cgl)
   target_exam?: string; // Target examination (e.g., SSC CGL)
   avatar_url?: string;
+  email?: string;
   preferred_examination_id?: string;
+  language_preference?: 'en' | 'hi';
   role: 'student' | 'admin' | 'moderator';
   current_streak: number;
   last_active_date?: string;
