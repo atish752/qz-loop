@@ -94,13 +94,34 @@ export async function POST(request: NextRequest) {
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase) {
+        // Ensure author profile exists in Supabase profiles table to avoid foreign key violation
+        if (newQuestion.author_id) {
+          const { data: existingProf } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("id", newQuestion.author_id)
+            .maybeSingle();
+
+          if (!existingProf) {
+            const localAuthor = db.getProfileById(newQuestion.author_id) || db.getCurrentUser();
+            await supabase.from("profiles").upsert({
+              id: newQuestion.author_id,
+              display_name: localAuthor.display_name || "Aspirant",
+              username: localAuthor.username || ("aspirant_" + newQuestion.author_id.slice(0, 6)),
+              target_exam: localAuthor.target_exam || "NEET UG",
+              preferred_examination_id: newQuestion.examination_id,
+              avatar_url: localAuthor.avatar_url || null,
+              email: localAuthor.email || null,
+            });
+          }
+        }
+
+        // Insert into Supabase questions table matching authentic PostgreSQL schema
         await supabase.from("questions").insert({
           id: newQuestion.id,
           author_id: newQuestion.author_id,
-          author_name: newQuestion.author_name,
           examination_id: newQuestion.examination_id,
           subject_id: newQuestion.subject_id,
-          subject_name: newQuestion.subject_name,
           question_text: newQuestion.question_text,
           hindi_question_text: newQuestion.hindi_question_text,
           language: newQuestion.language,

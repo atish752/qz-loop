@@ -6,6 +6,7 @@ import { MatrixStats, UserProfile, HabitSettings, Examination } from "@/types/da
 import { TopHeader } from "../layout/TopHeader";
 import { ExamSwitchModal } from "../feed/ExamSwitchModal";
 import { calculateNetScore, getExamScoringRule } from "@/lib/utils/examScoring";
+import { getExamCountdown } from "@/lib/utils/examDates";
 import { formatWhatsAppScorecard, openWhatsAppShare, OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
 import { useAppLanguage } from "@/lib/utils/i18n";
 
@@ -20,13 +21,18 @@ export const HomeDashboardView: React.FC = () => {
   const [showExamModal, setShowExamModal] = useState<boolean>(false);
   const [showGoalModal, setShowGoalModal] = useState<boolean>(false);
   const [newGoalInput, setNewGoalInput] = useState<number>(25);
-  const [targetExamId, setTargetExamId] = useState<string>("exam-ssc-cgl");
+  const [targetExamId, setTargetExamId] = useState<string>("exam-neet-ug");
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
 
   // Check auth and load user profile & matrix stats
   useEffect(() => {
     const checkAuth = () => {
       if (typeof window !== "undefined") {
+        const storedExam = localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam");
+        if (storedExam) {
+          setTargetExamId(storedExam);
+        }
+
         const uid = localStorage.getItem("qz_user_id");
         setIsLoggedIn(Boolean(uid));
 
@@ -49,8 +55,18 @@ export const HomeDashboardView: React.FC = () => {
     };
 
     checkAuth();
+    const handleExamChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ examId?: string }>;
+      if (customEvent.detail?.examId) {
+        setTargetExamId(customEvent.detail.examId);
+      }
+    };
+    window.addEventListener("qz_exam_changed", handleExamChanged);
     window.addEventListener("qz_auth_changed", checkAuth);
-    return () => window.removeEventListener("qz_auth_changed", checkAuth);
+    return () => {
+      window.removeEventListener("qz_exam_changed", handleExamChanged);
+      window.removeEventListener("qz_auth_changed", checkAuth);
+    };
   }, []);
 
   useEffect(() => {
@@ -135,6 +151,11 @@ export const HomeDashboardView: React.FC = () => {
     const examName = typeof examOrId === "object" ? examOrId.name : undefined;
     setTargetExamId(examId);
     setShowExamModal(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("qz_target_exam", examId);
+      localStorage.setItem("qz_last_exam", examId);
+      window.dispatchEvent(new CustomEvent("qz_exam_changed", { detail: { examId, examName } }));
+    }
     try {
       await fetch("/api/profile", {
         method: "PATCH",
@@ -190,6 +211,8 @@ export const HomeDashboardView: React.FC = () => {
   const solvedToday = isLoggedIn ? (habit?.solved_today || stats?.total_solved || 0) : 0;
   const currentStreak = isLoggedIn ? (user?.current_streak || 0) : 0;
   const goalProgress = Math.min(100, Math.round((solvedToday / dailyGoal) * 100));
+  const activeExamId = user?.preferred_examination_id || targetExamId || user?.target_exam || "exam-ssc-cgl";
+  const examCountdown = getExamCountdown(activeExamId);
 
   return (
     <div className="flex flex-col min-h-screen pb-28">
@@ -242,29 +265,46 @@ export const HomeDashboardView: React.FC = () => {
           </div>
         )}
 
-        {/* 1. Hero Dopamine Banner: Direct CTA to Qz Loop */}
+        {/* 1. Hero Dopamine Banner: Direct CTA to Qz Loop with Powerful Exam Countdown */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary-container to-secondary-container p-5 text-on-primary shadow-md mb-4 group">
           <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider flex items-center gap-1">
+            <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider flex items-center gap-1 text-white">
                 <span>🔥</span>
                 <span>{t.infiniteHabitLoop}</span>
               </span>
-              <span className="text-xs text-white/80 font-medium">{t.reelStudyMode}</span>
+              <button
+                type="button"
+                onClick={() => setShowExamModal(true)}
+                className="px-2.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-xs font-bold text-white/95 transition-all flex items-center gap-1 cursor-pointer"
+                title="Click to switch target exam"
+              >
+                <span>Target: {examCountdown.examShortName}</span>
+                <span className="material-symbols-outlined text-[13px]">expand_more</span>
+              </button>
             </div>
-            <h2 className="text-xl font-bold tracking-tight mb-1">
-              {t.readyForQuizLoop}
-            </h2>
-            <p className="text-sm text-white/90 mb-4 max-w-xs leading-relaxed">
-              {t.heroDescription}
-            </p>
-            <Link
-              href="/loop"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-primary font-bold shadow-md hover:bg-white/95 active:scale-95 transition-all text-sm group-hover:shadow-lg"
-            >
-              <span className="material-symbols-outlined text-[20px] text-primary">play_arrow</span>
-              <span>{t.enterQzLoop}</span>
-            </Link>
+
+            {/* Large powerful exam countdown highlight */}
+            <div className="my-2.5">
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight drop-shadow-sm">
+                {lang === "hi" ? examCountdown.headlineHi : examCountdown.headlineEn}
+              </h2>
+              <p className="text-xs sm:text-sm text-white/90 mt-1 font-medium leading-relaxed max-w-sm">
+                {lang === "hi"
+                  ? `लक्ष्य ${examCountdown.examDisplayName} — आज का प्रत्येक हल किया गया प्रश्न आपकी अंतिम रैंक तय करेगा।`
+                  : `Targeting ${examCountdown.examDisplayName} · Every question you solve today builds your All India Rank.`}
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <Link
+                href="/loop"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-primary font-bold shadow-md hover:bg-white/95 active:scale-95 transition-all text-sm group-hover:shadow-lg"
+              >
+                <span className="material-symbols-outlined text-[20px] text-primary">play_arrow</span>
+                <span>{t.enterQzLoop}</span>
+              </Link>
+            </div>
           </div>
           {/* Aesthetic background glow & watermark */}
           <div className="absolute -right-4 -bottom-6 text-white/10 select-none pointer-events-none">

@@ -101,14 +101,39 @@ export const ProfileView: React.FC = () => {
     const url = uid ? `/api/questions/author?authorId=${encodeURIComponent(uid)}` : "/api/questions/author";
     const headers: Record<string, string> = uid ? { "x-user-id": uid } : {};
 
+    // Check locally saved authored questions first for instant resilience
+    let localAuthored: Question[] = [];
+    try {
+      const raw = localStorage.getItem("qz_local_authored_questions");
+      if (raw) localAuthored = JSON.parse(raw);
+    } catch {
+      // ignore
+    }
+
+    if (localAuthored.length > 0) {
+      setAuthoredQuestions((prev) => (prev.length === 0 ? localAuthored : prev));
+    }
+
     fetch(url, { headers })
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.questions) {
-          setAuthoredQuestions(data.questions);
+          const combined = [...data.questions];
+          for (const lq of localAuthored) {
+            if (!combined.some((q) => q.id === lq.id)) {
+              combined.unshift(lq);
+            }
+          }
+          setAuthoredQuestions(combined);
+        } else if (localAuthored.length > 0) {
+          setAuthoredQuestions(localAuthored);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (localAuthored.length > 0) {
+          setAuthoredQuestions(localAuthored);
+        }
+      });
   };
 
   useEffect(() => {
@@ -301,6 +326,18 @@ export const ProfileView: React.FC = () => {
       const data = await res.json();
       if (res.ok && data.success) {
         setAuthoredQuestions((prev) => prev.filter((q) => q.id !== questionId));
+        if (typeof window !== "undefined") {
+          try {
+            const raw = localStorage.getItem("qz_local_authored_questions");
+            if (raw) {
+              const list: Question[] = JSON.parse(raw);
+              const updated = list.filter((q) => q.id !== questionId);
+              localStorage.setItem("qz_local_authored_questions", JSON.stringify(updated));
+            }
+          } catch {
+            // ignore
+          }
+        }
       } else {
         alert(data.error || "Failed to delete question");
       }
@@ -871,6 +908,42 @@ export const ProfileView: React.FC = () => {
               </div>
             </div>
             <span className="material-symbols-outlined text-[20px] text-secondary">chevron_right</span>
+          </button>
+
+          {/* App Language Switcher (Hindi / English) */}
+          <button
+            onClick={() => {
+              const nextLang = lang === "en" ? "hi" : "en";
+              setAppLanguage(nextLang);
+              if (user?.id) {
+                fetch("/api/profile", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ userId: user.id, language_preference: nextLang }),
+                }).catch(() => {});
+              }
+            }}
+            className="w-full flex items-center justify-between p-3.5 hover:bg-surface-container transition-colors text-left"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-primary shrink-0">
+                <span className="material-symbols-outlined text-[20px]">translate</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-body-lg text-body-lg text-on-surface font-semibold truncate">
+                  {lang === "en" ? "App Language (भाषा)" : "ऐप की भाषा (Language)"}
+                </span>
+                <span className="font-body-sm text-body-sm text-secondary truncate">
+                  {lang === "en" ? "Currently English · Tap to switch to हिन्दी" : "वर्तमान में हिन्दी · Switch to English"}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary font-bold text-xs">
+                {lang === "en" ? "हिन्दी" : "English"}
+              </span>
+              <span className="material-symbols-outlined text-[20px] text-secondary">chevron_right</span>
+            </div>
           </button>
 
           {/* Hidden Questions Manager (with count and restore option) */}
@@ -1463,6 +1536,11 @@ export const ProfileView: React.FC = () => {
         isOpen={showExamModal}
         onClose={() => setShowExamModal(false)}
         onSelectExam={(exam) => {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("qz_target_exam", exam.id);
+            localStorage.setItem("qz_last_exam", exam.id);
+            window.dispatchEvent(new CustomEvent("qz_exam_changed", { detail: { examId: exam.id, examName: exam.name } }));
+          }
           if (user) {
             fetch("/api/profile", {
               method: "PATCH",

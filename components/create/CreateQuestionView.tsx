@@ -119,10 +119,10 @@ export const CreateQuestionView: React.FC = () => {
     return () => window.removeEventListener("qz_auth_changed", checkAuth);
   }, []);
 
-  // Form states - Auto defaults to user's preferred examination from profile
-  const [selectedExamId, setSelectedExamId] = useState<string>("exam-railway-ntpc");
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("subj-rrb-maths");
-  const [targetTopic, setTargetTopic] = useState<string>("Percentage, Profit & Loss");
+  // Form states - Auto defaults to user's preferred examination from profile or persistent storage
+  const [selectedExamId, setSelectedExamId] = useState<string>("exam-neet-ug");
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("subj-neet-bio");
+  const [targetTopic, setTargetTopic] = useState<string>("Genetics and Evolution");
   const [customTopic, setCustomTopic] = useState<string>("");
   const [syllabusTag, setSyllabusTag] = useState<string>("");
   const [pyqInfo, setPyqInfo] = useState<string>("");
@@ -282,32 +282,49 @@ export const CreateQuestionView: React.FC = () => {
     hindiExplanation,
   ]);
 
-  // Target examination automatically bound from user profile
-  const effectiveExamId = user?.preferred_examination_id || selectedExamId || "exam-railway-ntpc";
-  const currentExamObj = EXAMS_LIST.find((e) => e.id === effectiveExamId) || EXAMS_LIST[0];
-  const currentExamSubjects = EXAM_SUBJECTS_MAP[effectiveExamId] || EXAM_SUBJECTS_MAP["exam-railway-ntpc"];
+  // Target examination automatically bound from user profile or persistent storage
+  const persistentExamId =
+    (typeof window !== "undefined"
+      ? localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam")
+      : null) || null;
+  const effectiveExamId = user?.preferred_examination_id || persistentExamId || selectedExamId || "exam-neet-ug";
+  const currentExamObj = EXAMS_LIST.find((e) => e.id === effectiveExamId) || EXAMS_LIST[2] || EXAMS_LIST[0];
+  const currentExamSubjects = EXAM_SUBJECTS_MAP[effectiveExamId] || EXAM_SUBJECTS_MAP["exam-neet-ug"];
   const currentSubjectObj = currentExamSubjects.find((s) => s.id === selectedSubjectId) || currentExamSubjects[0];
   const dynamicTopics = getTopicsForSubject(currentSubjectObj?.slug, currentSubjectObj?.name);
 
-  // Sync exam & subjects from user profile automatically
+  // Sync exam & subjects from user profile or localStorage automatically
   useEffect(() => {
-    if (user?.preferred_examination_id) {
-      setSelectedExamId(user.preferred_examination_id);
-      const subjs = EXAM_SUBJECTS_MAP[user.preferred_examination_id] || EXAM_SUBJECTS_MAP["exam-railway-ntpc"];
-      if (subjs && subjs.length > 0) {
-        const stillValid = subjs.some((s) => s.id === selectedSubjectId);
-        const activeSub = stillValid ? subjs.find((s) => s.id === selectedSubjectId)! : subjs[0];
-        if (!stillValid) setSelectedSubjectId(subjs[0].id);
-        const topics = getTopicsForSubject(activeSub?.slug, activeSub?.name);
-        if (topics.length > 0 && !topics.includes(targetTopic)) {
-          setTargetTopic(topics[0]);
-        }
+    const syncExam = () => {
+      let activeId = user?.preferred_examination_id;
+      if (!activeId && typeof window !== "undefined") {
+        activeId = localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam") || undefined;
       }
-    }
+      if (!activeId) activeId = "exam-neet-ug";
+
+      setSelectedExamId(activeId);
+      const subjs = EXAM_SUBJECTS_MAP[activeId] || EXAM_SUBJECTS_MAP["exam-neet-ug"];
+      if (subjs && subjs.length > 0) {
+        setSelectedSubjectId((prev) => {
+          const valid = subjs.some((s) => s.id === prev);
+          return valid ? prev : subjs[0].id;
+        });
+      }
+    };
+
+    syncExam();
+    window.addEventListener("qz_exam_changed", syncExam);
+    window.addEventListener("qz_auth_changed", syncExam);
+
     if (user?.language_preference === "hi") {
       setLanguageFormat("hi");
       setLanguage("hi");
     }
+
+    return () => {
+      window.removeEventListener("qz_exam_changed", syncExam);
+      window.removeEventListener("qz_auth_changed", syncExam);
+    };
   }, [user]);
 
   // Keep targetTopic in sync with dynamic topics whenever subject changes
@@ -449,17 +466,12 @@ export const CreateQuestionView: React.FC = () => {
     e.preventDefault();
     setErrorMsg(null);
 
-    // Require sign-in before publishing
-    if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
-      window.dispatchEvent(
-        new CustomEvent("open_auth_modal", {
-          detail: {
-            reason: "Sign in required to create and publish questions to Qz Loop",
-            mode: "signup",
-          },
-        })
-      );
-      return;
+    // Ensure student has a persistent ID (or create guest ID) so question authoring is fully functional
+    let uid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
+    if (!uid && typeof window !== "undefined") {
+      uid = "usr-aspirant-" + Math.random().toString(36).substring(2, 9);
+      localStorage.setItem("qz_user_id", uid);
+      document.cookie = `qz_user_id=${uid}; path=/; max-age=2592000; SameSite=Lax`;
     }
 
     const isHindiOnly = languageFormat === "hi";
@@ -558,6 +570,19 @@ export const CreateQuestionView: React.FC = () => {
         setPublishSuccess(true);
         if (typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_DRAFT_KEY);
+          try {
+            const raw = localStorage.getItem("qz_local_authored_questions");
+            const list: Question[] = raw ? JSON.parse(raw) : [];
+            const existingIdx = list.findIndex((q) => q.id === data.question.id);
+            if (existingIdx >= 0) {
+              list[existingIdx] = data.question;
+            } else {
+              list.unshift(data.question);
+            }
+            localStorage.setItem("qz_local_authored_questions", JSON.stringify(list));
+          } catch {
+            // ignore
+          }
           window.dispatchEvent(
             new CustomEvent("qz_question_created", { detail: { question: data.question } })
           );
@@ -726,10 +751,10 @@ export const CreateQuestionView: React.FC = () => {
                 </button>
               )}
               <button
-                onClick={() => router.push("/")}
+                onClick={() => router.push("/loop")}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm hover:bg-primary-container transition-colors"
               >
-                {t.goToFeedBtn || "Go to Feed"}
+                {t.goToFeedBtn || "Go to Quiz Loop"}
               </button>
             </div>
           </div>
@@ -828,25 +853,6 @@ export const CreateQuestionView: React.FC = () => {
               </button>
             </div>
 
-            {/* Quality & Engagement Score Meter */}
-            <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center font-bold text-xs">
-                  {calculateQualityScore()}%
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-on-surface">{t.questionQualityIndex || "Question Quality Index"}</div>
-                  <div className="text-[10px] text-secondary">
-                    {calculateQualityScore() >= 80
-                      ? (t.qualityHighYield || "🔥 High-yield bilingual feed quality")
-                      : (t.qualityAddDetails || "Add Hindi translation or PYQ tag for max reach")}
-                  </div>
-                </div>
-              </div>
-              <span className="text-[11px] font-bold text-primary px-2 py-0.5 rounded-full bg-primary-fixed/50">
-                {t.examReadyBadge || "Exam Ready"}
-              </span>
-            </div>
 
             {activeTab === "preview" ? (
               /* Live Reel Preview Card */
@@ -955,24 +961,7 @@ export const CreateQuestionView: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handlePublish} className="flex flex-col gap-4">
-                {/* Village / Rural Friendly Simple Step-by-Step Guide */}
-                <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center font-bold text-xs shrink-0">
-                    💡
-                  </div>
-                  <div className="text-xs text-on-surface leading-tight">
-                    <strong className="text-primary font-bold block mb-0.5">
-                      {lang === "hi" ? "आसान 3-स्टेप्स में प्रश्न बनाएं:" : "Easy 3-Step Question Maker:"}
-                    </strong>
-                    <span className="text-secondary text-[11px]">
-                      {lang === "hi"
-                        ? "1. विषय व टॉपिक चुनें · 2. प्रश्न व 4 विकल्प लिखें · 3. सही उत्तर (A/B/C/D) चुनें और पब्लिश करें!"
-                        : "1. Select Subject & Topic · 2. Write Question & 4 Options · 3. Pick Correct Option (A/B/C/D) & Publish!"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Auto Target Examination Info Badge (from Profile) */}
+                {/* Easy 3-Step Question Maker and position under exam removed from UI; target exam is default */}
                 <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 shadow-xs">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
@@ -980,21 +969,16 @@ export const CreateQuestionView: React.FC = () => {
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="font-label-sm text-[10px] uppercase tracking-wider text-secondary font-bold">
-                        {t.postingUnderExam}
+                        Target Exam (Default)
                       </span>
                       <span className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface truncate">
                         {currentExamObj.name}
                       </span>
                     </div>
                   </div>
-                  <Link
-                    href="/profile"
-                    className="px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs shrink-0 transition-colors flex items-center gap-1"
-                    title="Change target exam in your profile"
-                  >
-                    <span>{t.changeInProfile}</span>
-                    <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
-                  </Link>
+                  <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
+                    {currentExamObj.shortName}
+                  </span>
                 </div>
 
                 {/* Subject Selector Filter Row (Target Domain) */}
@@ -1093,7 +1077,8 @@ export const CreateQuestionView: React.FC = () => {
                 </section>
 
                 {/* Language Format & Difficulty */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                {/* Language Format (Difficulty & penalty are default as per exam) */}
+                <div className="flex items-center justify-between gap-2.5">
                   <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl">
                     <button
                       type="button"
@@ -1129,16 +1114,6 @@ export const CreateQuestionView: React.FC = () => {
                       {t.formatBilingual}
                     </button>
                   </div>
-
-                  <select
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
-                    className="px-3 py-1.5 rounded-xl bg-surface-container-low border border-surface-container-high text-xs font-semibold text-on-surface focus:outline-none self-start sm:self-auto"
-                  >
-                    <option value="easy">{t.easyPenalty}</option>
-                    <option value="medium">{t.mediumPenalty}</option>
-                    <option value="hard">{t.hardPenalty}</option>
-                  </select>
                 </div>
 
                 {/* Question Statement Input - Adapts to English, Hindi Only, or Bilingual */}

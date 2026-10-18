@@ -1,5 +1,6 @@
 // Automated Acceptance Test Suite for Qz Loop
 // Validates all requirements and scenarios end-to-end
+process.env.NODE_ENV = "test";
 
 import fs from "fs";
 import path from "path";
@@ -9,6 +10,7 @@ import { checkSimilarity } from "../lib/utils/similarity";
 import { getTopicsForSubject } from "../lib/data/topics";
 import { OFFICIAL_WHATSAPP_GROUP_URL, FOUNDER_PHONE, FOUNDER_EMAIL, FOUNDER_WHATSAPP_LINK } from "../lib/utils/whatsapp";
 import { TRANSLATIONS } from "../lib/utils/i18n";
+import { getExamCountdown } from "../lib/utils/examDates";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -1002,8 +1004,121 @@ async function runTests() {
   assert(topHeaderFile.includes("Qz-loop"), "TopHeader displays prominent brand name 'Qz-loop'");
   assert(!topHeaderFile.includes("onClick={onSelectExam}"), "TopHeader has removed exam switcher button from JSX");
 
+  // Scenario 53: Authentic NEET UG Feed Isolation, Subject Filters & Authoring Prioritization
+  console.log("\n[Scenario 53] Authentic NEET UG Feed Isolation, Subject Filters & Authoring Prioritization");
+  const neetFeed = db.getFeedQuestions({
+    examId: "exam-neet-ug",
+    subjectSlug: "all",
+  });
+  assert(neetFeed.length >= 5, "NEET UG feed returns authentic seed questions");
+  assert(neetFeed.every((q) => q.examination_id === "exam-neet-ug"), "All questions in NEET feed strictly belong to exam-neet-ug");
+  assert(!neetFeed.some((q) => q.examination_id === "exam-ssc-cgl"), "SSC CGL questions do not contaminate NEET feed");
+
+  // Verify NEET subject filters
+  const neetBioFeed = db.getFeedQuestions({
+    examId: "exam-neet-ug",
+    subjectSlug: "biology",
+  });
+  assert(neetBioFeed.length > 0, "NEET Biology filter returns questions");
+  assert(neetBioFeed.every((q) => q.subject_slug === "biology"), "All questions in NEET Biology feed have subject_slug 'biology'");
+
+  const neetChemFeed = db.getFeedQuestions({
+    examId: "exam-neet-ug",
+    subjectSlug: "chemistry",
+  });
+  assert(neetChemFeed.length > 0, "NEET Chemistry filter returns questions");
+  assert(neetChemFeed.every((q) => q.subject_slug === "chemistry"), "All questions in NEET Chemistry feed have subject_slug 'chemistry'");
+
+  const neetPhyFeed = db.getFeedQuestions({
+    examId: "exam-neet-ug",
+    subjectSlug: "physics",
+  });
+  assert(neetPhyFeed.length > 0, "NEET Physics filter returns questions");
+  assert(neetPhyFeed.every((q) => q.subject_slug === "physics"), "All questions in NEET Physics feed have subject_slug 'physics'");
+
+  // Verify non-NEET exam feed does not contain NEET questions
+  const sscFeed = db.getFeedQuestions({
+    examId: "exam-ssc-cgl",
+    subjectSlug: "all",
+  });
+  assert(!sscFeed.some((q) => q.examination_id === "exam-neet-ug"), "NEET questions do not leak into SSC CGL feed");
+
+  // Verify newly authored NEET question is prioritized at index 0 in NEET feed
+  const testNeetAuthorId = "usr-neet-aspirant-99";
+  const newNeetQ = db.createQuestion({
+    examinationId: "exam-neet-ug",
+    subjectId: "subj-neet-bio",
+    questionText: "Which organelle is known as the powerhouse of the cell in biology?",
+    targetTopic: "Cell Structure and Function",
+    options: [
+      { id: "A", text: "Mitochondria" },
+      { id: "B", text: "Ribosome" },
+      { id: "C", text: "Golgi apparatus" },
+      { id: "D", text: "Lysosome" },
+    ],
+    correctOptionId: "A",
+    authorId: testNeetAuthorId,
+  });
+  assert(newNeetQ.examination_id === "exam-neet-ug", "Newly created question preserves NEET exam ID");
+  assert(newNeetQ.author_id === testNeetAuthorId, "Newly created question preserves author ID");
+
+  const neetAuthorQuestions = db.getQuestionsByAuthor(testNeetAuthorId);
+  assert(neetAuthorQuestions.some((q) => q.id === newNeetQ.id), "getQuestionsByAuthor retrieves newly authored NEET question");
+
+  const neetFeedWithAuthor = db.getFeedQuestions({
+    examId: "exam-neet-ug",
+    userId: testNeetAuthorId,
+  });
+  assert(neetFeedWithAuthor[0].id === newNeetQ.id, "Newly authored question is prioritized at index 0 for the author");
+
+  // Scenario 54: Authentic Target Exam Countdown Engine & Hero Display
+  console.log("\n[Scenario 54] Authentic Target Exam Countdown Engine & Hero Display");
+  // Oct 18, 2026 system date
+  const systemRefDate = new Date(2026, 9, 18);
+  const neetCountdown = getExamCountdown("exam-neet-ug", systemRefDate);
+  assert(neetCountdown.daysLeft === 196, `NEET 2027 countdown from Oct 18, 2026 is exactly 196 days (got ${neetCountdown.daysLeft})`);
+  assert(neetCountdown.examDisplayName === "NEET 2027", "NEET exam display name is 'NEET 2027'");
+  assert(neetCountdown.headlineEn === "196 days left for NEET 2027", "Headline matches '196 days left for NEET 2027'");
+  assert(neetCountdown.headlineHi.includes("196 दिन शेष"), "Hindi headline contains '196 दिन शेष'");
+
+  const jeeCountdown = getExamCountdown("exam-jee-main", systemRefDate);
+  assert(jeeCountdown.examDisplayName === "JEE Main 2027", "JEE exam display name is 'JEE Main 2027'");
+  assert(jeeCountdown.daysLeft > 0, "JEE countdown returns positive days left");
+
+  const homeDashboardFile = fs.readFileSync(path.join(__dirname, "../components/home/HomeDashboardView.tsx"), "utf8");
+  assert(homeDashboardFile.includes("getExamCountdown"), "HomeDashboardView imports getExamCountdown");
+  assert(homeDashboardFile.includes("examCountdown.headlineEn"), "HomeDashboardView renders English countdown headline");
+  assert(homeDashboardFile.includes("text-2xl sm:text-3xl font-black"), "HomeDashboardView renders prominent countdown typography");
+
+  // Scenario 55: Simplified Village-Friendly Creator Studio
+  console.log("\n[Scenario 55] Simplified Village-Friendly Creator Studio");
+  const s55CreateFile = fs.readFileSync(path.join(__dirname, "../components/create/CreateQuestionView.tsx"), "utf8");
+  assert(!s55CreateFile.includes("Question Quality Index"), "Quality Index meter removed from Create UI");
+  assert(!s55CreateFile.includes("Position under"), "Position under exam selector card removed from Create UI");
+  assert(!s55CreateFile.includes("Penalty for wrong attempt"), "Penalty dropdown removed from Create UI");
+  assert(s55CreateFile.includes("qz_local_authored_questions"), "CreateQuestionView caches authored questions in localStorage");
+  assert(s55CreateFile.includes("qz_question_created"), "CreateQuestionView dispatches qz_question_created event");
+
+  const s55ProfileFile = fs.readFileSync(path.join(__dirname, "../components/profile/ProfileView.tsx"), "utf8");
+  assert(s55ProfileFile.includes("qz_local_authored_questions"), "ProfileView syncs with qz_local_authored_questions");
+
+  // Scenario 56: Header & Bottom Navigation Profile & Language Settings Integration
+  console.log("\n[Scenario 56] Header & Bottom Navigation Profile & Language Settings Integration");
+  const s56HeaderFile = fs.readFileSync(path.join(__dirname, "../components/layout/TopHeader.tsx"), "utf8");
+  assert(!s56HeaderFile.includes("toggleLanguage") && !s56HeaderFile.includes("setLanguage"), "TopHeader does not include language switcher button");
+  assert(!s56HeaderFile.includes("href=\"/profile\""), "TopHeader does not include top-right profile photo link");
+
+  const s56BottomNavFile = fs.readFileSync(path.join(__dirname, "../components/layout/BottomNav.tsx"), "utf8");
+  assert(s56BottomNavFile.includes("user?.avatar_url"), "BottomNav renders avatar photo if user has uploaded avatar");
+  assert(s56BottomNavFile.includes("rounded-full overflow-hidden"), "BottomNav renders avatar in a circular cutout");
+  assert(s56BottomNavFile.includes("person"), "BottomNav renders fallback person icon");
+
+  const s56ProfileFile = fs.readFileSync(path.join(__dirname, "../components/profile/ProfileView.tsx"), "utf8");
+  assert(s56ProfileFile.includes("setAppLanguage"), "ProfileView provides language switcher via setAppLanguage");
+  assert(s56ProfileFile.includes("App Language (भाषा)"), "ProfileView settings includes App Language option");
+
   console.log("\n=================================================");
-  console.log("   ALL 52 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 56 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

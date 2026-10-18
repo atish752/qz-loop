@@ -23,7 +23,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onSelectExam,
   onOpenAuth,
 }) => {
-  const { lang, setLanguage, t } = useAppLanguage();
+  const { t } = useAppLanguage();
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   // Initialize theme from localStorage or system preference on mount
@@ -86,19 +86,19 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </Link>
         </div>
 
-        {/* Right side: Language Switcher + WhatsApp Group + Dark Mode toggle + Streak + Auth / Profile Avatar */}
+        {/* Right side: WhatsApp Group + Dark Mode toggle + Streak (Profile & Language moved to bottom nav / profile) */}
         <div className="flex items-center gap-1.5 xs:gap-2 shrink-0">
-          {/* Top Language Switcher: EN to Hindi & Hindi to EN */}
-          <button
-            onClick={() => setLanguage(lang === "en" ? "hi" : "en")}
-            className="flex items-center gap-1 px-2 py-1 rounded-full bg-surface-container-low hover:bg-surface-container-high border border-surface-container-high/60 text-on-surface transition-all active:scale-95"
-            title={lang === "en" ? "हिन्दी में बदलें (Switch to Hindi)" : "Switch to English"}
-            aria-label="Switch Language"
-          >
-            <span className="text-[11px] font-extrabold text-primary">{lang === "en" ? "EN" : "अ"}</span>
-            <span className="text-[10px] text-secondary">|</span>
-            <span className="text-[11px] font-bold">{lang === "en" ? "हिन्दी" : "Eng"}</span>
-          </button>
+          {/* Daily Streak Indicator (if user has active streak) */}
+          {(user?.current_streak || streakDays > 0) && (
+            <div
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-error-container/80 text-on-error-container shadow-xs animate-pulse-subtle"
+              title={`${user?.current_streak || streakDays} Day Practice Streak`}
+            >
+              <span className="text-xs">🔥</span>
+              <span className="font-label-md text-xs font-bold">{user?.current_streak ?? streakDays}</span>
+              <span className="font-label-sm text-[10px] text-error font-medium">d</span>
+            </div>
+          )}
 
           {/* Direct WhatsApp Group Button */}
           <a
@@ -123,55 +123,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               {isDarkMode ? "light_mode" : "dark_mode"}
             </span>
           </button>
-
-          {/* User Logged In vs Guest */}
-          {user ? (
-            <>
-              {/* Daily Streak Indicator */}
-              <div
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-error-container/80 text-on-error-container shadow-xs animate-pulse-subtle"
-                title={`${user.current_streak || streakDays} Day Practice Streak`}
-              >
-                <span className="text-xs">🔥</span>
-                <span className="font-label-md text-xs font-bold">{user.current_streak ?? streakDays}</span>
-                <span className="font-label-sm text-[10px] text-error font-medium">d</span>
-              </div>
-
-              {/* Profile Avatar */}
-              <Link
-                href="/profile"
-                className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center transition-transform active:scale-95 ${
-                  currentTab === "profile"
-                    ? "ring-2 ring-primary ring-offset-1"
-                    : "border border-surface-container-high"
-                }`}
-                title={`@${user.username || user.display_name}`}
-              >
-                {user.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={user.avatar_url}
-                    alt={user.display_name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-primary flex items-center justify-center text-on-primary">
-                    <span className="material-symbols-outlined text-[16px]">person</span>
-                  </div>
-                )}
-              </Link>
-            </>
-          ) : (
-            /* Guest / Unauthenticated Visitor: Prominent Sign In button */
-            <button
-              onClick={handleAuthClick}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-on-primary hover:bg-primary-container active:scale-95 transition-all text-xs font-bold shadow-xs"
-              title="Sign In with Google or Email"
-            >
-              <span className="material-symbols-outlined text-[15px]">login</span>
-              <span>Sign In</span>
-            </button>
-          )}
         </div>
       </div>
     </header>

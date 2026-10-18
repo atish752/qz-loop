@@ -8,6 +8,7 @@ import { TopHeader } from "../layout/TopHeader";
 import { ExamSwitchModal } from "../feed/ExamSwitchModal";
 import { OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
 import { useAppLanguage, LANGUAGE_CHANGE_EVENT } from "@/lib/utils/i18n";
+import { EXAMS_LIST, EXAM_SUBJECTS_MAP } from "@/components/create/CreateQuestionView";
 
 interface QuizLoopContainerProps {
   initialExams?: Examination[];
@@ -31,7 +32,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const [quizLanguage, setQuizLanguage] = useState<"all" | "hi" | "en">("all");
 
   // Exam & User State
-  const [currentExamId, setCurrentExamId] = useState<string>("exam-ssc-cgl");
+  const [currentExamId, setCurrentExamId] = useState<string>("exam-neet-ug");
   const [exams, setExams] = useState<Examination[]>(initialExams);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [showExamModal, setShowExamModal] = useState<boolean>(false);
@@ -109,6 +110,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   useEffect(() => {
     const checkAuthAndLoad = () => {
       if (typeof window !== "undefined") {
+        const storedExam = localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam");
+        if (storedExam) {
+          setCurrentExamId(storedExam);
+        }
+
         const savedLang = localStorage.getItem("qz_quiz_lang");
         if (savedLang === "hi" || savedLang === "en" || savedLang === "all") {
           setQuizLanguage(savedLang);
@@ -150,6 +156,14 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     checkAuthAndLoad();
     window.addEventListener("qz_auth_changed", checkAuthAndLoad);
 
+    const handleExamChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ examId?: string }>;
+      if (customEvent.detail?.examId) {
+        setCurrentExamId(customEvent.detail.examId);
+      }
+    };
+    window.addEventListener("qz_exam_changed", handleExamChanged);
+
     const handleQuestionCreated = (e: Event) => {
       const customEvent = e as CustomEvent<{ question?: Question }>;
       if (customEvent.detail?.question) {
@@ -174,6 +188,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
     return () => {
       window.removeEventListener("qz_auth_changed", checkAuthAndLoad);
+      window.removeEventListener("qz_exam_changed", handleExamChanged);
       window.removeEventListener("qz_question_created", handleQuestionCreated);
       window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLangChange);
     };
@@ -217,7 +232,26 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         const data = await res.json();
 
         if (data.success) {
-          const fetched: Question[] = data.questions || [];
+          let fetched: Question[] = data.questions || [];
+
+          // Also merge locally authored questions matching this exam
+          if (typeof window !== "undefined") {
+            try {
+              const raw = localStorage.getItem("qz_local_authored_questions");
+              if (raw) {
+                const localList: Question[] = JSON.parse(raw);
+                const matching = localList.filter((q) => !exam || q.examination_id === exam);
+                for (const lq of matching) {
+                  if (!fetched.some((f) => f.id === lq.id)) {
+                    fetched.unshift(lq);
+                  }
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+
           if (reset) {
             setQuestions(fetched);
             setCurrentIndex(0);
@@ -487,6 +521,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const handleSelectExam = async (exam: Examination) => {
     setCurrentExamId(exam.id);
     setShowExamModal(false);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("qz_target_exam", exam.id);
+      localStorage.setItem("qz_last_exam", exam.id);
+      window.dispatchEvent(new CustomEvent("qz_exam_changed", { detail: { examId: exam.id, examName: exam.name } }));
+    }
     try {
       await fetch("/api/profile", {
         method: "PATCH",
@@ -522,6 +561,15 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-primary-container text-on-primary shadow-lg mb-3 animate-bounce">
               <span className="material-symbols-outlined text-[36px]">all_inclusive</span>
             </div>
+            
+            {/* Active Exam Badge */}
+            <div className="flex items-center justify-center mb-1.5">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/25 text-primary text-xs font-bold shadow-xs">
+                <span className="material-symbols-outlined text-[15px]">school</span>
+                <span>{activeExam?.name || "NEET UG"}</span>
+              </span>
+            </div>
+
             <h1 className="text-2xl font-bold tracking-tight text-on-surface">
               Qz Loop
             </h1>
@@ -541,63 +589,83 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             <span>{t.startQuiz}</span>
           </button>
 
-          {/* Subject Flow Multi-Selector */}
-          <div className="bg-surface-container-low rounded-2xl p-4 border border-surface-container-high/60 shadow-xs mb-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-bold text-xs uppercase tracking-wider text-secondary">
-                {t.selectSubjectFlow}
-              </span>
-              <span className="text-[11px] font-semibold text-primary">
-                {t.multiSelectEnabled}
-              </span>
-            </div>
+          {/* Subject Flow Multi-Selector - Dynamically mapped to student's chosen exam */}
+          {(() => {
+            const currentExamSubjects = EXAM_SUBJECTS_MAP[currentExamId] || [];
+            const dynamicSubjects = [
+              { slug: "all", label: t.subjAll || "All Subjects", icon: "auto_awesome" },
+              ...(currentExamSubjects.length > 0
+                ? currentExamSubjects.map((s) => ({
+                    slug: s.slug,
+                    label: s.name,
+                    icon: s.icon,
+                  }))
+                : AVAILABLE_SUBJECTS.filter((s) => s.slug !== "all").map((s) => ({
+                    slug: s.slug,
+                    label: t[s.labelKey] || s.defaultLabel,
+                    icon: s.icon,
+                  }))),
+            ];
 
-            <div className="flex flex-col gap-2">
-              {AVAILABLE_SUBJECTS.map((subj) => {
-                const isSelected =
-                  subj.slug === "all"
-                    ? selectedSubjects.includes("all")
-                    : selectedSubjects.includes(subj.slug);
+            return (
+              <div className="bg-surface-container-low rounded-2xl p-4 border border-surface-container-high/60 shadow-xs mb-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-bold text-xs uppercase tracking-wider text-secondary">
+                    {t.selectSubjectFlow}
+                  </span>
+                  <span className="text-[11px] font-semibold text-primary">
+                    {t.multiSelectEnabled}
+                  </span>
+                </div>
 
-                return (
-                  <button
-                    key={subj.slug}
-                    onClick={() => handleToggleSubject(subj.slug)}
-                    className={`w-full p-3 rounded-xl flex items-center justify-between text-left transition-all border ${
-                      isSelected
-                        ? "bg-primary-container/20 border-primary text-on-surface shadow-xs font-bold"
-                        : "bg-surface-container/60 hover:bg-surface-container border-transparent text-secondary hover:text-on-surface"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          isSelected ? "bg-primary text-on-primary" : "bg-surface-container text-secondary"
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[18px]">
-                          {subj.icon}
-                        </span>
-                      </div>
-                      <span className="text-sm">{t[subj.labelKey] || subj.defaultLabel}</span>
-                    </div>
+                <div className="flex flex-col gap-2">
+                  {dynamicSubjects.map((subj) => {
+                    const isSelected =
+                      subj.slug === "all"
+                        ? selectedSubjects.includes("all")
+                        : selectedSubjects.includes(subj.slug);
 
-                    <div className="shrink-0">
-                      <span
-                        className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs ${
+                    return (
+                      <button
+                        key={subj.slug}
+                        onClick={() => handleToggleSubject(subj.slug)}
+                        className={`w-full p-3 rounded-xl flex items-center justify-between text-left transition-all border ${
                           isSelected
-                            ? "bg-primary border-primary text-on-primary"
-                            : "border-secondary/40 text-transparent"
+                            ? "bg-primary-container/20 border-primary text-on-surface shadow-xs font-bold"
+                            : "bg-surface-container/60 hover:bg-surface-container border-transparent text-secondary hover:text-on-surface"
                         }`}
                       >
-                        ✓
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                              isSelected ? "bg-primary text-on-primary" : "bg-surface-container text-secondary"
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              {subj.icon}
+                            </span>
+                          </div>
+                          <span className="text-sm">{subj.label}</span>
+                        </div>
+
+                        <div className="shrink-0">
+                          <span
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs ${
+                              isSelected
+                                ? "bg-primary border-primary text-on-primary"
+                                : "border-secondary/40 text-transparent"
+                            }`}
+                          >
+                            ✓
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Session Overview Badges */}
           <div className="grid grid-cols-2 gap-2 mb-5 text-center">

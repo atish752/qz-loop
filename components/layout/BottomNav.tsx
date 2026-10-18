@@ -1,13 +1,44 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppLanguage } from "@/lib/utils/i18n";
+import { UserProfile } from "@/types/database";
 
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
   const { t } = useAppLanguage();
+  const [user, setUser] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const checkUser = () => {
+      if (typeof window !== "undefined") {
+        const uid = localStorage.getItem("qz_user_id");
+        if (uid) {
+          const cached = localStorage.getItem("qz_auth_user");
+          if (cached) {
+            try {
+              setUser(JSON.parse(cached));
+            } catch {
+              // ignore
+            }
+          }
+          fetch(`/api/profile?userId=${encodeURIComponent(uid)}`)
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.success && d.user) setUser(d.user);
+            })
+            .catch(() => {});
+        } else {
+          setUser(null);
+        }
+      }
+    };
+    checkUser();
+    window.addEventListener("qz_auth_changed", checkUser);
+    return () => window.removeEventListener("qz_auth_changed", checkUser);
+  }, []);
 
   const isHome = pathname === "/" || pathname === "/home";
   const isCreate = pathname === "/create" || pathname === "/add";
@@ -98,19 +129,36 @@ export const BottomNav: React.FC = () => {
             <span className="font-label-sm text-label-sm">{t.navSocial}</span>
           </Link>
 
-          {/* 5. Profile (with entry to Ranks / Leaderboard) */}
+          {/* 5. Profile (with uploaded photo in circular cutout if signed in, or default icon) */}
           <Link
             href="/profile"
             className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 ${
               isProfile ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
             }`}
           >
-            <span
-              className="material-symbols-outlined text-[24px]"
-              style={isProfile ? { fontVariationSettings: "'FILL' 1" } : {}}
-            >
-              person
-            </span>
+            {user?.avatar_url ? (
+              <div
+                className={`w-6 h-6 rounded-full overflow-hidden border transition-all ${
+                  isProfile
+                    ? "ring-2 ring-primary border-transparent shadow-xs"
+                    : "border-surface-container-high opacity-85 hover:opacity-100"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={user.avatar_url}
+                  alt={user.display_name || "Profile"}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <span
+                className="material-symbols-outlined text-[24px]"
+                style={isProfile ? { fontVariationSettings: "'FILL' 1" } : {}}
+              >
+                person
+              </span>
+            )}
             <span className="font-label-sm text-label-sm">{t.navProfile}</span>
           </Link>
         </div>
