@@ -150,6 +150,19 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     checkAuthAndLoad();
     window.addEventListener("qz_auth_changed", checkAuthAndLoad);
 
+    const handleQuestionCreated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ question?: Question }>;
+      if (customEvent.detail?.question) {
+        const newQ = customEvent.detail.question;
+        setQuestions((prev) => [newQ, ...prev.filter((q) => q.id !== newQ.id)]);
+        setCurrentIndex(0);
+        setIsStarted(true);
+        displayedQuestionIdsRef.current.clear();
+        displayedQuestionIdsRef.current.add(newQ.id);
+      }
+    };
+    window.addEventListener("qz_question_created", handleQuestionCreated);
+
     const handleLangChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ lang?: "en" | "hi" }>;
       if (customEvent.detail?.lang) {
@@ -161,6 +174,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
     return () => {
       window.removeEventListener("qz_auth_changed", checkAuthAndLoad);
+      window.removeEventListener("qz_question_created", handleQuestionCreated);
       window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLangChange);
     };
   }, []);
@@ -192,11 +206,14 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
       setError(null);
 
       try {
+        const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
         const subjectsParam = subjects.includes("all") ? "all" : subjects.join(",");
         const excludedList = Array.from(displayedQuestionIdsRef.current).join(",");
-        const url = `/api/feed?subjects=${subjectsParam}&examId=${exam}&lang=${lang}&excludedIds=${reset ? "" : excludedList}`;
+        const userParam = uid ? `&userId=${encodeURIComponent(uid)}` : "";
+        const url = `/api/feed?subjects=${subjectsParam}&examId=${exam}&lang=${lang}&excludedIds=${reset ? "" : excludedList}${userParam}`;
 
-        const res = await fetch(url);
+        const headers: Record<string, string> = uid ? { "x-user-id": uid } : {};
+        const res = await fetch(url, { headers });
         const data = await res.json();
 
         if (data.success) {
@@ -289,8 +306,8 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   // Swipe Attempt Interception Handler
   const attemptNextQuestion = useCallback(() => {
     const status = activeStatusRef.current;
-    // Critical Requirement: If user swiped while answering (clicked answer button), ask to answer and skip!
-    if (status.isAnswerMode && !status.isAnswered) {
+    // Explicit Choice: If student swipes before answering, prompt with Answer vs Skip modal
+    if (!status.isAnswered) {
       pendingSwipeActionRef.current = executeNextQuestion;
       setShowAnswerOrSkipModal(true);
       return;
@@ -846,11 +863,13 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             </div>
 
             <div>
-              <h3 className="font-bold text-on-surface text-base">{t.skipQuestion}</h3>
+              <h3 className="font-bold text-on-surface text-base">
+                {lang === "hi" ? "उत्तर दें या छोड़ें?" : "Answer or Skip Question?"}
+              </h3>
               <p className="text-xs text-secondary mt-1">
                 {lang === "hi"
-                  ? "आपने इस प्रश्न पर उत्तर देना चुना था। क्या आप उत्तर सबमिट करना चाहते हैं या अगला प्रश्न देखना चाहते हैं?"
-                  : "You clicked Answer on this question! Would you like to submit your answer or skip to the next reel?"}
+                  ? "आपने अभी तक इस प्रश्न का उत्तर नहीं दिया है। क्या आप उत्तर देना चाहते हैं या अगले प्रश्न पर जाना चाहते हैं?"
+                  : "You haven't answered this question yet. Would you like to answer it now or skip to the next question?"}
               </p>
             </div>
 

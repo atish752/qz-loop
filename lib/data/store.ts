@@ -128,16 +128,9 @@ class DataStore {
 
   // Pre-seed social, playlist, friend and habit data
   private seedInitialSocialAndHabitData() {
-    // 1. Likes for questions
-    this.questions.forEach((q, idx) => {
-      const likers = new Set<string>();
-      // Random mock likes between 18 and 64
-      const seedLikerIds = ["user-amit", "user-priya", "user-vikram", "user-ananya"];
-      seedLikerIds.slice(0, (idx % 4) + 1).forEach((id) => likers.add(id));
-      if (idx % 2 === 0) {
-        likers.add(this.currentUserId);
-      }
-      this.likes.set(q.id, likers);
+    // 1. Likes for questions (all start at 0 for real data)
+    this.questions.forEach((q) => {
+      this.likes.set(q.id, new Set<string>());
     });
 
     // 2. Playlists / Collections
@@ -229,39 +222,8 @@ class DataStore {
       },
     ];
 
-    // 5. Initial Discussion Comments on questions
-    this.comments = [
-      {
-        id: "cmt-1",
-        question_id: "q-math-1",
-        user_id: "user-priya",
-        user_name: "Priya Sharma",
-        user_avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80",
-        comment_text: "Shortcut: When radius is doubled, area scales by square of radius factor (2² = 4). Hence 4:1 instantly without writing π!",
-        likes_count: 34,
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-      },
-      {
-        id: "cmt-2",
-        question_id: "q-math-1",
-        user_id: "user-amit",
-        user_name: "Amit Kumar",
-        user_avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
-        comment_text: "Very classic SSC question. Frequently asked in Tier-1. Master the scaling ratio rule.",
-        likes_count: 19,
-        created_at: new Date(Date.now() - 43200000).toISOString(),
-      },
-      {
-        id: "cmt-3",
-        question_id: "q-eng-1",
-        user_id: "user-ananya",
-        user_name: "Ananya Roy",
-        user_avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&auto=format&fit=crop&q=80",
-        comment_text: "Rule: 'Neither of' takes a singular verb ('is' not 'are'). Always spot the subject-verb agreement first!",
-        likes_count: 27,
-        created_at: new Date(Date.now() - 72000000).toISOString(),
-      },
-    ];
+    // 5. Initial Discussion Comments on questions (real customer data: starts empty)
+    this.comments = [];
 
     // 6. Habit & Study Settings
     this.habitSettings.set(this.currentUserId, {
@@ -437,6 +399,7 @@ class DataStore {
       today_solved_count: 0, // 0 solved
       total_questions_answered: 0, // 0 total answered
       overall_accuracy: 0, // 0% accuracy
+      onboarding_completed: true,
       created_at: new Date().toISOString(),
     };
 
@@ -497,6 +460,8 @@ class DataStore {
     preferred_examination_id?: string;
     avatar_url?: string | null;
     email?: string;
+    language_preference?: 'en' | 'hi';
+    onboarding_completed?: boolean;
   }): UserProfile {
     let existing = this.profiles.find((p) => p.id === data.id);
     if (!existing) {
@@ -508,12 +473,14 @@ class DataStore {
         preferred_examination_id: data.preferred_examination_id || "exam-railway-ntpc",
         avatar_url: data.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
         email: data.email || undefined,
+        language_preference: data.language_preference || "en",
         role: "student",
         current_streak: 0,
         daily_goal: 10,
         today_solved_count: 0,
         total_questions_answered: 0,
         overall_accuracy: 0,
+        onboarding_completed: data.onboarding_completed ?? false,
         created_at: new Date().toISOString(),
       };
       this.profiles.push(existing);
@@ -524,6 +491,8 @@ class DataStore {
       if (data.preferred_examination_id) existing.preferred_examination_id = data.preferred_examination_id;
       if (data.avatar_url) existing.avatar_url = data.avatar_url;
       if (data.email) existing.email = data.email;
+      if (data.language_preference) existing.language_preference = data.language_preference;
+      if (data.onboarding_completed !== undefined) existing.onboarding_completed = data.onboarding_completed;
     }
     this.currentUserId = data.id;
     return existing;
@@ -579,7 +548,7 @@ class DataStore {
 
     // Filter by exam, subject, and language
     let pool = this.questions.filter((q) => {
-      if (hasSpecificQuestions && q.examination_id !== examId) return false;
+      if (hasSpecificQuestions && q.examination_id !== examId && q.author_id !== userId) return false;
       if (q.publication_status !== "published" || q.moderation_status !== "active") return false;
       if (userHiddenIds.has(q.id)) return false;
       if (sessionExcludedIds.has(q.id)) return false;
@@ -698,7 +667,15 @@ class DataStore {
     };
 
     // Priority 3: Never answered questions first, then eligible revisions
-    let selected = [...shuffle(neverAnswered), ...shuffle(eligibleForRevision)];
+    // Newly created community and user-authored questions are placed at the front so students see newly published questions immediately
+    const userAuthoredOrNew = neverAnswered.filter(
+      (q) => (userId && q.author_id === userId) || q.id.startsWith("q-usr-")
+    );
+    const standardNeverAnswered = neverAnswered.filter(
+      (q) => !((userId && q.author_id === userId) || q.id.startsWith("q-usr-"))
+    );
+
+    let selected = [...userAuthoredOrNew, ...shuffle(standardNeverAnswered), ...shuffle(eligibleForRevision)];
 
     // If candidate pool is small (early database), include questions that haven't been seen in this session
     if (selected.length < limit && pool.length > 0) {
@@ -912,8 +889,30 @@ class DataStore {
     syllabusTag?: string;
     targetTopic?: string;
     pyqInfo?: string;
+    authorId?: string;
   }): Question {
-    const author = this.getCurrentUser();
+    let author = params.authorId ? this.profiles.find((p) => p.id === params.authorId) : null;
+    if (!author && params.authorId) {
+      author = {
+        id: params.authorId,
+        display_name: "Aspirant",
+        username: "aspirant_" + params.authorId.slice(0, 6),
+        target_exam: "Railways (RRB NTPC & Group D)",
+        preferred_examination_id: "exam-railway-ntpc",
+        role: "student",
+        current_streak: 0,
+        daily_goal: 10,
+        today_solved_count: 0,
+        total_questions_answered: 0,
+        overall_accuracy: 0,
+        onboarding_completed: true,
+        created_at: new Date().toISOString(),
+      };
+      this.profiles.push(author);
+    }
+    if (!author) {
+      author = this.getCurrentUser();
+    }
     const effectiveText = (params.questionText || params.hindiQuestionText || "").trim();
     const cleanedText = cleanText(effectiveText);
     const fingerprint = normalizeTextFingerprint(cleanedText);
@@ -976,7 +975,7 @@ class DataStore {
       difficulty: params.difficulty || "medium",
       syllabus_tag: finalSyllabusTag || undefined,
       pyq_info: params.pyqInfo || undefined,
-      quality_upvotes: 1,
+      quality_upvotes: 0,
       quality_downvotes: 0,
       normalized_fingerprint: fingerprint,
       publication_status: "published",
@@ -989,6 +988,13 @@ class DataStore {
 
     this.questions.unshift(newQuestion);
     return newQuestion;
+  }
+
+  public syncCloudQuestion(q: Question): void {
+    const idx = this.questions.findIndex((item) => item.id === q.id);
+    if (idx === -1) {
+      this.questions.unshift(q);
+    }
   }
 
   // --- Hide and Restore Questions ---
@@ -1300,7 +1306,15 @@ class DataStore {
   // --- Get Questions Created by a Specific Author ---
   public getQuestionsByAuthor(authorId?: string): Question[] {
     const user = this.getCurrentUser();
-    const target = authorId || user.id;
+    if (authorId) {
+      const authorProf = this.profiles.find((p) => p.id === authorId);
+      return this.questions.filter(
+        (q) =>
+          q.author_id === authorId ||
+          (authorProf && q.author_name?.toLowerCase() === authorProf.display_name.toLowerCase())
+      );
+    }
+    const target = user.id;
     return this.questions.filter(
       (q) =>
         q.author_id === target ||
@@ -1575,16 +1589,27 @@ class DataStore {
 
   public getFriends(userId?: string): FriendUser[] {
     const targetId = userId || this.currentUserId;
-    if (targetId === "user-current") {
-      return this.friends;
+    if (!this.userFriends.has(targetId)) {
+      if (targetId === "user-current") {
+        this.userFriends.set(targetId, [...this.friends]);
+      } else {
+        this.userFriends.set(targetId, []);
+      }
     }
-    return this.userFriends.get(targetId) || [];
+    return this.userFriends.get(targetId)!;
+  }
+
+  public getIncomingFriendRequests(userId?: string): FriendUser[] {
+    return this.getFriends(userId).filter(
+      (f) => f.status === "pending_incoming" || f.status === "request_received"
+    );
   }
 
   public searchUsers(query: string, currentUserId?: string): (UserProfile & { isFriend: boolean; friendStatus?: string })[] {
     const q = query.trim().toLowerCase().replace(/^@/, "");
     if (!q) return [];
     const currId = currentUserId || this.currentUserId;
+    const userFriends = this.getFriends(currId);
 
     return this.profiles
       .filter((p) => p.id !== currId)
@@ -1593,7 +1618,7 @@ class DataStore {
         p.display_name.toLowerCase().includes(q)
       )
       .map((p) => {
-        const friend = this.friends.find((f) => f.id === p.id || f.username?.toLowerCase() === p.username.toLowerCase());
+        const friend = userFriends.find((f) => f.id === p.id || f.username?.toLowerCase() === p.username.toLowerCase());
         return {
           ...p,
           isFriend: friend?.status === "friend",
@@ -1620,8 +1645,10 @@ class DataStore {
       return { success: false, message: "You cannot add yourself as a study partner" };
     }
 
+    const userFriends = this.getFriends(userId);
+
     // 1. Check if already in friends list
-    const existing = this.friends.find(
+    const existing = userFriends.find(
       (f) =>
         f.id === targetUserIdOrName ||
         f.username?.toLowerCase() === query ||
@@ -1674,10 +1701,35 @@ class DataStore {
       status: "friend",
       last_active: "Active just now",
     };
-    this.friends.unshift(newFriend);
+    userFriends.unshift(newFriend);
+    if (userId === "user-current") {
+      this.friends = userFriends;
+    }
+
+    // Also add to recipient's friends list as incoming friend request
+    if (matchedProfile && matchedProfile.id !== userId) {
+      const recipientFriends = this.getFriends(matchedProfile.id);
+      const inRecipient = recipientFriends.find((f) => f.id === currentUser.id);
+      if (!inRecipient) {
+        recipientFriends.unshift({
+          id: currentUser.id,
+          display_name: currentUser.display_name,
+          username: currentUser.username,
+          avatar_url: currentUser.avatar_url,
+          streak_days: currentUser.current_streak,
+          target_exam: currentUser.target_exam || "Aspirant",
+          status: "pending_incoming",
+          last_active: "Active just now",
+        });
+        if (matchedProfile.id === "user-current") {
+          this.friends = recipientFriends;
+        }
+      }
+    }
+
     return {
       success: true,
-      message: `Friend request accepted! Now studying with @${newFriend.username}`,
+      message: `Friend request sent to @${newFriend.username}!`,
       friend: newFriend,
     };
   }
@@ -1687,15 +1739,37 @@ class DataStore {
     friendId: string,
     action: "accept" | "decline"
   ): { success: boolean; message: string } {
-    const friend = this.friends.find((f) => f.id === friendId);
+    const userFriends = this.getFriends(userId);
+    const friend = userFriends.find((f) => f.id === friendId);
     if (!friend) {
       return { success: false, message: "Request not found" };
     }
     if (action === "accept") {
       friend.status = "friend";
+      // Also ensure reciprocity
+      const otherFriends = this.getFriends(friendId);
+      const otherEntry = otherFriends.find((f) => f.id === userId);
+      if (otherEntry) {
+        otherEntry.status = "friend";
+      } else {
+        const userProf = this.profiles.find((p) => p.id === userId);
+        if (userProf) {
+          otherFriends.unshift({
+            id: userProf.id,
+            display_name: userProf.display_name,
+            username: userProf.username,
+            avatar_url: userProf.avatar_url,
+            streak_days: userProf.current_streak,
+            target_exam: userProf.target_exam || "Aspirant",
+            status: "friend",
+            last_active: "Active just now",
+          });
+        }
+      }
       return { success: true, message: `Accepted friend request from @${friend.username || friend.display_name}` };
     } else {
-      this.friends = this.friends.filter((f) => f.id !== friendId);
+      const idx = userFriends.findIndex((f) => f.id === friendId);
+      if (idx !== -1) userFriends.splice(idx, 1);
       return { success: true, message: `Declined friend request` };
     }
   }

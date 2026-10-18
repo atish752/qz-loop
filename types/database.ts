@@ -118,6 +118,7 @@ export interface UserProfile {
   today_solved_count: number;
   total_questions_answered?: number;
   overall_accuracy?: number;
+  onboarding_completed?: boolean;
   created_at: string;
 }
 
@@ -202,7 +203,7 @@ export interface FriendUser {
   avatar_url?: string;
   streak_days: number;
   target_exam: string;
-  status: 'friend' | 'request_sent' | 'request_received';
+  status: 'friend' | 'request_sent' | 'request_received' | 'pending_incoming';
   last_active?: string;
 }
 

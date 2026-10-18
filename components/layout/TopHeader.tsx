@@ -69,27 +69,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   return (
     <header className="sticky top-0 w-full z-40 bg-surface-container-lowest/90 backdrop-blur-md border-b border-surface-container-high/40 pt-safe">
       <div className="h-14 px-3 flex items-center justify-between">
-        {/* Brand & Exam Chip */}
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Brand Name Prominently Displayed */}
+        <div className="flex items-center gap-2.5 min-w-0">
           <Link href="/" className="flex items-center gap-2 group shrink-0">
             <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 shadow-xs border border-primary/20">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logo.jpg"
-                alt="Qz Loop Logo"
+                alt="Qz-loop Logo"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform"
               />
             </div>
-            <span className="text-primary font-headline-sm font-bold tracking-tight hidden xs:inline">Qz Loop</span>
+            <span className="text-primary text-lg xs:text-xl font-black tracking-tight">
+              Qz-loop
+            </span>
           </Link>
-          <button
-            onClick={onSelectExam}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors text-[11px] font-semibold truncate max-w-[150px] xs:max-w-[190px]"
-            title="Switch Target Exam"
-          >
-            <span className="truncate">{activeExamName}</span>
-            <span className="material-symbols-outlined text-[14px] shrink-0">expand_more</span>
-          </button>
         </div>
 
         {/* Right side: Language Switcher + WhatsApp Group + Dark Mode toggle + Streak + Auth / Profile Avatar */}

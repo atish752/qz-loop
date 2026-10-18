@@ -153,6 +153,8 @@ export const SocialView: React.FC = () => {
     }
   }, [messages, selectedFriend]);
 
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+
   // Search Users by unique username
   const handleSearchUsers = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,7 +163,12 @@ export const SocialView: React.FC = () => {
     setIsSearching(true);
     setHasSearched(true);
     try {
-      const res = await fetch(`/api/friends?search=${encodeURIComponent(searchQuery.trim())}`);
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const url = currentUid
+        ? `/api/friends?search=${encodeURIComponent(searchQuery.trim())}&userId=${encodeURIComponent(currentUid)}`
+        : `/api/friends?search=${encodeURIComponent(searchQuery.trim())}`;
+      const headers: Record<string, string> = currentUid ? { "x-user-id": currentUid } : {};
+      const res = await fetch(url, { headers });
       const data = await res.json();
       if (data.success) {
         setSearchResults(data.users || []);
@@ -180,10 +187,17 @@ export const SocialView: React.FC = () => {
     setAddStatus(null);
 
     try {
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       const res = await fetch("/api/friends", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: targetUsernameOrName.trim() }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
+        body: JSON.stringify({
+          target: targetUsernameOrName.trim(),
+          userId: currentUid || undefined,
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -208,20 +222,57 @@ export const SocialView: React.FC = () => {
     }
   };
 
+  // Accept or Decline Incoming Friend Request
+  const handleRespondFriendRequest = async (friendId: string, action: "accept" | "decline") => {
+    setRespondingId(friendId);
+    try {
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const res = await fetch("/api/friends", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
+        body: JSON.stringify({
+          friendId,
+          action,
+          userId: currentUid || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (action === "accept") {
+          confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+        }
+        loadFriendsAndMessages();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setRespondingId(null);
+    }
+  };
+
+
   // Send Direct Chat Message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInputText.trim() || !selectedFriend) return;
 
     const text = chatInputText.trim();
+    const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
     setChatInputText("");
     setIsSendingMessage(true);
 
     try {
       const res = await fetch("/api/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
         body: JSON.stringify({
+          fromUserId: currentUid || undefined,
           toUserId: selectedFriend.id,
           text,
         }),
@@ -261,10 +312,15 @@ export const SocialView: React.FC = () => {
     setShowQuickShareModal(false);
 
     try {
+      const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
       const res = await fetch("/api/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
         body: JSON.stringify({
+          fromUserId: currentUid || undefined,
           toUserId: selectedFriend.id,
           text: `Can you solve this ${question.subject_name || "General"} quiz? Check your speed!`,
           questionId: question.id,
@@ -966,71 +1022,133 @@ export const SocialView: React.FC = () => {
               </div>
             )}
 
-            {/* My Friends List */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between px-1">
-                <span className="font-label-sm text-label-sm text-secondary uppercase font-bold tracking-wider">
-                  {t.myStudyFriends || "My Study Friends"} ({friends.length})
-                </span>
-                <span className="text-[11px] text-secondary font-medium">{t.verifiedAspirants || "Verified Aspirants"}</span>
-              </div>
-
-              {friends.length === 0 ? (
-                <div className="p-8 rounded-2xl bg-surface-container-low text-center text-xs text-secondary border border-surface-container-high/40">
-                  {t.noFriendsConnectedYet || "You have not connected with any friends yet. Use the username search above!"}
-                </div>
-              ) : (
-                friends.map((friend) => (
-                  <div
-                    key={friend.id}
-                    className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-3 shadow-xs hover:bg-surface-container transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high shrink-0">
-                        {friend.avatar_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={friend.avatar_url} alt={friend.display_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center font-bold text-primary text-sm">
-                            {friend.display_name.charAt(0)}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-sm text-on-surface truncate">
-                            {friend.display_name}
-                          </span>
-                          <span className="text-[10px] text-tertiary font-bold">
-                            🔥 {friend.streak_days}d
-                          </span>
-                        </div>
-                        <span className="text-xs text-primary font-bold">
-                          @{friend.username}
-                        </span>
-                        <span className="text-[11px] text-secondary truncate mt-0.5">
-                          {friend.target_exam}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => {
-                          setSelectedFriend(friend);
-                          setActiveTab("chat");
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container active:scale-95 transition-all shadow-xs flex items-center gap-1"
-                        title={t.chatSubTab || "Chat"}
-                      >
-                        <span className="material-symbols-outlined text-[15px]">chat</span>
-                        <span>{t.chatSubTab || "Chat"}</span>
-                      </button>
-                    </div>
+            {/* Incoming Friend Requests */}
+            {(() => {
+              const incomingRequests = friends.filter((f) => f.status === "pending_incoming" || f.status === "request_received");
+              if (incomingRequests.length === 0) return null;
+              return (
+                <div className="flex flex-col gap-2 mb-3 animate-in fade-in">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="font-label-sm text-label-sm text-primary uppercase font-bold tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">person_add</span>
+                      <span>{lang === "hi" ? "आने वाले मित्रता अनुरोध" : "Incoming Friend Requests"} ({incomingRequests.length})</span>
+                    </span>
                   </div>
-                ))
-              )}
-            </div>
+                  {incomingRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="p-3.5 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between gap-3 shadow-xs"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-primary/30 shrink-0">
+                          {req.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={req.avatar_url} alt={req.display_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center font-bold text-primary text-sm">
+                              {req.display_name.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold text-sm text-on-surface truncate">{req.display_name}</span>
+                          <span className="text-xs text-primary font-bold">@{req.username}</span>
+                          <span className="text-[11px] text-secondary truncate">{req.target_exam}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleRespondFriendRequest(req.id, "accept")}
+                          disabled={respondingId === req.id}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">check</span>
+                          <span>{lang === "hi" ? "स्वीकार" : "Accept"}</span>
+                        </button>
+                        <button
+                          onClick={() => handleRespondFriendRequest(req.id, "decline")}
+                          disabled={respondingId === req.id}
+                          className="px-2.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:text-error hover:bg-surface-container-high font-semibold text-xs transition-all"
+                        >
+                          <span>{lang === "hi" ? "हटाएं" : "Decline"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* My Friends List */}
+            {(() => {
+              const acceptedFriends = friends.filter((f) => f.status !== "pending_incoming" && f.status !== "request_received");
+              return (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="font-label-sm text-label-sm text-secondary uppercase font-bold tracking-wider">
+                      {t.myStudyFriends || "My Study Friends"} ({acceptedFriends.length})
+                    </span>
+                    <span className="text-[11px] text-secondary font-medium">{t.verifiedAspirants || "Verified Aspirants"}</span>
+                  </div>
+
+                  {acceptedFriends.length === 0 ? (
+                    <div className="p-8 rounded-2xl bg-surface-container-low text-center text-xs text-secondary border border-surface-container-high/40">
+                      {t.noFriendsConnectedYet || "You have not connected with any friends yet. Use the username search above!"}
+                    </div>
+                  ) : (
+                    acceptedFriends.map((friend) => (
+                      <div
+                        key={friend.id}
+                        className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-3 shadow-xs hover:bg-surface-container transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high shrink-0">
+                            {friend.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={friend.avatar_url} alt={friend.display_name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center font-bold text-primary text-sm">
+                                {friend.display_name.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-sm text-on-surface truncate">
+                                {friend.display_name}
+                              </span>
+                              <span className="text-[10px] text-tertiary font-bold">
+                                🔥 {friend.streak_days}d
+                              </span>
+                            </div>
+                            <span className="text-xs text-primary font-bold">
+                              @{friend.username}
+                            </span>
+                            <span className="text-[11px] text-secondary truncate mt-0.5">
+                              {friend.target_exam}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              setSelectedFriend(friend);
+                              setActiveTab("chat");
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container active:scale-95 transition-all shadow-xs flex items-center gap-1"
+                            title={t.chatSubTab || "Chat"}
+                          >
+                            <span className="material-symbols-outlined text-[15px]">chat</span>
+                            <span>{t.chatSubTab || "Chat"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

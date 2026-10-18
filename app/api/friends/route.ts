@@ -5,7 +5,10 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
-    const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id");
+    const cookieUserId = request.cookies.get("qz_user_id")?.value;
+    const requestedUserId =
+      searchParams.get("userId") || request.headers.get("x-user-id") || cookieUserId;
+
     if (!requestedUserId || requestedUserId === "guest") {
       return NextResponse.json({ success: true, friends: [], isGuest: true });
     }
@@ -30,8 +33,11 @@ export async function POST(request: NextRequest) {
     if (!target) {
       return NextResponse.json({ success: false, error: "Friend username or ID is required" }, { status: 400 });
     }
-    const currentUser = db.getCurrentUser();
-    const result = db.sendFriendRequest(currentUser.id, target);
+    const cookieUserId = request.cookies.get("qz_user_id")?.value;
+    const currentUserId =
+      body.userId || request.headers.get("x-user-id") || cookieUserId || db.getCurrentUser().id;
+
+    const result = db.sendFriendRequest(currentUserId, target);
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.message }, { status: 400 });
     }
@@ -49,11 +55,15 @@ export async function PATCH(request: NextRequest) {
     if (!friendId || (action !== "accept" && action !== "decline")) {
       return NextResponse.json({ success: false, error: "Valid friendId and action are required" }, { status: 400 });
     }
-    const currentUser = db.getCurrentUser();
-    const result = db.respondFriendRequest(currentUser.id, friendId, action);
+    const cookieUserId = request.cookies.get("qz_user_id")?.value;
+    const currentUserId =
+      body.userId || request.headers.get("x-user-id") || cookieUserId || db.getCurrentUser().id;
+
+    const result = db.respondFriendRequest(currentUserId, friendId, action);
     return NextResponse.json(result);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to update friend request";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
+

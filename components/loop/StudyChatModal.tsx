@@ -43,12 +43,17 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
     e.preventDefault();
     if (!inputText.trim()) return;
 
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
     setIsSending(true);
     try {
       const res = await fetch("/api/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
         body: JSON.stringify({
+          fromUserId: currentUid || undefined,
           toUserId: friend.id,
           text: inputText.trim(),
         }),
@@ -109,7 +114,8 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
         {/* Messages Stream */}
         <div className="flex-1 overflow-y-auto no-scrollbar py-3 flex flex-col gap-3">
           {messages.map((m) => {
-            const isMe = m.from_user_id === "user-current";
+            const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+            const isMe = currentUid ? m.from_user_id === currentUid : m.from_user_id === "user-current";
             return (
               <div
                 key={m.id}

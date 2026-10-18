@@ -88,8 +88,8 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   }, [preferredLanguage, question]);
 
   // Quality peer verification votes
-  const [upvotes, setUpvotes] = useState<number>(question.quality_upvotes || 94);
-  const [downvotes, setDownvotes] = useState<number>(question.quality_downvotes || 2);
+  const [upvotes, setUpvotes] = useState<number>(question.quality_upvotes || 0);
+  const [downvotes, setDownvotes] = useState<number>(question.quality_downvotes || 0);
   const [userQualityVote, setUserQualityVote] = useState<"up" | "down" | null>(null);
 
   // Quick Save Toast
@@ -137,8 +137,8 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
   // Social interactions (Likes, Comments count, Saved status)
   const [isLiked, setIsLiked] = useState<boolean>(false);
-  const [likesCount, setLikesCount] = useState<number>(38);
-  const [commentsCount, setCommentsCount] = useState<number>(14);
+  const [likesCount, setLikesCount] = useState<number>(0);
+  const [commentsCount, setCommentsCount] = useState<number>(0);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
 
@@ -148,7 +148,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
     correctAttempts: initialAnswerRecord?.metrics?.correctAttempts ?? question.correct_attempts,
     avgTimeSec:
       initialAnswerRecord?.metrics?.avgTimeSec ??
-      (question.total_attempts > 0 ? Math.round(question.total_time_ms / question.total_attempts / 1000) : 15),
+      (question.total_attempts > 0 ? Math.round(question.total_time_ms / question.total_attempts / 1000) : 0),
     fastestSec:
       initialAnswerRecord?.metrics?.fastestSec ??
       (question.fastest_correct_ms ? Number((question.fastest_correct_ms / 1000).toFixed(1)) : null),
@@ -174,7 +174,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Load question like status, repeat preference and quality vote
+  // Load question like status, comment count, and quality vote
   useEffect(() => {
     fetch(`/api/questions/like?questionId=${question.id}`)
       .then((res) => res.json())
@@ -182,6 +182,15 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         if (data.success) {
           setIsLiked(data.liked);
           setLikesCount(data.totalLikes);
+        }
+      })
+      .catch(() => {});
+
+    fetch(`/api/comments?questionId=${question.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.comments)) {
+          setCommentsCount(data.comments.length);
         }
       })
       .catch(() => {});
@@ -600,56 +609,67 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           </div>
         </div>
 
-        {/* Question Statement (Scrollable independently if large, perfectly centered if short) */}
-        <div
-          data-reel-scrollable="true"
-          className={`overflow-y-auto overscroll-contain no-scrollbar my-auto py-1 ${
-            showOptions || isAnswered ? "max-h-[34vh]" : "max-h-[58vh]"
-          } mb-2.5`}
-        >
-          <h2 className="text-lg sm:text-xl font-bold text-on-surface tracking-tight leading-snug">
-            {activeQuestionText}
-          </h2>
-        </div>
+        {/* Question Statement (Scrollable independently if large, perfectly centered vertically if short) */}
+        {(() => {
+          const qLen = (activeQuestionText || "").length;
+          const qFontClass =
+            qLen < 80
+              ? "text-xl sm:text-2xl font-bold"
+              : qLen < 180
+              ? "text-base sm:text-lg font-bold"
+              : qLen < 320
+              ? "text-sm sm:text-base font-semibold leading-relaxed"
+              : "text-xs sm:text-sm font-medium leading-relaxed";
 
-        {/* Community Performance Metrics Bar - Exactly Two Lines on Mobile */}
+          return (
+            <div
+              data-reel-scrollable="true"
+              className={`overflow-y-auto overscroll-contain no-scrollbar py-2 my-auto flex flex-col justify-center ${
+                showOptions || isAnswered
+                  ? "max-h-[30vh] mb-2"
+                  : "flex-1 min-h-[32vh] mb-3"
+              }`}
+            >
+              <h2
+                className={`${qFontClass} text-on-surface tracking-tight leading-snug ${
+                  !showOptions && !isAnswered ? "text-center my-auto" : "my-auto"
+                }`}
+              >
+                {activeQuestionText}
+              </h2>
+            </div>
+          );
+        })()}
+
+        {/* Community Performance Metrics Bar - Real Baseline 0 Data */}
         <div className="mb-2.5 shrink-0">
           <div className="bg-surface-container-low px-3 py-2 rounded-xl border border-surface-container-high/40 flex flex-col gap-1 shadow-xs">
-            {metrics.attempts > 0 ? (
-              <>
-                {/* Line 1: Attempts + Accuracy */}
-                <div className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1.5 font-medium text-on-surface">
-                    <span className="material-symbols-outlined text-[15px] text-primary">groups</span>
-                    <span>{metrics.attempts.toLocaleString()} {t.attempts || "attempts"}</span>
-                  </span>
-                  <span className="flex items-center gap-1.5 font-bold text-tertiary">
-                    <span className="material-symbols-outlined text-[15px]">target</span>
-                    <span>{accuracyPercentage}% {t.accuracy || "acc"}</span>
-                  </span>
-                </div>
-                {/* Line 2: Avg Speed + Fastest Speed */}
-                <div className="flex items-center justify-between text-[11px] text-secondary border-t border-surface-container-high/30 pt-1">
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">speed</span>
-                    <span>{metrics.avgTimeSec}s {t.avgSpeed || "avg speed"}</span>
-                  </span>
-                  <span className="flex items-center gap-1 text-primary font-semibold">
-                    <span className="material-symbols-outlined text-[14px]">bolt</span>
-                    <span>{metrics.fastestSec ? `${metrics.fastestSec}s` : "—"} {t.fastest || "fastest"}</span>
-                  </span>
-                </div>
-              </>
-            ) : (
-              <span className="text-secondary italic text-xs flex items-center justify-center gap-1.5 py-0.5">
-                <span className="material-symbols-outlined text-[15px] text-primary">emoji_events</span>
-                <span>{t.beFirstToSolve}</span>
+            {/* Line 1: Attempts + Accuracy */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-medium text-on-surface">
+                <span className="material-symbols-outlined text-[15px] text-primary">groups</span>
+                <span>{metrics.attempts.toLocaleString()} {t.attempts || "attempts"}</span>
               </span>
-            )}
+              <span className="flex items-center gap-1.5 font-bold text-tertiary">
+                <span className="material-symbols-outlined text-[15px]">target</span>
+                <span>{accuracyPercentage}% {t.accuracy || "acc"}</span>
+              </span>
+            </div>
+            {/* Line 2: Avg Speed + Fastest Speed */}
+            <div className="flex items-center justify-between text-[11px] text-secondary border-t border-surface-container-high/30 pt-1">
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">speed</span>
+                <span>{metrics.avgTimeSec}s {t.avgSpeed || "avg speed"}</span>
+              </span>
+              <span className="flex items-center gap-1 text-primary font-semibold">
+                <span className="material-symbols-outlined text-[14px]">bolt</span>
+                <span>{metrics.fastestSec ? `${metrics.fastestSec}s` : "0s"} {t.fastest || "fastest"}</span>
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Options Stack / Answering Area */}
+        {/* Options Stack / Answering Area (Scrollable if options are long) */}
         <div className="shrink-0">
           {!showOptions && !isAnswered ? (
             <button
@@ -662,7 +682,10 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               <span>{t.answerQuestion}</span>
             </button>
           ) : (
-            <div className="flex flex-col gap-2 animate-in fade-in duration-200">
+            <div
+              data-reel-scrollable="true"
+              className="flex flex-col gap-2 animate-in fade-in duration-200 max-h-[38vh] overflow-y-auto overscroll-contain no-scrollbar"
+            >
               {question.options.map((opt) => {
                 const isSelected = selectedOptionId === opt.id;
                 const isTheCorrectOne = correctOptionId === opt.id;
@@ -689,6 +712,14 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                   }
                 }
 
+                const optText = activeOptText(opt);
+                const optFont =
+                  optText.length > 90
+                    ? "text-[11px] leading-tight"
+                    : optText.length > 45
+                    ? "text-xs leading-snug"
+                    : "text-xs sm:text-sm font-medium leading-snug";
+
                 return (
                   <button
                     key={opt.id}
@@ -702,7 +733,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                       >
                         {opt.id}
                       </span>
-                      <span className="text-sm font-medium leading-snug">{activeOptText(opt)}</span>
+                      <span className={optFont}>{optText}</span>
                     </div>
 
                     {isAnswered && iconName && (

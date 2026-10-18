@@ -872,8 +872,138 @@ async function runTests() {
   const layoutFile = fs.readFileSync(path.join(__dirname, "../app/layout.tsx"), "utf8");
   assert(layoutFile.includes("<AuthSync />"), "RootLayout actively mounts <AuthSync /> on every application page");
 
+  // Scenario 48: Onboarding Persistence & Single-Session Guard
+  console.log("\n[Scenario 48] Onboarding Persistence & Single-Session Guard");
+  const newOnboardingUser = db.signUpUser({
+    display_name: "Ramesh Verma",
+    username: "ramesh_railway",
+    target_exam: "Railways (RRB NTPC & Group D)",
+    preferred_examination_id: "exam-railway-ntpc",
+  });
+  assert(newOnboardingUser.onboarding_completed === true, "New user signed up has onboarding_completed: true");
+
+  const syncedOnboardingUser = db.syncUserFromAuth({
+    id: "user-synced-cloud",
+    display_name: "Cloud User",
+    username: "cloud_user",
+    onboarding_completed: true,
+  });
+  assert(syncedOnboardingUser.onboarding_completed === true, "Auth sync preserves onboarding_completed: true");
+
+  const seedCurrent = db.getProfileById("user-current");
+  assert(seedCurrent?.onboarding_completed === true, "Seed profiles have onboarding_completed: true");
+
+  const onboardingModalFile = fs.readFileSync(path.join(__dirname, "../components/auth/UsernameOnboardingModal.tsx"), "utf8");
+  assert(onboardingModalFile.includes("qz_onboarding_completed"), "UsernameOnboardingModal checks qz_onboarding_completed in localStorage");
+  assert(onboardingModalFile.includes("data.user.onboarding_completed"), "UsernameOnboardingModal checks data.user.onboarding_completed");
+  assert(onboardingModalFile.includes("qz_auth_changed"), "UsernameOnboardingModal listens to qz_auth_changed");
+
+  // Scenario 49: Author ID Preservation & Feed Community Prioritization
+  console.log("\n[Scenario 49] Author ID Preservation & Feed Community Prioritization");
+  const specificAuthorId = "user-creator-789";
+  const authoredQ = db.createQuestion({
+    authorId: specificAuthorId,
+    subjectId: "subj-gk",
+    questionText: "What is the capital of Jharkhand state in India?",
+    options: [
+      { id: "A", text: "Ranchi" },
+      { id: "B", text: "Patna" },
+      { id: "C", text: "Jamshedpur" },
+      { id: "D", text: "Dhanbad" },
+    ],
+    correctOptionId: "A",
+  });
+  assert(authoredQ.author_id === specificAuthorId, "Question created with explicit authorId preserves author_id");
+
+  const authorQuestions = db.getQuestionsByAuthor(specificAuthorId);
+  assert(authorQuestions.some((q) => q.id === authoredQ.id), "getQuestionsByAuthor retrieves question by author ID");
+
+  const feedForAuthor = db.getFeedQuestions({ userId: specificAuthorId, limit: 10 });
+  assert(feedForAuthor.some((q) => q.id === authoredQ.id), "Authored question appears in feed for author");
+  assert(feedForAuthor[0].id === authoredQ.id, "Newly authored question is prioritized at index 0 in the feed");
+
+  // Scenario 50: 0-Baseline Real Community Metrics Guarantee
+  console.log("\n[Scenario 50] 0-Baseline Real Community Metrics Guarantee");
+  const cleanBaselineQ = db.getQuestionById("q-math-1");
+  assert(cleanBaselineQ?.total_attempts === 0, "Seed question total_attempts is 0");
+  assert(cleanBaselineQ?.correct_attempts === 0, "Seed question correct_attempts is 0");
+  assert(cleanBaselineQ?.total_time_ms === 0, "Seed question total_time_ms is 0");
+  assert(cleanBaselineQ?.quality_upvotes === 0, "Seed question quality_upvotes is 0");
+
+  const questionCardFile = fs.readFileSync(path.join(__dirname, "../components/loop/QuestionReelCard.tsx"), "utf8");
+  assert(questionCardFile.includes("metrics.attempts.toLocaleString()"), "QuestionReelCard displays real numerical attempts");
+  assert(questionCardFile.includes("accuracyPercentage"), "QuestionReelCard displays real accuracy percentage");
+  assert(questionCardFile.includes("metrics.avgTimeSec"), "QuestionReelCard displays real average solve speed");
+  assert(questionCardFile.includes("metrics.fastestSec ? `${metrics.fastestSec}s` : \"0s\""), "QuestionReelCard displays 0s baseline fastest solve");
+
+  // Scenario 51: Mutual Friendship Workflow & Study Chat Sender Attribution
+  console.log("\n[Scenario 51] Mutual Friendship Workflow & Study Chat Sender Attribution");
+  const studentA = db.signUpUser({ display_name: "Student Alpha", username: "student_alpha" });
+  const studentB = db.signUpUser({ display_name: "Student Beta", username: "student_beta" });
+  const studentAId = studentA.id;
+  const studentBId = studentB.id;
+
+  const sendResult = db.sendFriendRequest(studentAId, studentBId);
+  assert(sendResult.success === true, "Student A successfully sends friend request to Student B");
+
+  const bIncoming = db.getIncomingFriendRequests(studentBId);
+  assert(bIncoming.some((r) => r.id === studentAId), "Student B sees Student A in incoming friend requests");
+
+  const acceptResult = db.respondFriendRequest(studentBId, studentAId, "accept");
+  assert(acceptResult.success === true, "Student B successfully accepts Student A's friend request");
+
+  const aFriends = db.getFriends(studentAId);
+  const bFriends = db.getFriends(studentBId);
+  assert(aFriends.some((f) => f.id === studentBId && f.status === "friend"), "Student B is mutual friend of Student A");
+  assert(bFriends.some((f) => f.id === studentAId && f.status === "friend"), "Student A is mutual friend of Student B");
+
+  const sentMessage = db.sendMessage({
+    fromUserId: studentAId,
+    toUserId: studentBId,
+    text: "Hey, try this tricky polity question!",
+    questionId: authoredQ.id,
+  });
+  assert(sentMessage.from_user_id === studentAId, "Study chat message has correct from_user_id");
+  assert(sentMessage.to_user_id === studentBId, "Study chat message has correct to_user_id");
+  assert(sentMessage.question_id === authoredQ.id, "Study chat message embeds shared question ID");
+
+  const studyChatFile = fs.readFileSync(path.join(__dirname, "../components/loop/StudyChatModal.tsx"), "utf8");
+  assert(studyChatFile.includes("currentUid ? m.from_user_id === currentUid : m.from_user_id === \"user-current\""), "StudyChatModal uses dynamic user ID attribution instead of hardcoded user-current");
+
+  // Scenario 52: 'Others' Custom Topic & Simplified Village Question Creation
+  console.log("\n[Scenario 52] 'Others' Custom Topic & Simplified Village Question Creation");
+  const s52GkTopics = getTopicsForSubject("gk");
+  const s52MathTopics = getTopicsForSubject("maths");
+  const s52BioTopics = getTopicsForSubject("biology");
+  assert(s52GkTopics.includes("Others"), "GK topics include 'Others' option");
+  assert(s52MathTopics.includes("Others"), "Maths topics include 'Others' option");
+  assert(s52BioTopics.includes("Others"), "Biology topics include 'Others' option");
+
+  const customQ = db.createQuestion({
+    subjectId: "subj-gk",
+    questionText: "What is the ancient name of Patna city in Bihar?",
+    targetTopic: "प्राचीन भारतीय इतिहास",
+    syllabusTag: "Bihar History",
+    options: [
+      { id: "A", text: "Pataliputra" },
+      { id: "B", text: "Magadha" },
+      { id: "C", text: "Vaishali" },
+      { id: "D", text: "Anga" },
+    ],
+    correctOptionId: "A",
+  });
+  assert(Boolean(customQ.syllabus_tag?.includes("प्राचीन भारतीय इतिहास")), "Custom topic is preserved in syllabus_tag");
+
+  const createViewFile = fs.readFileSync(path.join(__dirname, "../components/create/CreateQuestionView.tsx"), "utf8");
+  assert(createViewFile.includes("targetTopic === \"Others\""), "CreateQuestionView renders custom topic input when 'Others' selected");
+  assert(createViewFile.includes("Easy 3-Step Question Maker"), "CreateQuestionView renders simplified 3-step beginner guide");
+
+  const topHeaderFile = fs.readFileSync(path.join(__dirname, "../components/layout/TopHeader.tsx"), "utf8");
+  assert(topHeaderFile.includes("Qz-loop"), "TopHeader displays prominent brand name 'Qz-loop'");
+  assert(!topHeaderFile.includes("onClick={onSelectExam}"), "TopHeader has removed exam switcher button from JSX");
+
   console.log("\n=================================================");
-  console.log("   ALL 47 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 52 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

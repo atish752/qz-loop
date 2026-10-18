@@ -121,46 +121,41 @@ export const SUBJECT_TOPICS_MAP: Record<string, string[]> = {
 };
 
 export function getTopicsForSubject(subjectSlug?: string, subjectName?: string): string[] {
-  if (!subjectSlug && !subjectName) {
-    return SUBJECT_TOPICS_MAP.gk;
+  let list = SUBJECT_TOPICS_MAP.gk;
+
+  if (subjectSlug || subjectName) {
+    const slug = (subjectSlug || "").toLowerCase();
+    const name = (subjectName || "").toLowerCase();
+
+    if (slug.includes("math") || name.includes("math") || name.includes("quant") || name.includes("numerical")) {
+      list = SUBJECT_TOPICS_MAP.maths;
+    } else if (slug.includes("reas") || name.includes("reas") || name.includes("intelligence") || name.includes("mental")) {
+      list = SUBJECT_TOPICS_MAP.reasoning;
+    } else if (slug.includes("eng") || name.includes("eng") || name.includes("comprehension")) {
+      list = SUBJECT_TOPICS_MAP.english;
+    } else if (slug.includes("bio") || name.includes("bio") || name.includes("botany") || name.includes("zoology")) {
+      list = SUBJECT_TOPICS_MAP.biology;
+    } else if (slug.includes("phy") || name.includes("phy")) {
+      list = SUBJECT_TOPICS_MAP.physics;
+    } else if (slug.includes("chem") || name.includes("chem")) {
+      list = SUBJECT_TOPICS_MAP.chemistry;
+    } else if (slug.includes("hindi") || name.includes("hindi")) {
+      list = SUBJECT_TOPICS_MAP.hindi;
+    } else if (slug.includes("state") || name.includes("state")) {
+      list = SUBJECT_TOPICS_MAP["state-gk"];
+    } else if (slug.includes("sci") || name.includes("sci")) {
+      list = SUBJECT_TOPICS_MAP.science;
+    } else if (slug.includes("affair") || name.includes("affair") || name.includes("current")) {
+      list = SUBJECT_TOPICS_MAP["current-affairs"];
+    } else if (slug.includes("gk") || name.includes("gk") || name.includes("general") || name.includes("awareness") || name.includes("polity") || name.includes("history")) {
+      list = SUBJECT_TOPICS_MAP.gk;
+    } else if (SUBJECT_TOPICS_MAP[slug]) {
+      list = SUBJECT_TOPICS_MAP[slug];
+    }
   }
 
-  const slug = (subjectSlug || "").toLowerCase();
-  const name = (subjectName || "").toLowerCase();
-
-  if (slug.includes("math") || name.includes("math") || name.includes("quant") || name.includes("numerical")) {
-    return SUBJECT_TOPICS_MAP.maths;
+  if (!list.includes("Others")) {
+    return [...list, "Others"];
   }
-  if (slug.includes("reas") || name.includes("reas") || name.includes("intelligence") || name.includes("mental")) {
-    return SUBJECT_TOPICS_MAP.reasoning;
-  }
-  if (slug.includes("eng") || name.includes("eng") || name.includes("comprehension")) {
-    return SUBJECT_TOPICS_MAP.english;
-  }
-  if (slug.includes("bio") || name.includes("bio") || name.includes("botany") || name.includes("zoology")) {
-    return SUBJECT_TOPICS_MAP.biology;
-  }
-  if (slug.includes("phy") || name.includes("phy")) {
-    return SUBJECT_TOPICS_MAP.physics;
-  }
-  if (slug.includes("chem") || name.includes("chem")) {
-    return SUBJECT_TOPICS_MAP.chemistry;
-  }
-  if (slug.includes("hindi") || name.includes("hindi")) {
-    return SUBJECT_TOPICS_MAP.hindi;
-  }
-  if (slug.includes("state") || name.includes("state")) {
-    return SUBJECT_TOPICS_MAP["state-gk"];
-  }
-  if (slug.includes("sci") || name.includes("sci")) {
-    return SUBJECT_TOPICS_MAP.science;
-  }
-  if (slug.includes("affair") || name.includes("affair") || name.includes("current")) {
-    return SUBJECT_TOPICS_MAP["current-affairs"];
-  }
-  if (slug.includes("gk") || name.includes("gk") || name.includes("general") || name.includes("awareness") || name.includes("polity") || name.includes("history")) {
-    return SUBJECT_TOPICS_MAP.gk;
-  }
-
-  return SUBJECT_TOPICS_MAP[slug] || SUBJECT_TOPICS_MAP.gk;
+  return list;
 }

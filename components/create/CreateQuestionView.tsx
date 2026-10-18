@@ -123,6 +123,7 @@ export const CreateQuestionView: React.FC = () => {
   const [selectedExamId, setSelectedExamId] = useState<string>("exam-railway-ntpc");
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("subj-rrb-maths");
   const [targetTopic, setTargetTopic] = useState<string>("Percentage, Profit & Loss");
+  const [customTopic, setCustomTopic] = useState<string>("");
   const [syllabusTag, setSyllabusTag] = useState<string>("");
   const [pyqInfo, setPyqInfo] = useState<string>("");
   const [questionText, setQuestionText] = useState<string>("");
@@ -519,6 +520,9 @@ export const CreateQuestionView: React.FC = () => {
         },
       ];
 
+      const uid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
+      const effectiveTopic = targetTopic === "Others" && customTopic.trim() ? customTopic.trim() : targetTopic.trim();
+
       const payload = {
         examinationId: effectiveExamId,
         subjectId: currentSubjectObj.id,
@@ -531,8 +535,9 @@ export const CreateQuestionView: React.FC = () => {
         hindiExplanation: hindiExplanation.trim() || undefined,
         difficulty,
         syllabusTag: syllabusTag.trim() || undefined,
-        targetTopic: targetTopic.trim() || undefined,
+        targetTopic: effectiveTopic || undefined,
         pyqInfo: pyqInfo.trim() || undefined,
+        authorId: uid || undefined,
       };
 
       const url = isEditMode ? `/api/questions/${editId}` : "/api/questions/create";
@@ -540,7 +545,10 @@ export const CreateQuestionView: React.FC = () => {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(uid ? { "x-user-id": uid } : {}),
+        },
         body: JSON.stringify(payload),
       });
 
@@ -550,6 +558,9 @@ export const CreateQuestionView: React.FC = () => {
         setPublishSuccess(true);
         if (typeof window !== "undefined") {
           localStorage.removeItem(LOCAL_STORAGE_DRAFT_KEY);
+          window.dispatchEvent(
+            new CustomEvent("qz_question_created", { detail: { question: data.question } })
+          );
         }
       } else {
         setErrorMsg(data.error || "Failed to save question");
@@ -944,6 +955,23 @@ export const CreateQuestionView: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handlePublish} className="flex flex-col gap-4">
+                {/* Village / Rural Friendly Simple Step-by-Step Guide */}
+                <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-primary text-on-primary flex items-center justify-center font-bold text-xs shrink-0">
+                    💡
+                  </div>
+                  <div className="text-xs text-on-surface leading-tight">
+                    <strong className="text-primary font-bold block mb-0.5">
+                      {lang === "hi" ? "आसान 3-स्टेप्स में प्रश्न बनाएं:" : "Easy 3-Step Question Maker:"}
+                    </strong>
+                    <span className="text-secondary text-[11px]">
+                      {lang === "hi"
+                        ? "1. विषय व टॉपिक चुनें · 2. प्रश्न व 4 विकल्प लिखें · 3. सही उत्तर (A/B/C/D) चुनें और पब्लिश करें!"
+                        : "1. Select Subject & Topic · 2. Write Question & 4 Options · 3. Pick Correct Option (A/B/C/D) & Publish!"}
+                    </span>
+                  </div>
+                </div>
+
                 {/* Auto Target Examination Info Badge (from Profile) */}
                 <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 shadow-xs">
                   <div className="flex items-center gap-3 min-w-0">
@@ -1046,6 +1074,21 @@ export const CreateQuestionView: React.FC = () => {
                         </option>
                       ))}
                     </select>
+
+                    {targetTopic === "Others" && (
+                      <div className="mt-2 animate-in fade-in">
+                        <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
+                          {lang === "hi" ? "कस्टम टॉपिक का नाम लिखें (वैकल्पिक)" : "Specify Topic Name (Optional)"}
+                        </label>
+                        <input
+                          type="text"
+                          value={customTopic}
+                          onChange={(e) => setCustomTopic(e.target.value)}
+                          placeholder={lang === "hi" ? "उदा. आधुनिक भारत का इतिहास, लाभ-हानि शॉर्टकट" : "e.g. Modern Indian History, Percentage Shortcuts"}
+                          className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    )}
                   </div>
                 </section>
 

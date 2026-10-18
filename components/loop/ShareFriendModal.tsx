@@ -28,7 +28,10 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/friends")
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const url = currentUid ? `/api/friends?userId=${encodeURIComponent(currentUid)}` : "/api/friends";
+      const headers: Record<string, string> = currentUid ? { "x-user-id": currentUid } : {};
+      fetch(url, { headers })
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.friends) {
@@ -43,11 +46,16 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
 
   const handleSendToFriend = async (friend: FriendUser) => {
     try {
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       setSentMap((prev) => ({ ...prev, [friend.id]: true }));
       await fetch("/api/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
         body: JSON.stringify({
+          fromUserId: currentUid || undefined,
           toUserId: friend.id,
           text: `Check out this ${question.subject_name || "General"} question on Qz Loop: "${question.question_text.substring(0, 60)}..."`,
           questionId: question.id,
@@ -63,14 +71,21 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
     setIsAdding(true);
     setAddStatusMsg(null);
     try {
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       const res = await fetch("/api/friends", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: addFriendInput }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
+        body: JSON.stringify({
+          target: addFriendInput.trim(),
+          userId: currentUid || undefined,
+        }),
       });
       const data = await res.json();
       if (data.success) {
-        setAddStatusMsg(data.message || "Friend added!");
+        setAddStatusMsg(data.message || "Friend request sent!");
         setAddFriendInput("");
         if (data.friend) {
           setFriends((prev) => [data.friend, ...prev.filter((f) => f.id !== data.friend.id)]);

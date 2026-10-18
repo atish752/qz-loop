@@ -152,6 +152,9 @@ export async function GET(request: Request) {
           avatar_url: existingProfile?.avatar_url || avatar,
           target_exam: existingProfile?.target_exam || "Railways (RRB NTPC & Group D)",
           preferred_examination_id: existingProfile?.preferred_examination_id || "exam-railway-ntpc",
+          email: existingProfile?.email || email,
+          language_preference: existingProfile?.language_preference || "en",
+          onboarding_completed: existingProfile?.onboarding_completed ?? (existingProfile ? true : false),
         });
 
         // 3. Return client bridge HTML that instantly populates localStorage & dispatches event
@@ -199,7 +202,7 @@ export async function GET(request: Request) {
       var profileData = ${JSON.stringify(syncedUser)};
       localStorage.setItem("qz_user_id", uid);
       localStorage.setItem("qz_auth_user", JSON.stringify(profileData));
-      ${isNewUser ? 'localStorage.setItem("qz_just_signed_up", "true");' : ""}
+      ${!isNewUser ? 'localStorage.setItem("qz_onboarding_completed", "true");\n      localStorage.setItem("qz_details_submitted", "true");' : 'localStorage.setItem("qz_just_signed_up", "true");'}
       document.cookie = "qz_user_id=" + uid + "; path=/; max-age=2592000; SameSite=Lax";
       window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: profileData } }));
     } catch(err) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/data/store";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,6 +43,26 @@ export async function POST(request: NextRequest) {
       email,
       language_preference: lang,
     });
+
+    // Cloud sync to Supabase profiles table
+    try {
+      const supabase = await createServerSupabaseClient();
+      if (supabase && newUser) {
+        await supabase.from("profiles").upsert({
+          id: newUser.id,
+          display_name: newUser.display_name,
+          username: newUser.username,
+          target_exam: newUser.target_exam,
+          preferred_examination_id: newUser.preferred_examination_id,
+          avatar_url: newUser.avatar_url,
+          email: newUser.email,
+          language_preference: newUser.language_preference,
+          onboarding_completed: true,
+        });
+      }
+    } catch (sbErr) {
+      console.error("Supabase signup profile sync notice:", sbErr);
+    }
 
     const res = NextResponse.json({
       success: true,

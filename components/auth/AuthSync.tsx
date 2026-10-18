@@ -25,6 +25,10 @@ export const AuthSync: React.FC = () => {
           .then((d) => {
             if (d.success && d.user) {
               localStorage.setItem("qz_auth_user", JSON.stringify(d.user));
+              if (d.user.onboarding_completed) {
+                localStorage.setItem("qz_onboarding_completed", "true");
+                localStorage.setItem("qz_details_submitted", "true");
+              }
               window.dispatchEvent(
                 new CustomEvent("qz_auth_changed", { detail: { user: d.user } })
               );
@@ -53,6 +57,10 @@ export const AuthSync: React.FC = () => {
             .then((d) => {
               if (d.success && d.user) {
                 localStorage.setItem("qz_auth_user", JSON.stringify(d.user));
+                if (d.user.onboarding_completed) {
+                  localStorage.setItem("qz_onboarding_completed", "true");
+                  localStorage.setItem("qz_details_submitted", "true");
+                }
                 window.dispatchEvent(
                   new CustomEvent("qz_auth_changed", { detail: { user: d.user } })
                 );
@@ -76,6 +84,10 @@ export const AuthSync: React.FC = () => {
           .then((d) => {
             if (d.success && d.user) {
               localStorage.setItem("qz_auth_user", JSON.stringify(d.user));
+              if (d.user.onboarding_completed) {
+                localStorage.setItem("qz_onboarding_completed", "true");
+                localStorage.setItem("qz_details_submitted", "true");
+              }
               window.dispatchEvent(
                 new CustomEvent("qz_auth_changed", { detail: { user: d.user } })
               );
@@ -85,6 +97,8 @@ export const AuthSync: React.FC = () => {
       } else if (event === "SIGNED_OUT") {
         localStorage.removeItem("qz_user_id");
         localStorage.removeItem("qz_auth_user");
+        localStorage.removeItem("qz_onboarding_completed");
+        localStorage.removeItem("qz_details_submitted");
         document.cookie = "qz_user_id=; path=/; max-age=0; SameSite=Lax";
         window.dispatchEvent(
           new CustomEvent("qz_auth_changed", { detail: { user: null } })

@@ -206,6 +206,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           if (existing && existing.id && existing.id !== "user-current") {
             localStorage.setItem("qz_user_id", existing.id);
             localStorage.setItem("qz_auth_user", JSON.stringify(existing));
+            localStorage.setItem("qz_onboarding_completed", "true");
+            localStorage.setItem("qz_details_submitted", "true");
             document.cookie = `qz_user_id=${existing.id}; path=/; max-age=2592000; SameSite=Lax`;
             window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: existing } }));
             if (onSuccess) onSuccess(existing);
@@ -276,11 +278,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         localStorage.setItem("qz_user_id", data.user.id);
         localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
         localStorage.setItem("qz_quiz_lang", languagePref);
+        localStorage.setItem("qz_onboarding_completed", "true");
+        localStorage.setItem("qz_details_submitted", "true");
         document.cookie = `qz_user_id=${data.user.id}; path=/; max-age=2592000; SameSite=Lax`;
         setAppLanguage(languagePref);
         window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
         window.dispatchEvent(new CustomEvent("qz_account_completed", { detail: { user: data.user } }));
-        window.dispatchEvent(new CustomEvent("open_onboarding_tour", { detail: { user: data.user } }));
         if (onSuccess) onSuccess(data.user);
         handleClose();
       } else {

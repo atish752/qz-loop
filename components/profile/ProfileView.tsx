@@ -95,9 +95,13 @@ export const ProfileView: React.FC = () => {
     return () => window.removeEventListener("qz_auth_changed", checkAuthAndLoad);
   }, []);
 
-  useEffect(() => {
-    // Fetch authored questions
-    fetch("/api/questions/author")
+  const loadAuthoredQuestions = () => {
+    if (typeof window === "undefined") return;
+    const uid = localStorage.getItem("qz_user_id") || user?.id;
+    const url = uid ? `/api/questions/author?authorId=${encodeURIComponent(uid)}` : "/api/questions/author";
+    const headers: Record<string, string> = uid ? { "x-user-id": uid } : {};
+
+    fetch(url, { headers })
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.questions) {
@@ -105,6 +109,10 @@ export const ProfileView: React.FC = () => {
         }
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadAuthoredQuestions();
 
     // Fetch hidden questions
     fetch("/api/questions/hidden")
@@ -116,6 +124,10 @@ export const ProfileView: React.FC = () => {
       })
       .catch(() => {});
 
+    // Listen for question created events to auto-refresh
+    window.addEventListener("qz_question_created", loadAuthoredQuestions);
+    window.addEventListener("qz_auth_changed", loadAuthoredQuestions);
+
     // PWA beforeinstallprompt event
     window.addEventListener("beforeinstallprompt", (e: Event) => {
       e.preventDefault();
@@ -126,7 +138,12 @@ export const ProfileView: React.FC = () => {
       setIsInstalled(true);
       setInstallPrompt(null);
     });
-  }, []);
+
+    return () => {
+      window.removeEventListener("qz_question_created", loadAuthoredQuestions);
+      window.removeEventListener("qz_auth_changed", loadAuthoredQuestions);
+    };
+  }, [user?.id]);
 
   const openEditProfile = () => {
     if (user) {
@@ -218,11 +235,15 @@ export const ProfileView: React.FC = () => {
 
     try {
       const selectedExam = exams.find((x) => x.id === editExamId);
+      const uid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
       const res = await fetch("/api/profile", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(uid ? { "x-user-id": uid } : {}),
+        },
         body: JSON.stringify({
-          userId: user?.id,
+          userId: uid || undefined,
           display_name: editName.trim(),
           username: editUsername.trim().toLowerCase(),
           preferred_examination_id: editExamId,
@@ -230,6 +251,7 @@ export const ProfileView: React.FC = () => {
           avatar_url: editAvatarUrl || undefined,
           email: editEmail.trim() || undefined,
           language_preference: editLanguagePref,
+          onboarding_completed: true,
         }),
       });
       const data = await res.json();
@@ -239,6 +261,8 @@ export const ProfileView: React.FC = () => {
         localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
         localStorage.setItem("qz_user_id", data.user.id);
         localStorage.setItem("qz_quiz_lang", editLanguagePref);
+        localStorage.setItem("qz_onboarding_completed", "true");
+        localStorage.setItem("qz_details_submitted", "true");
         document.cookie = `qz_user_id=${data.user.id}; path=/; max-age=2592000; SameSite=Lax`;
         window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
         setShowEditProfileModal(false);

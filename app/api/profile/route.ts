@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
               preferred_examination_id: dbProfile.preferred_examination_id,
               avatar_url: dbProfile.avatar_url,
               email: dbProfile.email,
+              language_preference: dbProfile.language_preference,
+              onboarding_completed: dbProfile.onboarding_completed,
             });
           } else {
             const { data: authData } = await supabase.auth.getUser();
@@ -88,7 +90,9 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const requestedUserId = body.userId || body.id || request.headers.get("x-user-id");
+    const cookieUserId = request.cookies.get("qz_user_id")?.value;
+    const requestedUserId =
+      body.userId || body.id || request.headers.get("x-user-id") || cookieUserId;
     const payload = {
       ...body,
       preferred_examination_id: body.preferred_examination_id || body.preferredExaminationId,
@@ -96,6 +100,27 @@ export async function PATCH(request: NextRequest) {
       display_name: body.display_name || body.displayName,
     };
     const updated = db.updateProfile(payload, requestedUserId || undefined);
+
+    // Sync to Supabase cloud if connected
+    try {
+      const supabase = await createServerSupabaseClient();
+      if (supabase && updated) {
+        await supabase.from("profiles").upsert({
+          id: updated.id,
+          display_name: updated.display_name,
+          username: updated.username,
+          target_exam: updated.target_exam,
+          preferred_examination_id: updated.preferred_examination_id,
+          avatar_url: updated.avatar_url,
+          email: updated.email,
+          language_preference: updated.language_preference,
+          onboarding_completed: updated.onboarding_completed ?? true,
+        });
+      }
+    } catch (supabaseErr) {
+      console.error("Supabase profile sync error:", supabaseErr);
+    }
+
     return NextResponse.json({
       success: true,
       user: updated,
@@ -109,18 +134,38 @@ export async function PATCH(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId } = body;
-    if (userId) {
-      const switched = db.setCurrentUser(userId);
+    const cookieUserId = request.cookies.get("qz_user_id")?.value;
+    const requestedUserId =
+      body.userId || request.headers.get("x-user-id") || cookieUserId;
+
+    if (body.userId) {
+      const switched = db.setCurrentUser(body.userId);
       return NextResponse.json({ success: true, user: switched });
     }
 
     const examId = body.preferred_examination_id || body.preferredExaminationId;
     if (examId) {
-      const updated = db.updateProfile({
-        preferred_examination_id: examId,
-        target_exam: body.target_exam || body.targetExam,
-      });
+      const updated = db.updateProfile(
+        {
+          preferred_examination_id: examId,
+          target_exam: body.target_exam || body.targetExam,
+        },
+        requestedUserId || undefined
+      );
+
+      // Sync updated exam to Supabase
+      try {
+        const supabase = await createServerSupabaseClient();
+        if (supabase && requestedUserId) {
+          await supabase.from("profiles").update({
+            preferred_examination_id: examId,
+            target_exam: body.target_exam || body.targetExam,
+          }).eq("id", requestedUserId);
+        }
+      } catch (err) {
+        console.error("Supabase exam update notice:", err);
+      }
+
       return NextResponse.json({ success: true, user: updated });
     }
 
@@ -130,3 +175,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
+
