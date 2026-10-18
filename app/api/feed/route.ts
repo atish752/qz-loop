@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/data/store";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+let lastCloudFeedSync = 0;
+const CLOUD_FEED_SYNC_TTL_MS = 60 * 1000; // 60 seconds cache
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -15,17 +18,21 @@ export async function GET(request: NextRequest) {
     const sessionExcludedIds = excludedParam ? excludedParam.split(",") : [];
     const langParam = (searchParams.get("lang") || searchParams.get("language") || "all") as "en" | "hi" | "all";
 
-    // Recover community published questions from Supabase if connected
-    try {
-      const supabase = await createServerSupabaseClient();
-      if (supabase) {
-        const { data: cloudQuestions } = await supabase
-          .from("questions")
-          .select("*")
-          .eq("publication_status", "published")
-          .eq("moderation_status", "active")
-          .order("created_at", { ascending: false })
-          .limit(50);
+    // Recover community published questions from Supabase if connected (throttled by TTL to minimize egress)
+    const now = Date.now();
+    if (now - lastCloudFeedSync > CLOUD_FEED_SYNC_TTL_MS) {
+      try {
+        const supabase = await createServerSupabaseClient();
+        if (supabase) {
+          const { data: cloudQuestions } = await supabase
+            .from("questions")
+            .select("*")
+            .eq("publication_status", "published")
+            .eq("moderation_status", "active")
+            .order("created_at", { ascending: false })
+            .limit(50);
+
+          lastCloudFeedSync = now;
 
         if (cloudQuestions && cloudQuestions.length > 0) {
           for (const cq of cloudQuestions) {
@@ -67,6 +74,7 @@ export async function GET(request: NextRequest) {
     } catch (sbErr) {
       console.error("Supabase feed questions sync notice:", sbErr);
     }
+  }
 
     const questions = db.getFeedQuestions({
       userId: requestedUserId || undefined,
@@ -77,11 +85,18 @@ export async function GET(request: NextRequest) {
       limit: 10,
     });
 
-    return NextResponse.json({
-      success: true,
-      questions,
-      count: questions.length,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        questions,
+        count: questions.length,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=15, stale-while-revalidate=45",
+        },
+      }
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to load feed";
     return NextResponse.json({ success: false, error: message }, { status: 500 });

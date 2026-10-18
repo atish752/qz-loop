@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/data/store";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+let authorSyncTimestamps = new Map<string, number>();
+const AUTHOR_SYNC_TTL_MS = 60 * 1000;
+
 export async function GET(request: NextRequest) {
   try {
     const authorId =
@@ -10,8 +13,11 @@ export async function GET(request: NextRequest) {
       request.cookies.get("qz_user_id")?.value ||
       undefined;
 
-    // Cloud recovery from Supabase if connected
-    if (authorId) {
+    // Cloud recovery from Supabase if connected (throttled by TTL per author to minimize egress)
+    const now = Date.now();
+    const lastSync = authorId ? authorSyncTimestamps.get(authorId) || 0 : 0;
+    if (authorId && now - lastSync > AUTHOR_SYNC_TTL_MS) {
+      authorSyncTimestamps.set(authorId, now);
       try {
         const supabase = await createServerSupabaseClient();
         if (supabase) {
