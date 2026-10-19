@@ -169,6 +169,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   const [showReportModal, setShowReportModal] = useState(false);
   const [showThreeDotMenu, setShowThreeDotMenu] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+  const [showPostAnswerModal, setShowPostAnswerModal] = useState(false);
 
   // Gesture refs
   const explanationRef = useRef<HTMLDivElement | null>(null);
@@ -303,6 +304,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         if (data.explanation) {
           setExplanation(data.explanation);
         }
+        setShowPostAnswerModal(true);
 
         const updatedMetrics = {
           attempts: data.updatedMetrics.total_attempts,
@@ -361,11 +363,16 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
     setRepeatSavedBadge(labels[interval]);
     setTimeout(() => setRepeatSavedBadge(null), 2500);
 
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+
     try {
       await fetch("/api/questions/repeat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: question.id, interval }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
+        body: JSON.stringify({ questionId: question.id, interval, userId: currentUid }),
       });
     } catch {
       // Handled
@@ -534,20 +541,35 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Active Question Timer */}
+          {/* Active Question Sleek Digital Timer Display */}
           <div
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full font-mono text-label-md transition-colors ${
+            className={`relative flex items-center px-3 py-1 rounded-xl font-mono text-xs sm:text-sm font-extrabold tracking-widest border transition-all duration-300 ${
               isAnswered
-                ? "bg-surface-container text-secondary"
-                : "bg-surface-container-high text-primary font-bold shadow-xs"
+                ? "bg-surface-container/80 text-secondary border-surface-container-high/40 shadow-xs"
+                : "bg-gradient-to-r from-primary/10 via-primary-container/20 to-primary/10 text-primary border-primary/30 shadow-[0_0_12px_rgba(83,0,183,0.18)] dark:shadow-[0_0_15px_rgba(208,188,255,0.2)]"
             }`}
-            title="Time spent on this question"
+            title="Elapsed solve time"
           >
-            <span className="material-symbols-outlined text-[15px]">timer</span>
-            <span>
-              {isAnswered
-                ? `${(stoppedTimeMsRef.current / 1000).toFixed(1)}s`
-                : `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, "0")}`}
+            {!isAnswered && (
+              <span className="relative flex h-2 w-2 mr-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
+              </span>
+            )}
+            <span
+              key={isAnswered ? "stopped" : elapsedSeconds}
+              className="inline-block tabular-nums transition-transform duration-150 animate-in zoom-in-95"
+            >
+              {isAnswered ? (
+                `${(stoppedTimeMsRef.current / 1000).toFixed(1)}s`
+              ) : (
+                <>
+                  <span>{String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}</span>
+                  <span className="animate-pulse mx-0.5 text-primary/70">:</span>
+                  <span>{String(elapsedSeconds % 60).padStart(2, "0")}</span>
+                  <span className="text-[10px] ml-0.5 text-primary/80 uppercase font-sans font-bold">s</span>
+                </>
+              )}
             </span>
           </div>
 
@@ -564,6 +586,20 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
       {/* 2. Main Question Card Body + Floating Action Bar on the Right */}
       <div className="relative flex-1 flex flex-col justify-center py-2 pr-16 sm:pr-20 min-h-0 overflow-hidden">
+
+        {/* Prominent Repeat Question Badge if resurfaced via Spaced Repetition */}
+        {question.is_repeat && (
+          <div className="mb-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-900 dark:text-amber-200 text-xs font-bold flex items-center gap-2 shadow-2xs animate-in fade-in shrink-0">
+            <span className="material-symbols-outlined text-[18px] text-amber-600 dark:text-amber-400">
+              replay
+            </span>
+            <span>
+              {lang === "hi"
+                ? "दोहराव प्रश्न · आपने इसे पहले हल किया था"
+                : "Repeat Question · You previously answered this"}
+            </span>
+          </div>
+        )}
 
         {/* Question Statement (Scrollable independently if large, perfectly centered vertically if short) */}
         {(() => {
@@ -582,8 +618,8 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               data-reel-scrollable="true"
               className={`overflow-y-auto overscroll-contain no-scrollbar py-2 my-auto flex flex-col justify-center ${
                 showOptions || isAnswered
-                  ? "max-h-[30vh] mb-2"
-                  : "flex-1 min-h-[32vh] mb-3"
+                  ? "max-h-[34vh] mb-2"
+                  : "flex-1 min-h-[36vh] mb-3"
               }`}
             >
               <h2
@@ -597,55 +633,27 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           );
         })()}
 
-        {/* Community Performance Metrics Bar - Real Baseline 0 Data */}
-        <div className="mb-2.5 shrink-0">
-          <div className="bg-surface-container-low px-3 py-2 rounded-xl border border-surface-container-high/40 flex flex-col gap-1 shadow-xs">
-            {/* Line 1: Attempts + Accuracy */}
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-1.5 font-medium text-on-surface">
-                <span className="material-symbols-outlined text-[15px] text-primary">groups</span>
-                <span>{metrics.attempts.toLocaleString()} {t.attempts || "attempts"}</span>
-              </span>
-              <span className="flex items-center gap-1.5 font-bold text-tertiary">
-                <span className="material-symbols-outlined text-[15px]">target</span>
-                <span>{accuracyPercentage}% {t.accuracy || "acc"}</span>
-              </span>
-            </div>
-            {/* Line 2: Avg Speed + Fastest Speed */}
-            <div className="flex items-center justify-between text-[11px] text-secondary border-t border-surface-container-high/30 pt-1">
-              <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">speed</span>
-                <span>{metrics.avgTimeSec}s {t.avgSpeed || "avg speed"}</span>
-              </span>
-              <span className="flex items-center gap-1 text-primary font-semibold">
-                <span className="material-symbols-outlined text-[14px]">bolt</span>
-                <span>{metrics.fastestSec ? `${metrics.fastestSec}s` : "0s"} {t.fastest || "fastest"}</span>
-              </span>
-            </div>
-          </div>
-        </div>
-
         {/* Options Stack / Answering Area (Scrollable if options are long) */}
         {(() => {
           const swipeControl = (
-            <div className="flex flex-col items-center justify-center px-1.5 py-1 rounded-xl bg-surface-container border border-surface-container-high/60 shadow-xs shrink-0 select-none my-auto">
+            <div className="flex flex-row items-center justify-between px-2.5 rounded-xl bg-surface-container border border-surface-container-high/60 shadow-xs shrink-0 select-none h-13 min-w-[104px]">
               <button
                 type="button"
                 onClick={onPrevQuestion}
                 disabled={index <= 1}
-                className="w-7 h-5 flex items-center justify-center text-secondary hover:text-primary disabled:opacity-20 transition-opacity active:scale-90"
+                className="w-7 h-full flex items-center justify-center text-secondary hover:text-primary disabled:opacity-20 transition-opacity active:scale-90"
                 title="Previous question (Swipe down)"
                 aria-label="Previous question"
               >
                 <span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
               </button>
-              <span className="font-mono text-[9px] uppercase tracking-wider font-extrabold text-secondary/90 leading-none py-0.5">
+              <span className="font-mono text-[10px] uppercase tracking-wider font-extrabold text-secondary/90 leading-none px-1">
                 {t.swipeLabel || "SWIPE"}
               </span>
               <button
                 type="button"
                 onClick={onNextQuestion}
-                className="w-7 h-5 flex items-center justify-center text-secondary hover:text-primary transition-colors active:scale-90"
+                className="w-7 h-full flex items-center justify-center text-secondary hover:text-primary transition-colors active:scale-90"
                 title="Next question (Swipe up)"
                 aria-label="Next question"
               >
@@ -655,7 +663,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           );
 
           return (
-            <div className="shrink-0">
+            <div className="shrink-0 flex flex-col gap-1.5">
               {!showOptions && !isAnswered ? (
                 <div className="flex items-center gap-2">
                   <button
@@ -685,10 +693,10 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                   {swipeControl}
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2">
                   <div
                     data-reel-scrollable="true"
-                    className="flex-1 flex flex-col gap-2 animate-in fade-in duration-200 max-h-[38vh] overflow-y-auto overscroll-contain no-scrollbar"
+                    className="w-full flex flex-col gap-2 animate-in fade-in duration-200 max-h-[38vh] overflow-y-auto overscroll-contain no-scrollbar"
                   >
                     {question.options.map((opt) => {
                       const isSelected = selectedOptionId === opt.id;
@@ -755,9 +763,49 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                       </div>
                     )}
                   </div>
-                  {swipeControl}
+
+                  {/* Action row below options: Review Solution if answered + Horizontal SWIPE pill */}
+                  <div className="flex items-center gap-2">
+                    {isAnswered && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPostAnswerModal(true)}
+                        className="flex-1 h-13 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-2xs group"
+                      >
+                        <span className="material-symbols-outlined text-[19px] transition-transform group-hover:scale-110">bolt</span>
+                        <span>{lang === "hi" ? "समाधान व दोहराव (Quick Proof)" : "Quick Proof & Solution"}</span>
+                      </button>
+                    )}
+                    <div className={isAnswered ? "shrink-0" : "w-full flex justify-end"}>
+                      {swipeControl}
+                    </div>
+                  </div>
                 </div>
               )}
+
+              {/* Community Performance Metrics Bar - Below Answer & Learn and SWIPE with minimum height */}
+              <div className="mt-1.5 shrink-0">
+                <div className="bg-surface-container-low px-3 py-1.5 rounded-xl border border-surface-container-high/40 flex items-center justify-between text-[11px] shadow-2xs">
+                  {/* Attempts + Accuracy */}
+                  <span className="flex items-center gap-1 font-medium text-on-surface">
+                    <span className="material-symbols-outlined text-[14px] text-primary">groups</span>
+                    <span>{metrics.attempts.toLocaleString()} {t.attempts || "attempts"}</span>
+                  </span>
+                  <span className="flex items-center gap-1 font-bold text-tertiary">
+                    <span className="material-symbols-outlined text-[14px]">target</span>
+                    <span>{accuracyPercentage}% {t.accuracy || "acc"}</span>
+                  </span>
+                  {/* Avg Speed + Fastest Speed */}
+                  <span className="flex items-center gap-1 text-secondary">
+                    <span className="material-symbols-outlined text-[14px]">speed</span>
+                    <span>{metrics.avgTimeSec}s {t.avgSpeed || "avg speed"}</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-primary font-semibold">
+                    <span className="material-symbols-outlined text-[14px]">bolt</span>
+                    <span>{metrics.fastestSec ? `${metrics.fastestSec}s` : "0s"} {t.fastest || "fastest"}</span>
+                  </span>
+                </div>
+              </div>
             </div>
           );
         })()}
@@ -1035,6 +1083,20 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             </div>
             <span className="text-[11px] font-bold text-secondary mt-0.5">{isSaved ? t.save : t.save}</span>
           </button>
+
+          {/* Quick Swipe Below Save Button */}
+          <button
+            type="button"
+            onClick={onNextQuestion}
+            className="flex flex-col items-center group active:scale-90 transition-transform mt-0.5"
+            title="Next Question (Swipe)"
+            aria-label="Next question"
+          >
+            <div className="w-9 h-9 rounded-full bg-surface-container-low text-secondary hover:text-primary hover:bg-surface-container flex items-center justify-center transition-all border border-surface-container-high/40 shadow-2xs">
+              <span className="material-symbols-outlined text-[19px]">keyboard_arrow_down</span>
+            </div>
+            <span className="text-[9px] font-mono font-bold text-secondary uppercase tracking-tight mt-0.5">SWIPE</span>
+          </button>
         </div>
       </div>
 
@@ -1092,6 +1154,145 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                 <span className="text-[10px] text-secondary font-normal">Flag incorrect or inappropriate content</span>
               </div>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Post-Answer Pop-up Modal */}
+      {showPostAnswerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm sm:max-w-md bg-surface-container-lowest rounded-3xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col gap-3.5 max-h-[90vh] overflow-y-auto no-scrollbar animate-in zoom-in-95 duration-200 text-left">
+            {/* Top Result Banner */}
+            <div className="flex items-center justify-between pb-2 border-b border-surface-container-high/40">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-9 h-9 rounded-2xl flex items-center justify-center text-white font-bold shrink-0 shadow-sm ${
+                    isCorrect ? "bg-emerald-600" : "bg-rose-600"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    {isCorrect ? "check" : "close"}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-on-surface">
+                    {isCorrect ? (t.correctFeedback || "Correct Answer!") : (t.reviewSolution || "Incorrect Solution")}
+                  </h3>
+                  <span className="text-[11px] text-secondary font-mono">
+                    Solved in {(stoppedTimeMsRef.current / 1000).toFixed(1)}s
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                    isCorrect
+                      ? "bg-tertiary-fixed text-on-tertiary-fixed"
+                      : "bg-error-container text-on-error-container"
+                  }`}
+                >
+                  {isCorrect
+                    ? `+${scoringRule.marksPerCorrect.toFixed(2)} ${t.marksPlus || "Marks"}`
+                    : `-${scoringRule.penaltyPerWrong.toFixed(2)} ${t.marksPenalty || "Penalty"}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPostAnswerModal(false)}
+                  className="w-7 h-7 rounded-full hover:bg-surface-container flex items-center justify-center text-secondary hover:text-on-surface"
+                  title="Close modal"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Correct Option Pill if Incorrect */}
+            {!isCorrect && correctOptionId && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">
+                  {correctOptionId}
+                </span>
+                <span className="font-bold text-emerald-950 dark:text-emerald-200">
+                  Correct Answer is Option {correctOptionId}
+                </span>
+              </div>
+            )}
+
+            {/* Quick Proof Explanation Section */}
+            <div className="bg-surface-container-low rounded-2xl p-3 border border-surface-container-high/40 flex flex-col gap-1.5">
+              <div className="flex items-center gap-1 text-primary font-bold text-xs">
+                <span className="material-symbols-outlined text-[16px]">bolt</span>
+                <span>{t.quickProof || "Quick Proof"}</span>
+              </div>
+              <p className="text-xs text-on-surface leading-relaxed max-h-36 overflow-y-auto no-scrollbar">
+                {activeExplanation || (lang === "hi" ? "इस प्रश्न के लिए कोई व्याख्या उपलब्ध नहीं है।" : "Author did not provide an explanation for this question.")}
+              </p>
+            </div>
+
+            {/* Spaced Repetition Timeline Selector */}
+            <div className="bg-surface-container-low rounded-2xl p-3 border border-surface-container-high/40 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1 text-secondary text-xs font-semibold">
+                  <span className="material-symbols-outlined text-[15px] text-primary">history</span>
+                  <span>{t.repeatPrompt || "When should this question repeat?"}</span>
+                </div>
+                {repeatSavedBadge && (
+                  <span className="text-[10px] text-tertiary font-bold animate-in fade-in">
+                    {repeatSavedBadge}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {(
+                  [
+                    { id: "day", label: t.repeatDay || "Same Day", tip: "< 1 Day" },
+                    { id: "week", label: t.repeatWeek || "In a Week", tip: "2-6 Days" },
+                    { id: "month", label: t.repeatMonth || "In a Month", tip: "14-28 Days" },
+                    { id: "never", label: t.repeatNever || "Never", tip: "Mastered" },
+                  ] as const
+                ).map((item) => {
+                  const isChosen = repeatInterval === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleSelectRepeat(item.id)}
+                      className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
+                        isChosen
+                          ? "bg-primary text-on-primary border-primary shadow-xs"
+                          : "bg-surface-container border-transparent text-secondary hover:text-on-surface hover:bg-surface-container-high"
+                      }`}
+                      title={item.tip}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Large Prominent Skip & Next Question Button */}
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPostAnswerModal(false);
+                  onNextQuestion();
+                }}
+                className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-base shadow-lg hover:shadow-xl active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+              >
+                <span>{lang === "hi" ? "छोड़ें और अगला प्रश्न (Skip & Next)" : "Skip & Next Question"}</span>
+                <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPostAnswerModal(false)}
+                className="py-1 text-center text-xs text-secondary hover:text-on-surface font-semibold"
+              >
+                {lang === "hi" ? "कार्ड पर वापस देखें" : "Dismiss & View Question Card"}
+              </button>
+            </div>
           </div>
         </div>
       )}

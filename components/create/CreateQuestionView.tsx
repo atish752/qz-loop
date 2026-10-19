@@ -9,6 +9,8 @@ import { formatWhatsAppChallenge, openWhatsAppShare, OFFICIAL_WHATSAPP_GROUP_URL
 import { getExamScoringRule } from "@/lib/utils/examScoring";
 import { getTopicsForSubject } from "@/lib/data/topics";
 import { useAppLanguage } from "@/lib/utils/i18n";
+import { QuestionScanner } from "./QuestionScanner";
+import { ParsedQuestion } from "@/lib/utils/ocrParser";
 
 export const EXAMS_LIST = [
   { id: "exam-railway-ntpc", name: "Railways (RRB NTPC & Group D)", shortName: "Railways RRB" },
@@ -149,6 +151,39 @@ export const CreateQuestionView: React.FC = () => {
   const [hindiExplanation, setHindiExplanation] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
   const [previewLanguage, setPreviewLanguage] = useState<"en" | "hi">("en");
+  const [creationMethod, setCreationMethod] = useState<"manual" | "scan">("manual");
+  const [scanSuccessNotice, setScanSuccessNotice] = useState<string | null>(null);
+
+  const handleParsedQuestion = useCallback((parsed: ParsedQuestion) => {
+    const isHindiText = /[\u0900-\u097F]/.test(parsed.questionText) || lang === "hi";
+    if (parsed.questionText) {
+      setQuestionText(parsed.questionText);
+      if (isHindiText) {
+        setHindiQuestionText(parsed.questionText);
+      }
+    }
+    if (parsed.options && parsed.options.length >= 4) {
+      setOptions(parsed.options);
+      if (isHindiText) {
+        setHindiOptions(parsed.options);
+      }
+    }
+    if (parsed.correctOptionId) {
+      setCorrectOptionId(parsed.correctOptionId);
+    }
+    if (parsed.explanation) {
+      setExplanation(parsed.explanation);
+      if (isHindiText) {
+        setHindiExplanation(parsed.explanation);
+      }
+    }
+    setScanSuccessNotice(
+      lang === "hi"
+        ? "प्रश्न और 4 विकल्प स्वचालित रूप से भर गए हैं! सही विकल्प जांचें और प्रकाशित करें।"
+        : "Question and 4 options populated! Select the correct option and publish."
+    );
+    setTimeout(() => setScanSuccessNotice(null), 6000);
+  }, [lang]);
 
   // Edit Mode state
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
@@ -965,6 +1000,50 @@ export const CreateQuestionView: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handlePublish} className="flex flex-col gap-4">
+                {/* Two Authoring Methods: Manual Adding vs Smart OCR Scan */}
+                <div className="grid grid-cols-2 gap-2 p-1.5 bg-surface-container rounded-2xl shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => setCreationMethod("manual")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      creationMethod === "manual"
+                        ? "bg-primary text-on-primary shadow-xs"
+                        : "text-secondary hover:text-on-surface"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                    <span>{lang === "hi" ? "1. मैन्युअल एंट्री" : "1. Manual Entry"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCreationMethod("scan")}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      creationMethod === "scan"
+                        ? "bg-primary text-on-primary shadow-xs"
+                        : "text-secondary hover:text-on-surface"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">document_scanner</span>
+                    <span>{lang === "hi" ? "2. स्मार्ट स्कैन (OCR)" : "2. Smart Scan Question"}</span>
+                  </button>
+                </div>
+
+                {/* Smart OCR Scanner with Horizontal Camera Viewfinder */}
+                {creationMethod === "scan" && (
+                  <QuestionScanner
+                    onParsedQuestion={handleParsedQuestion}
+                    lang={lang}
+                  />
+                )}
+
+                {/* Scan Success Notice */}
+                {scanSuccessNotice && (
+                  <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-950 dark:text-emerald-100 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                    <span className="material-symbols-outlined text-[20px] text-emerald-600 shrink-0">check_circle</span>
+                    <span>{scanSuccessNotice}</span>
+                  </div>
+                )}
+
                 {/* Easy 3-Step Question Maker and position under exam removed from UI; target exam is default */}
                 <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 shadow-xs">
                   <div className="flex items-center gap-3 min-w-0">

@@ -16,7 +16,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid repeat interval" }, { status: 400 });
     }
 
-    const currentUser = db.getCurrentUser();
+    const cookieUserId = request.cookies.get("qz_user_id")?.value;
+    const requestedUserId =
+      body.userId || request.headers.get("x-user-id") || cookieUserId;
+    const currentUser = requestedUserId
+      ? db.getProfileById(requestedUserId) || db.getCurrentUser()
+      : db.getCurrentUser();
     const pref = db.setQuestionRepeatInterval(currentUser.id, questionId, interval);
 
     return NextResponse.json({

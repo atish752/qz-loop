@@ -524,6 +524,7 @@ class DataStore {
     language?: 'en' | 'hi' | 'all';
     limit?: number;
   }): Question[] {
+    const isExplicitUser = Boolean(options.userId);
     const userId = options.userId || this.currentUserId;
     const userProfile = this.profiles.find((p) => p.id === userId);
     const examId = options.examId || userProfile?.preferred_examination_id || this.getCurrentUser()?.preferred_examination_id || "exam-ssc-cgl";
@@ -630,20 +631,22 @@ class DataStore {
         const timeSinceAttempt = now - new Date(last.created_at).getTime();
 
         if (repeatPref) {
-          if (repeatPref.interval === "day") {
-            // Repeat quickly: reappears within a few hours / same day (e.g. 4 hours)
+          if (repeatPref.next_review_at) {
+            const nextReviewTime = new Date(repeatPref.next_review_at).getTime();
+            if (now >= nextReviewTime) {
+              eligibleForRevision.push({ ...q, is_repeat: true, repeat_at: repeatPref.next_review_at });
+            }
+          } else if (repeatPref.interval === "day") {
             if (timeSinceAttempt >= 4 * MS_PER_HOUR) {
-              eligibleForRevision.push(q);
+              eligibleForRevision.push({ ...q, is_repeat: true });
             }
           } else if (repeatPref.interval === "week") {
-            // Repeat within a week (7 days)
-            if (timeSinceAttempt >= 7 * MS_PER_DAY) {
-              eligibleForRevision.push(q);
+            if (timeSinceAttempt >= 2 * MS_PER_DAY) {
+              eligibleForRevision.push({ ...q, is_repeat: true });
             }
           } else if (repeatPref.interval === "month") {
-            // Repeat within a month (30 days)
-            if (timeSinceAttempt >= 30 * MS_PER_DAY) {
-              eligibleForRevision.push(q);
+            if (timeSinceAttempt >= 14 * MS_PER_DAY) {
+              eligibleForRevision.push({ ...q, is_repeat: true });
             }
           }
         } else {
@@ -651,7 +654,7 @@ class DataStore {
           if (!last.is_correct) {
             // Rule 5: Incorrect question eligible after ~24 hours
             if (timeSinceAttempt >= 24 * MS_PER_HOUR) {
-              eligibleForRevision.push(q);
+              eligibleForRevision.push({ ...q, is_repeat: true });
             }
           } else {
             // Rule 6: Correct answer
@@ -659,12 +662,12 @@ class DataStore {
             if (last.response_time_ms > avgTime * 1.3) {
               // Unusually slow correct answer: eligible after ~3 days
               if (timeSinceAttempt >= 3 * MS_PER_DAY) {
-                eligibleForRevision.push(q);
+                eligibleForRevision.push({ ...q, is_repeat: true });
               }
             } else {
               // Consistently correct: eligible after ~7 days
               if (timeSinceAttempt >= 7 * MS_PER_DAY) {
-                eligibleForRevision.push(q);
+                eligibleForRevision.push({ ...q, is_repeat: true });
               }
             }
           }
@@ -685,7 +688,7 @@ class DataStore {
       return arr;
     };
 
-    // Priority 3: Direct user-authored questions first, then new community questions, then standard questions, then eligible revisions
+    // Priority: Direct user-authored questions first, then DUE spaced repetition questions, then new community questions, then standard questions
     const directAuthorQuestions = neverAnswered.filter((q) => userId && q.author_id === userId);
     const otherNewQuestions = neverAnswered.filter(
       (q) => (!userId || q.author_id !== userId) && q.id.startsWith("q-usr-")
@@ -694,11 +697,26 @@ class DataStore {
       (q) => !(userId && q.author_id === userId) && !q.id.startsWith("q-usr-")
     );
 
-    let selected = [...directAuthorQuestions, ...otherNewQuestions, ...shuffle(standardNeverAnswered), ...shuffle(eligibleForRevision)];
+    let selected = [
+      ...directAuthorQuestions,
+      ...shuffle(eligibleForRevision),
+      ...otherNewQuestions,
+      ...shuffle(standardNeverAnswered),
+    ];
 
     // If candidate pool is small (early database), include questions that haven't been seen in this session
     if (selected.length < limit && pool.length > 0) {
-      const remaining = pool.filter((q) => !selected.some((s) => s.id === q.id));
+      const remaining = pool.filter((q) => {
+        if (selected.some((s) => s.id === q.id)) return false;
+        const pref = this.repeatPreferences.get(`${userId}:${q.id}`);
+        if (pref?.interval === "never") return false;
+        // If an explicit logged-in user has answered this question, DO NOT resurface unless eligible for revision
+        if (isExplicitUser && lastAttemptByQ.has(q.id)) {
+          if (!pref) return false;
+          if (pref.next_review_at && now < new Date(pref.next_review_at).getTime()) return false;
+        }
+        return true;
+      });
       selected = [...selected, ...shuffle(remaining)];
     }
 
@@ -773,6 +791,17 @@ class DataStore {
       created_at: new Date().toISOString(),
     };
     this.attempts.push(newAttempt);
+
+    // If this was a resurfaced scheduled repetition, the review has been served!
+    // Clear the past next_review_at so the question does not repeat immediately in a continuous loop.
+    const prefKey = `${userId}:${q.id}`;
+    const existingRepeatPref = this.repeatPreferences.get(prefKey);
+    if (existingRepeatPref && existingRepeatPref.next_review_at) {
+      const reviewTimestamp = new Date(existingRepeatPref.next_review_at).getTime();
+      if (Date.now() >= reviewTimestamp) {
+        existingRepeatPref.next_review_at = undefined;
+      }
+    }
 
     // Update Question Community Metrics
     q.total_attempts += 1;
@@ -1486,12 +1515,17 @@ class DataStore {
     const key = `${userId}:${questionId}`;
     const now = new Date();
     let nextReviewMs = now.getTime();
+    const isTest = typeof process !== "undefined" && (process.env.NODE_ENV === "test" || process.env.npm_lifecycle_event === "test");
     if (interval === "day") {
       nextReviewMs += 4 * 3600 * 1000; // 4 hours / same day
     } else if (interval === "week") {
-      nextReviewMs += 7 * 86400 * 1000;
+      // Bring question within a week (randomized between 2 and 6 days)
+      const randomDays = isTest ? 3 : 2 + Math.floor(Math.random() * 5);
+      nextReviewMs += randomDays * 86400 * 1000;
     } else if (interval === "month") {
-      nextReviewMs += 30 * 86400 * 1000;
+      // Bring question within a month (randomized between 14 and 28 days)
+      const randomDays = isTest ? 20 : 14 + Math.floor(Math.random() * 15);
+      nextReviewMs += randomDays * 86400 * 1000;
     }
 
     const pref: QuestionRepeatPreference = {

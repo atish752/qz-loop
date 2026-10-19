@@ -54,6 +54,8 @@ export interface Question {
   correct_attempts: number;
   total_time_ms: number;
   fastest_correct_ms?: number;
+  is_repeat?: boolean; // Resurfaced through spaced repetition
+  repeat_at?: string; // Next scheduled repetition timestamp
   created_at: string;
   updated_at?: string;
 }

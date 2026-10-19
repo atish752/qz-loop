@@ -11,6 +11,7 @@ import { getTopicsForSubject } from "../lib/data/topics";
 import { OFFICIAL_WHATSAPP_GROUP_URL, FOUNDER_PHONE, FOUNDER_EMAIL, FOUNDER_WHATSAPP_LINK } from "../lib/utils/whatsapp";
 import { TRANSLATIONS } from "../lib/utils/i18n";
 import { getExamCountdown } from "../lib/utils/examDates";
+import { parseQuestionAndOptions } from "../lib/utils/ocrParser";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -1156,8 +1157,137 @@ async function runTests() {
   assert(s57ProfileFile.includes("filter blur-md"), "ProfileView gates profile and settings with blur container");
   assert(s57ProfileFile.includes("Target Examination") || s57ProfileFile.includes("Target Exam"), "ProfileView provides guest exam switcher card");
 
+  // Scenario 58: Smart OCR Scanner, Spaced Repetition Feed, Horizontal SWIPE, Digital Timer & Post-Answer Modal
+  console.log("\n[Scenario 58] Smart OCR Scanner, Spaced Repetition Feed, Horizontal SWIPE, Digital Timer & Post-Answer Modal");
+
+  // 1. OCR Parser heuristics - Standard, Numbered, Inline, 2x2 and Hindi
+  const sampleOcrText = `Q. Which article of the Constitution deals with Fundamental Rights?
+  (A) Article 12-35
+  (B) Article 36-51
+  (C) Article 51A
+  (D) Article 1-4
+  Ans: A
+  Explanation: Part III, Articles 12 to 35 contains Fundamental Rights.`;
+
+  const parsed = parseQuestionAndOptions(sampleOcrText);
+  assert(parsed.questionText.includes("Fundamental Rights"), "OCR parser extracts question statement");
+  assert(parsed.options.length === 4, "OCR parser extracts 4 options");
+  assert(parsed.options[0].includes("Article 12-35"), "OCR parser correctly extracts Option A");
+  assert(parsed.options[1].includes("Article 36-51"), "OCR parser correctly extracts Option B");
+  assert(parsed.correctOptionId === "A", "OCR parser detects correct answer A");
+  assert(Boolean(parsed.explanation && parsed.explanation.includes("Part III")), "OCR parser extracts explanation");
+
+  // Numbered Question Statement & Inline Options
+  const numberedParsed = parseQuestionAndOptions(`1. What is the capital of India?
+  (A) New Delhi
+  (B) Mumbai
+  (C) Kolkata
+  (D) Chennai
+  Ans: A`);
+  assert(numberedParsed.questionText === "What is the capital of India?", "OCR parser correctly parses questions starting with number '1.'");
+  assert(numberedParsed.options[0] === "New Delhi", "Option A is not swallowed by question statement");
+
+  const inlineParsed = parseQuestionAndOptions(`Which planet is known as Red Planet? (A) Venus (B) Mars (C) Jupiter (D) Saturn`);
+  assert(inlineParsed.options[0] === "Venus" && inlineParsed.options[1] === "Mars", "OCR parser extracts single-space inline options");
+
+  const twoByTwoParsed = parseQuestionAndOptions(`Which planet is known as Red Planet?\n(A) Venus (B) Mars\n(C) Jupiter (D) Saturn`);
+  assert(twoByTwoParsed.options[1] === "Mars" && twoByTwoParsed.options[3] === "Saturn", "OCR parser extracts 2x2 textbook options layout");
+
+  const hindiParsed = parseQuestionAndOptions(`लाल ग्रह किसे कहा जाता है?
+  (क) शुक्र
+  (ख) मंगल
+  (ग) बृहस्पति
+  (घ) शनि
+  उत्तर: ख`);
+  assert(hindiParsed.questionText.includes("लाल ग्रह"), "OCR parser handles Hindi questions");
+  assert(hindiParsed.options[0] === "शुक्र" && hindiParsed.options[1] === "मंगल", "OCR parser handles Devanagari options क, ख, ग, घ");
+  assert(hindiParsed.correctOptionId === "B", "OCR parser maps Hindi answer 'उत्तर: ख' to Option B");
+
+  // 2. Create tab two parts & scanner component
+  const s58CreateFile = fs.readFileSync(path.join(__dirname, "../components/create/CreateQuestionView.tsx"), "utf8");
+  assert(s58CreateFile.includes("QuestionScanner"), "CreateQuestionView mounts QuestionScanner");
+  assert(s58CreateFile.includes("1. Manual Entry") || s58CreateFile.includes("1. मैन्युअल एंट्री"), "CreateQuestionView divides creator into Manual Entry part");
+  assert(s58CreateFile.includes("2. Smart Scan Question") || s58CreateFile.includes("2. स्मार्ट स्कैन"), "CreateQuestionView divides creator into Smart Scan OCR part");
+
+  const s58ScannerFile = fs.readFileSync(path.join(__dirname, "../components/create/QuestionScanner.tsx"), "utf8");
+  assert(s58ScannerFile.includes("navigator.mediaDevices.getUserMedia"), "QuestionScanner requests camera access");
+  assert(s58ScannerFile.includes("Tesseract.recognize"), "QuestionScanner implements client-side zero-egress OCR");
+  assert(s58ScannerFile.includes("h-44 sm:h-52"), "QuestionScanner renders horizontal camera viewfinder");
+
+  // 3. Spaced Repetition Feed & Anti-random duplication guarantee
+  const srUser = db.signUpUser({
+    display_name: "SR Aspirant",
+    username: `sr_user_${Date.now()}`,
+    target_exam: "SSC CGL / CHSL / MTS",
+    preferred_examination_id: "exam-ssc-cgl",
+  });
+  const testUserId = srUser.id;
+
+  const feed1 = db.getFeedQuestions({ userId: testUserId, examId: "exam-ssc-cgl", limit: 5 });
+  assert(feed1.length > 0, "Feed returns questions for logged in user");
+  const answeredQ = feed1[0];
+
+  db.submitAttempt({
+    userId: testUserId,
+    questionId: answeredQ.id,
+    selectedOptionId: "B",
+    responseTimeMs: 9000,
+  });
+
+  db.setQuestionRepeatInterval(testUserId, answeredQ.id, "never");
+  const feedAfterNeverUser = db.getFeedQuestions({ userId: testUserId, examId: "exam-ssc-cgl", limit: 10 });
+  assert(!feedAfterNeverUser.some(q => q.id === answeredQ.id), "Question marked 'never' does not resurface for signed in user");
+
+  const secondQ = feed1[1];
+  db.submitAttempt({
+    userId: testUserId,
+    questionId: secondQ.id,
+    selectedOptionId: "A",
+    responseTimeMs: 7500,
+  });
+  const weekPref = db.setQuestionRepeatInterval(testUserId, secondQ.id, "week");
+  assert(Boolean(weekPref.next_review_at), "Week interval sets scheduled next_review_at");
+  const feedBeforeDue = db.getFeedQuestions({ userId: testUserId, examId: "exam-ssc-cgl", limit: 10 });
+  assert(!feedBeforeDue.some(q => q.id === secondQ.id), "Question scheduled for week does not resurface randomly before due time");
+
+  // Due repetition resurfacing guarantee with is_repeat badge
+  const dueUser = db.signUpUser({ display_name: "Due Aspirant", username: `due_${Date.now()}`, preferred_examination_id: "exam-ssc-cgl" });
+  const feedDueUser = db.getFeedQuestions({ userId: dueUser.id, examId: "exam-ssc-cgl", limit: 3 });
+  const dueQ = feedDueUser[0];
+  db.submitAttempt({ userId: dueUser.id, questionId: dueQ.id, selectedOptionId: "C", responseTimeMs: 6000 });
+  db.setQuestionRepeatInterval(dueUser.id, dueQ.id, "week");
+  const duePref = db.repeatPreferences.get(`${dueUser.id}:${dueQ.id}`)!;
+  duePref.next_review_at = new Date(Date.now() - 50000).toISOString(); // Time in past
+
+  const feedWithDue = db.getFeedQuestions({ userId: dueUser.id, examId: "exam-ssc-cgl", limit: 5 });
+  const resurfacedItem = feedWithDue.find(q => q.id === dueQ.id);
+  assert(Boolean(resurfacedItem), "Due spaced repetition question resurfaces in feed");
+  assert(resurfacedItem?.is_repeat === true, "Resurfaced question has is_repeat: true badge");
+
+  // Answering resurfaced question satisfies schedule
+  db.submitAttempt({ userId: dueUser.id, questionId: dueQ.id, selectedOptionId: "A", responseTimeMs: 4000 });
+  const feedAfterSatisfied = db.getFeedQuestions({ userId: dueUser.id, examId: "exam-ssc-cgl", limit: 5 });
+  assert(!feedAfterSatisfied.some(q => q.id === dueQ.id), "Satisfied question does not loop immediately on next reel");
+
+  // 4. Horizontal SWIPE pill & Bottom Community Metrics
+  const s58ReelFile = fs.readFileSync(path.join(__dirname, "../components/loop/QuestionReelCard.tsx"), "utf8");
+  assert(s58ReelFile.includes("flex flex-row items-center justify-between"), "QuestionReelCard renders horizontal SWIPE pill");
+  assert(s58ReelFile.includes("h-13 min-w-[104px]"), "QuestionReelCard SWIPE pill matches h-13 Answer & Learn button height");
+  assert(s58ReelFile.includes("keyboard_arrow_up") && s58ReelFile.includes("keyboard_arrow_down"), "QuestionReelCard SWIPE pill has up arrow on left and down arrow on right");
+  assert(s58ReelFile.includes("Repeat Question"), "QuestionReelCard renders Repeat Question badge for resurfaced questions");
+  assert(s58ReelFile.includes("SWIPE</span>") && s58ReelFile.includes("title=\"Next Question (Swipe)\""), "QuestionReelCard provides swipe trigger below save button");
+
+  // 5. Digital Timer
+  assert(!s58ReelFile.includes("<span className=\"material-symbols-outlined text-[15px]\">timer</span>"), "QuestionReelCard removed clunky stopwatch icon");
+  assert(s58ReelFile.includes("font-mono text-xs sm:text-sm font-extrabold tracking-widest"), "QuestionReelCard renders sleek digital timer");
+  assert(s58ReelFile.includes("animate-ping"), "QuestionReelCard renders pulsating live digital timing dot");
+
+  // 6. Post-Answer Modal
+  assert(s58ReelFile.includes("showPostAnswerModal"), "QuestionReelCard manages Post-Answer Pop-up Modal state");
+  assert(s58ReelFile.includes("Skip & Next Question"), "QuestionReelCard renders large prominent Skip & Next button");
+
   console.log("\n=================================================");
-  console.log("   ALL 57 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 58 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 
