@@ -25,12 +25,16 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const nativeCameraInputRef = useRef<HTMLInputElement | null>(null);
 
   // Stop media stream on unmount
   const stopCameraStream = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
   }, []);
@@ -45,7 +49,19 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
     };
   }, []);
 
-  // Start Camera Stream
+  // Synchronize stream with videoRef whenever camera becomes active or video mounts
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && streamRef.current) {
+      if (videoRef.current.srcObject !== streamRef.current) {
+        videoRef.current.srcObject = streamRef.current;
+      }
+      videoRef.current.muted = true;
+      videoRef.current.setAttribute("playsinline", "true");
+      videoRef.current.play().catch(() => {});
+    }
+  }, [isCameraActive]);
+
+  // Multi-level fallback cascade for camera stream
   const startCamera = async (mode: "environment" | "user" = facingMode) => {
     setErrorMessage(null);
     try {
@@ -53,34 +69,96 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error(
           lang === "hi"
-            ? "आपके ब्राउज़र में कैमरा समर्थित नहीं है। कृपया फ़ाइल अपलोड का उपयोग करें।"
-            : "Camera access is not supported by your browser. Please upload an image."
+            ? "आपके ब्राउज़र में कैमरा समर्थित नहीं है। कृपया फ़ोटो चुनें या कैमरा ऐप से लें।"
+            : "Camera access is not supported by your browser. Please use native camera or upload."
         );
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: mode },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
+      let stream: MediaStream | null = null;
+      let lastErr: unknown = null;
+
+      // 1. Level 1: Preferred facing mode with high resolution
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: mode },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: false,
+        });
+      } catch (err1) {
+        lastErr = err1;
+      }
+
+      // 2. Level 2: Preferred facing mode without resolution constraints
+      if (!stream) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: mode } },
+            audio: false,
+          });
+        } catch (err2) {
+          lastErr = err2;
+        }
+      }
+
+      // 3. Level 3: Reverse facing mode (user webcam or desktop camera fallback)
+      if (!stream) {
+        try {
+          const alternateMode = mode === "environment" ? "user" : "environment";
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: alternateMode } },
+            audio: false,
+          });
+        } catch (err3) {
+          lastErr = err3;
+        }
+      }
+
+      // 4. Level 4: Simple video true fallback
+      if (!stream) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        } catch (err4) {
+          lastErr = err4;
+        }
+      }
+
+      if (!stream) {
+        throw lastErr || new Error("Failed to start video stream");
+      }
 
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
       setIsCameraActive(true);
       setFacingMode(mode);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
+        videoRef.current.setAttribute("playsinline", "true");
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(() => {});
+        };
+        videoRef.current.play().catch(() => {});
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unable to access camera";
+      const isPermission = msg.includes("Permission") || msg.includes("denied") || msg.includes("NotAllowedError");
+      const isOverconstrained = msg.includes("OverconstrainedError") || msg.includes("ConstraintNotSatisfied");
+      
       setErrorMessage(
-        msg.includes("Permission") || msg.includes("denied")
+        isPermission
           ? lang === "hi"
-            ? "कैमरा अनुमति अस्वीकृत हुई। कृपया कैमरा चालू करने की अनुमति दें या नीचे से फ़ोटो चुनें।"
-            : "Camera permission denied. Please grant permission or upload a photo."
+            ? "कैमरा अनुमति अस्वीकृत हुई। 'कैमरा ऐप (Shutter)' बटन दबाकर सीधे अपने फोन के कैमरे से फोटो खींचें।"
+            : "Camera permission denied or restricted. Tap 'Camera App (Shutter)' to capture directly with phone camera."
+          : isOverconstrained
+          ? lang === "hi"
+            ? "कैमरा रिज़ॉल्यूशन समर्थित नहीं है। नीचे दिए गए कैमरा ऐप बटन से फोटो लें।"
+            : "Camera resolution not supported. Please tap 'Camera App (Shutter)' to capture."
           : msg
       );
       setIsCameraActive(false);
@@ -229,6 +307,14 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
         onChange={handleFileUpload}
         className="hidden"
       />
+      <input
+        type="file"
+        ref={nativeCameraInputRef}
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
 
       {/* Header Info */}
       <div className="flex items-center justify-between">
@@ -255,17 +341,17 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
 
       {/* Horizontal Camera Viewfinder Window */}
       <div className="relative w-full h-44 sm:h-52 bg-black/95 rounded-2xl overflow-hidden border border-surface-container-high/60 flex items-center justify-center shadow-inner">
+        {/* Live Video Element: Always mounted to guarantee videoRef.current is never null */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`w-full h-full object-cover ${isCameraActive ? "block" : "hidden"}`}
+        />
+
         {isCameraActive ? (
           <>
-            {/* Live Video Element */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-            />
-
             {/* Horizontal Alignment Reticle & Scanning Laser */}
             <div className="absolute inset-3 border-2 border-primary/60 rounded-xl pointer-events-none flex flex-col justify-between p-2">
               <div className="flex justify-between items-start">
@@ -366,7 +452,7 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
       </div>
 
       {/* Action Buttons Row */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         {isCameraActive ? (
           <button
             type="button"
@@ -382,19 +468,31 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
             type="button"
             disabled={isProcessing}
             onClick={() => startCamera("environment")}
-            className="flex-1 py-2.5 px-4 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-sm hover:bg-primary-container active:scale-98 transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-sm hover:bg-primary-container active:scale-98 transition-all flex items-center justify-center gap-1.5"
           >
             <span className="material-symbols-outlined text-[18px]">photo_camera</span>
             <span>{lang === "hi" ? "कैमरा खोलें" : "Open Camera"}</span>
           </button>
         )}
 
+        {/* 100% Reliable Native Mobile Shutter Button */}
+        <button
+          type="button"
+          disabled={isProcessing}
+          onClick={() => nativeCameraInputRef.current?.click()}
+          className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1.5 shrink-0"
+          title="Direct native device camera shutter"
+        >
+          <span className="material-symbols-outlined text-[18px]">photo_camera_back</span>
+          <span>{lang === "hi" ? "कैमरा ऐप (Shutter)" : "Camera App (Native)"}</span>
+        </button>
+
         {/* File / Gallery Upload Fallback */}
         <button
           type="button"
           disabled={isProcessing}
           onClick={() => fileInputRef.current?.click()}
-          className="py-2.5 px-3 rounded-xl bg-surface-container font-semibold text-xs text-on-surface hover:bg-surface-container-high transition-colors flex items-center gap-1.5 shrink-0"
+          className="py-2.5 px-3 rounded-xl bg-surface-container font-semibold text-xs text-on-surface hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1.5 shrink-0"
           title="Pick image from gallery"
         >
           <span className="material-symbols-outlined text-[18px] text-secondary">image</span>

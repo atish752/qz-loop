@@ -11,6 +11,7 @@ import { getTopicsForSubject } from "@/lib/data/topics";
 import { useAppLanguage } from "@/lib/utils/i18n";
 import { QuestionScanner } from "./QuestionScanner";
 import { ParsedQuestion } from "@/lib/utils/ocrParser";
+import { detectTopicAndSyllabus } from "@/lib/utils/topicDetector";
 
 export const EXAMS_LIST = [
   { id: "exam-railway-ntpc", name: "Railways (RRB NTPC & Group D)", shortName: "Railways RRB" },
@@ -153,6 +154,74 @@ export const CreateQuestionView: React.FC = () => {
   const [previewLanguage, setPreviewLanguage] = useState<"en" | "hi">("en");
   const [creationMethod, setCreationMethod] = useState<"manual" | "scan">("manual");
   const [scanSuccessNotice, setScanSuccessNotice] = useState<string | null>(null);
+  const [autoDetectedNotice, setAutoDetectedNotice] = useState<string | null>(null);
+
+  // Target examination automatically bound from user profile or persistent storage
+  const persistentExamId =
+    (typeof window !== "undefined"
+      ? localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam")
+      : null) || null;
+  const effectiveExamId = user?.preferred_examination_id || persistentExamId || selectedExamId || "exam-neet-ug";
+  const currentExamObj = EXAMS_LIST.find((e) => e.id === effectiveExamId) || EXAMS_LIST[2] || EXAMS_LIST[0];
+  const currentExamSubjects = EXAM_SUBJECTS_MAP[effectiveExamId] || EXAM_SUBJECTS_MAP["exam-neet-ug"];
+  const currentSubjectObj = currentExamSubjects.find((s) => s.id === selectedSubjectId) || currentExamSubjects[0];
+  const dynamicTopics = getTopicsForSubject(currentSubjectObj?.slug, currentSubjectObj?.name);
+  const effectiveDynamicTopics = React.useMemo(() => {
+    if (targetTopic && targetTopic !== "Others" && !dynamicTopics.includes(targetTopic)) {
+      const idx = dynamicTopics.indexOf("Others");
+      if (idx !== -1) {
+        return [...dynamicTopics.slice(0, idx), targetTopic, ...dynamicTopics.slice(idx)];
+      }
+      return [...dynamicTopics, targetTopic];
+    }
+    return dynamicTopics;
+  }, [dynamicTopics, targetTopic]);
+
+  // Live Debounced Keyword & Topic Auto-Detection when typing or editing
+  const lastAutoDetectedTextRef = useRef<string>("");
+  const autoDetectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const textToAnalyze = (questionText + " " + hindiQuestionText).trim();
+    if (textToAnalyze.length < 6) return;
+    if (textToAnalyze === lastAutoDetectedTextRef.current) return;
+
+    if (autoDetectTimerRef.current) {
+      clearTimeout(autoDetectTimerRef.current);
+    }
+
+    autoDetectTimerRef.current = setTimeout(() => {
+      lastAutoDetectedTextRef.current = textToAnalyze;
+      const detected = detectTopicAndSyllabus(textToAnalyze);
+
+      if (detected.detectedTopic || detected.detectedSyllabusTag || detected.detectedSubjectSlug) {
+        if (detected.detectedTopic) {
+          setTargetTopic(detected.detectedTopic);
+        }
+        if (detected.detectedSyllabusTag && !syllabusTag) {
+          setSyllabusTag(detected.detectedSyllabusTag);
+        }
+        if (detected.detectedPyqInfo && !pyqInfo) {
+          setPyqInfo(detected.detectedPyqInfo);
+        }
+        if (detected.detectedSubjectSlug) {
+          const matchSub = currentExamSubjects.find((s) => s.slug === detected.detectedSubjectSlug);
+          if (matchSub) {
+            setSelectedSubjectId(matchSub.id);
+          }
+        }
+        setAutoDetectedNotice(
+          `✨ Auto-detected: ${detected.detectedTopic || ""} ${detected.detectedSyllabusTag ? `(${detected.detectedSyllabusTag})` : ""}`
+        );
+      }
+    }, 400);
+
+    return () => {
+      if (autoDetectTimerRef.current) {
+        clearTimeout(autoDetectTimerRef.current);
+      }
+    };
+  }, [questionText, hindiQuestionText, currentExamSubjects, syllabusTag, pyqInfo]);
 
   const handleParsedQuestion = useCallback((parsed: ParsedQuestion) => {
     const isHindiText = /[\u0900-\u097F]/.test(parsed.questionText) || lang === "hi";
@@ -177,13 +246,37 @@ export const CreateQuestionView: React.FC = () => {
         setHindiExplanation(parsed.explanation);
       }
     }
+
+    // Smart keyword & topic auto-detection
+    const detected = detectTopicAndSyllabus(parsed.questionText);
+    if (detected.detectedTopic) {
+      setTargetTopic(detected.detectedTopic);
+    }
+    if (detected.detectedSyllabusTag) {
+      setSyllabusTag(detected.detectedSyllabusTag);
+    }
+    if (detected.detectedPyqInfo) {
+      setPyqInfo(detected.detectedPyqInfo);
+    }
+    if (detected.detectedSubjectSlug) {
+      const matchSub = currentExamSubjects.find((s) => s.slug === detected.detectedSubjectSlug);
+      if (matchSub) {
+        setSelectedSubjectId(matchSub.id);
+      }
+    }
+    if (detected.detectedTopic || detected.detectedSyllabusTag) {
+      setAutoDetectedNotice(
+        `✨ Auto-detected: ${detected.detectedTopic || ""} ${detected.detectedSyllabusTag ? `(${detected.detectedSyllabusTag})` : ""}`
+      );
+    }
+
     setScanSuccessNotice(
       lang === "hi"
         ? "प्रश्न और 4 विकल्प स्वचालित रूप से भर गए हैं! सही विकल्प जांचें और प्रकाशित करें।"
         : "Question and 4 options populated! Select the correct option and publish."
     );
     setTimeout(() => setScanSuccessNotice(null), 6000);
-  }, [lang]);
+  }, [lang, currentExamSubjects]);
 
   // Edit Mode state
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
@@ -316,17 +409,6 @@ export const CreateQuestionView: React.FC = () => {
     explanation,
     hindiExplanation,
   ]);
-
-  // Target examination automatically bound from user profile or persistent storage
-  const persistentExamId =
-    (typeof window !== "undefined"
-      ? localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam")
-      : null) || null;
-  const effectiveExamId = user?.preferred_examination_id || persistentExamId || selectedExamId || "exam-neet-ug";
-  const currentExamObj = EXAMS_LIST.find((e) => e.id === effectiveExamId) || EXAMS_LIST[2] || EXAMS_LIST[0];
-  const currentExamSubjects = EXAM_SUBJECTS_MAP[effectiveExamId] || EXAM_SUBJECTS_MAP["exam-neet-ug"];
-  const currentSubjectObj = currentExamSubjects.find((s) => s.id === selectedSubjectId) || currentExamSubjects[0];
-  const dynamicTopics = getTopicsForSubject(currentSubjectObj?.slug, currentSubjectObj?.name);
 
   // Sync exam & subjects from user profile or localStorage automatically
   useEffect(() => {
@@ -479,10 +561,34 @@ export const CreateQuestionView: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       checkDuplicateQuestion(questionText);
+      const textToAnalyze = questionText.trim() || hindiQuestionText.trim();
+      if (textToAnalyze.length >= 8 && !isEditMode) {
+        const detected = detectTopicAndSyllabus(textToAnalyze);
+        if (detected.detectedTopic) {
+          setTargetTopic((prev) => (!prev || prev === "Genetics and Evolution" || prev === "Percentage, Profit & Loss" || dynamicTopics.includes(detected.detectedTopic!) ? detected.detectedTopic! : prev));
+        }
+        if (detected.detectedSyllabusTag) {
+          setSyllabusTag((prev) => (!prev ? detected.detectedSyllabusTag! : prev));
+        }
+        if (detected.detectedPyqInfo) {
+          setPyqInfo((prev) => (!prev ? detected.detectedPyqInfo! : prev));
+        }
+        if (detected.detectedSubjectSlug) {
+          const matchSub = currentExamSubjects.find((s) => s.slug === detected.detectedSubjectSlug);
+          if (matchSub) {
+            setSelectedSubjectId(matchSub.id);
+          }
+        }
+        if (detected.detectedTopic || detected.detectedSyllabusTag) {
+          setAutoDetectedNotice(
+            `✨ Auto-detected: ${detected.detectedTopic || ""} ${detected.detectedSyllabusTag ? `(${detected.detectedSyllabusTag})` : ""}`
+          );
+        }
+      }
     }, 450);
 
     return () => clearTimeout(timer);
-  }, [questionText, checkDuplicateQuestion]);
+  }, [questionText, hindiQuestionText, checkDuplicateQuestion, isEditMode, currentExamSubjects, dynamicTopics]);
 
   const handleOptionChange = (index: number, val: string) => {
     const updated: [string, string, string, string] = [...options];
@@ -864,31 +970,59 @@ export const CreateQuestionView: React.FC = () => {
               )}
             </div>
 
-            {/* Editor vs Reel Preview Mode Tabs */}
-            <div className="flex items-center justify-between bg-surface-container rounded-xl p-1">
+            {/* Three-Way Unified Authoring Bar: Question Editor (Pencil only, minimal space) | Smart Scan Question (Middle, flexible space) | Live Reel Preview (Right, compact) */}
+            <div className="flex items-center gap-1.5 p-1 bg-surface-container rounded-2xl shadow-xs h-12">
+              {/* 1. Question Editor / Manual Entry (Pencil icon only, minimum space, default) */}
               <button
                 type="button"
-                onClick={() => setActiveTab("edit")}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === "edit"
+                onClick={() => {
+                  setActiveTab("edit");
+                  setCreationMethod("manual");
+                }}
+                className={`h-full px-3.5 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+                  activeTab === "edit" && creationMethod === "manual"
                     ? "bg-primary text-on-primary shadow-xs"
-                    : "text-secondary hover:text-on-surface"
+                    : "text-secondary hover:text-on-surface hover:bg-surface-container-high/60"
                 }`}
+                title={lang === "hi" ? "1. मैन्युअल एंट्री (Question Editor)" : "1. Manual Entry (Question Editor)"}
+                aria-label="1. Manual Entry"
               >
-                <span className="material-symbols-outlined text-[16px]">edit</span>
-                <span>{t.questionEditorTab || "Question Editor"}</span>
+                <span className="material-symbols-outlined text-[20px]">edit</span>
               </button>
+
+              {/* 2. Smart Scan Question (Middle, flexible more space, scanner icon) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("edit");
+                  setCreationMethod("scan");
+                }}
+                className={`flex-1 h-full px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 min-w-0 ${
+                  activeTab === "edit" && creationMethod === "scan"
+                    ? "bg-primary text-on-primary shadow-xs"
+                    : "text-secondary hover:text-on-surface hover:bg-surface-container-high/60"
+                }`}
+                title={lang === "hi" ? "2. स्मार्ट स्कैन (OCR)" : "2. Smart Scan Question"}
+                aria-label="2. Smart Scan Question"
+              >
+                <span className="material-symbols-outlined text-[19px] shrink-0">document_scanner</span>
+                <span className="truncate">{lang === "hi" ? "2. स्मार्ट स्कैन (OCR)" : "2. Smart Scan Question"}</span>
+              </button>
+
+              {/* 3. Live Reel Preview (Last, compact width, preview icon) */}
               <button
                 type="button"
                 onClick={() => setActiveTab("preview")}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`h-full px-3 sm:px-3.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 ${
                   activeTab === "preview"
                     ? "bg-primary text-on-primary shadow-xs"
-                    : "text-secondary hover:text-on-surface"
+                    : "text-secondary hover:text-on-surface hover:bg-surface-container-high/60"
                 }`}
+                title={t.liveReelPreviewTab || "Live Reel Preview"}
+                aria-label="Live Reel Preview"
               >
-                <span className="material-symbols-outlined text-[16px]">all_inclusive</span>
-                <span>{t.liveReelPreviewTab || "Live Reel Preview"}</span>
+                <span className="material-symbols-outlined text-[19px]">all_inclusive</span>
+                <span className="hidden xs:inline truncate">{lang === "hi" ? "पूर्वावलोकन" : "Preview"}</span>
               </button>
             </div>
 
@@ -1000,35 +1134,7 @@ export const CreateQuestionView: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handlePublish} className="flex flex-col gap-4">
-                {/* Two Authoring Methods: Manual Adding vs Smart OCR Scan */}
-                <div className="grid grid-cols-2 gap-2 p-1.5 bg-surface-container rounded-2xl shadow-xs">
-                  <button
-                    type="button"
-                    onClick={() => setCreationMethod("manual")}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      creationMethod === "manual"
-                        ? "bg-primary text-on-primary shadow-xs"
-                        : "text-secondary hover:text-on-surface"
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">edit_note</span>
-                    <span>{lang === "hi" ? "1. मैन्युअल एंट्री" : "1. Manual Entry"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCreationMethod("scan")}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      creationMethod === "scan"
-                        ? "bg-primary text-on-primary shadow-xs"
-                        : "text-secondary hover:text-on-surface"
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">document_scanner</span>
-                    <span>{lang === "hi" ? "2. स्मार्ट स्कैन (OCR)" : "2. Smart Scan Question"}</span>
-                  </button>
-                </div>
-
-                {/* Smart OCR Scanner with Horizontal Camera Viewfinder */}
+                {/* Smart OCR Scanner with Horizontal Camera Viewfinder (Mounted when in scan mode) */}
                 {creationMethod === "scan" && (
                   <QuestionScanner
                     onParsedQuestion={handleParsedQuestion}
@@ -1043,121 +1149,6 @@ export const CreateQuestionView: React.FC = () => {
                     <span>{scanSuccessNotice}</span>
                   </div>
                 )}
-
-                {/* Easy 3-Step Question Maker and position under exam removed from UI; target exam is default */}
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 shadow-xs">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
-                      <span className="material-symbols-outlined text-[20px]">school</span>
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-label-sm text-[10px] uppercase tracking-wider text-secondary font-bold">
-                        Target Exam (Default)
-                      </span>
-                      <span className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface truncate">
-                        {currentExamObj.name}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
-                    {currentExamObj.shortName}
-                  </span>
-                </div>
-
-                {/* Subject Selector Filter Row (Target Domain) */}
-                <section>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
-                      {t.targetDomain}
-                    </span>
-                    <span className="font-label-sm text-label-sm text-primary flex items-center gap-1 font-bold">
-                      <span className="material-symbols-outlined text-[14px]">bolt</span>
-                      +25 Rep Points
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-                    {currentExamSubjects.map((s) => {
-                      const isSelected = selectedSubjectId === s.id;
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => handleSubjectSelect(s.id)}
-                          className={`px-3.5 py-2 rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 shrink-0 ${
-                            isSelected
-                              ? "bg-primary text-on-primary shadow-sm font-bold scale-[1.02]"
-                              : "bg-surface-container text-secondary hover:text-on-surface"
-                          }`}
-                        >
-                          <span className="material-symbols-outlined text-[16px]">{s.icon}</span>
-                          <span>{s.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                {/* Subtopic, Syllabus Tag & PYQ Metadata Row */}
-                <section className="bg-surface-container-low rounded-xl p-3 border border-surface-container-high/40 flex flex-col gap-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
-                        {t.syllabusTag}
-                      </label>
-                      <input
-                        type="text"
-                        value={syllabusTag}
-                        onChange={(e) => setSyllabusTag(e.target.value)}
-                        placeholder="e.g. Indian Polity · Article 14-32"
-                        className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
-                        {t.pyqInfo}
-                      </label>
-                      <input
-                        type="text"
-                        value={pyqInfo}
-                        onChange={(e) => setPyqInfo(e.target.value)}
-                        placeholder="e.g. SSC CGL 2023 Tier 1, RRB NTPC 2021"
-                        className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
-                      {t.selectTopic}
-                    </label>
-                    <select
-                      value={targetTopic}
-                      onChange={(e) => setTargetTopic(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-semibold focus:outline-none focus:border-primary"
-                    >
-                      {dynamicTopics.map((top) => (
-                        <option key={top} value={top}>
-                          {top}
-                        </option>
-                      ))}
-                    </select>
-
-                    {targetTopic === "Others" && (
-                      <div className="mt-2 animate-in fade-in">
-                        <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
-                          {lang === "hi" ? "कस्टम टॉपिक का नाम लिखें (वैकल्पिक)" : "Specify Topic Name (Optional)"}
-                        </label>
-                        <input
-                          type="text"
-                          value={customTopic}
-                          onChange={(e) => setCustomTopic(e.target.value)}
-                          placeholder={lang === "hi" ? "उदा. आधुनिक भारत का इतिहास, लाभ-हानि शॉर्टकट" : "e.g. Modern Indian History, Percentage Shortcuts"}
-                          className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </section>
 
                 {/* Language Format & Difficulty */}
                 {/* Language Format (Difficulty & penalty are default as per exam) */}
@@ -1406,7 +1397,7 @@ export const CreateQuestionView: React.FC = () => {
                   </p>
                 </section>
 
-                {/* Explanation Fields (English & Hindi) */}
+                {/* Explanation / Solution Proof Fields (English & Hindi) */}
                 <section className="bg-surface-container-low rounded-xl p-3 border border-surface-container-high/40 flex flex-col gap-2.5">
                   {(languageFormat === "en" || languageFormat === "bilingual") && (
                     <div>
@@ -1441,6 +1432,143 @@ export const CreateQuestionView: React.FC = () => {
                       />
                     </div>
                   )}
+                </section>
+
+                {/* ============================================================== */}
+                {/* BOTTOM SECTION: Subject, Topic, Syllabus Tag & PYQ Details     */}
+                {/* Placed below question explanation as per specification         */}
+                {/* ============================================================== */}
+
+                {/* Smart Auto-Detection Indicator */}
+                {autoDetectedNotice && (
+                  <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/25 text-primary text-xs font-bold flex items-center justify-between gap-2 animate-in fade-in">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="material-symbols-outlined text-[17px] text-primary shrink-0">auto_awesome</span>
+                      <span className="truncate">{autoDetectedNotice}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAutoDetectedNotice(null)}
+                      className="text-[11px] underline opacity-80 hover:opacity-100 shrink-0"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+
+                {/* Easy 3-Step Question Maker & Target Exam Default Card */}
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 shadow-xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
+                      <span className="material-symbols-outlined text-[20px]">school</span>
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-label-sm text-[10px] uppercase tracking-wider text-secondary font-bold">
+                        Easy 3-Step Question Maker · Target Exam
+                      </span>
+                      <span className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface truncate">
+                        {currentExamObj.name}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
+                    {currentExamObj.shortName}
+                  </span>
+                </div>
+
+                {/* Subject Selector Filter Row (Target Domain) */}
+                <section>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-label-sm text-label-sm uppercase tracking-wider text-secondary font-semibold">
+                      {t.targetDomain}
+                    </span>
+                    <span className="font-label-sm text-label-sm text-primary flex items-center gap-1 font-bold">
+                      <span className="material-symbols-outlined text-[14px]">bolt</span>
+                      +25 Rep Points
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                    {currentExamSubjects.map((s) => {
+                      const isSelected = selectedSubjectId === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => handleSubjectSelect(s.id)}
+                          className={`px-3.5 py-2 rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 shrink-0 ${
+                            isSelected
+                              ? "bg-primary text-on-primary shadow-sm font-bold scale-[1.02]"
+                              : "bg-surface-container text-secondary hover:text-on-surface"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">{s.icon}</span>
+                          <span>{s.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* Subtopic, Syllabus Tag & PYQ Metadata Row */}
+                <section className="bg-surface-container-low rounded-xl p-3 border border-surface-container-high/40 flex flex-col gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
+                        {t.syllabusTag}
+                      </label>
+                      <input
+                        type="text"
+                        value={syllabusTag}
+                        onChange={(e) => setSyllabusTag(e.target.value)}
+                        placeholder="e.g. Indian Polity · Article 14-32"
+                        className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
+                        {t.pyqInfo}
+                      </label>
+                      <input
+                        type="text"
+                        value={pyqInfo}
+                        onChange={(e) => setPyqInfo(e.target.value)}
+                        placeholder="e.g. SSC CGL 2023 Tier 1, RRB NTPC 2021"
+                        className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
+                      {t.selectTopic}
+                    </label>
+                    <select
+                      value={targetTopic}
+                      onChange={(e) => setTargetTopic(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-semibold focus:outline-none focus:border-primary"
+                    >
+                      {effectiveDynamicTopics.map((top) => (
+                        <option key={top} value={top}>
+                          {top}
+                        </option>
+                      ))}
+                    </select>
+
+                    {targetTopic === "Others" && (
+                      <div className="mt-2 animate-in fade-in">
+                        <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
+                          {lang === "hi" ? "कस्टम टॉपिक का नाम लिखें (वैकल्पिक)" : "Specify Topic Name (Optional)"}
+                        </label>
+                        <input
+                          type="text"
+                          value={customTopic}
+                          onChange={(e) => setCustomTopic(e.target.value)}
+                          placeholder={lang === "hi" ? "उदा. आधुनिक भारत का इतिहास, लाभ-हानि शॉर्टकट" : "e.g. Modern Indian History, Percentage Shortcuts"}
+                          className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </section>
 
                 {/* Join WhatsApp Study Community Banner */}

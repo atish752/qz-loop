@@ -56,6 +56,37 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
       );
       setTimeout(() => setToastMsg(null), 2200);
 
+      // Optimistic collection update for instant 0ms visual responsiveness
+      setCollections((prev) => {
+        const hasDefault = prev.some((c) => c.name.toLowerCase() === "saved questions");
+        let list = prev;
+        if (!hasDefault) {
+          list = [
+            ...prev,
+            {
+              id: `col-default-${Date.now()}`,
+              user_id: "",
+              name: "Saved Questions",
+              question_ids: [],
+              created_at: new Date().toISOString(),
+            },
+          ];
+        }
+        return list.map((c) => {
+          if (c.name.toLowerCase() === "saved questions") {
+            const newIds = isSavedIndependently
+              ? c.question_ids.filter((id) => id !== question.id)
+              : [...c.question_ids, question.id];
+            return { ...c, question_ids: newIds };
+          }
+          return c;
+        });
+      });
+
+      if (onSavedChange) {
+        onSavedChange(action === "save" ? ["Saved Questions"] : []);
+      }
+
       const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       const res = await fetch("/api/collections", {
         method: "POST",

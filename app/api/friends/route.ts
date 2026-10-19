@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const cookieUserId = request.cookies.get("qz_user_id")?.value;
     const requestedUserId =
-      searchParams.get("userId") || request.headers.get("x-user-id") || cookieUserId;
+      searchParams.get("userId") || request.headers.get("x-user-id") || cookieUserId || db.getCurrentUser().id;
 
     if (!requestedUserId || requestedUserId === "guest") {
       return NextResponse.json({ success: true, friends: [], isGuest: true });

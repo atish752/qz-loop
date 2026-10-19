@@ -25,6 +25,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
   const [addFriendInput, setAddFriendInput] = useState("");
   const [addStatusMsg, setAddStatusMsg] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [shareToast, setShareToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -48,6 +49,9 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
     try {
       const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       setSentMap((prev) => ({ ...prev, [friend.id]: true }));
+      setShareToast(`Question sent to ${friend.display_name}! 🚀`);
+      setTimeout(() => setShareToast(null), 2500);
+
       await fetch("/api/messages", {
         method: "POST",
         headers: {
@@ -159,6 +163,14 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
+
+        {/* Share Confirmation Toast */}
+        {shareToast && (
+          <div className="my-2 p-2 rounded-xl bg-primary text-on-primary text-xs font-bold text-center animate-in fade-in flex items-center justify-center gap-1.5 shadow-sm">
+            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+            <span>{shareToast}</span>
+          </div>
+        )}
 
         {/* 1-Click WhatsApp Viral Challenge Card (Top Priority for Indian Students) */}
         <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-emerald-600/5 to-surface-container-low border border-emerald-500/30 flex flex-col gap-2.5 shadow-xs">

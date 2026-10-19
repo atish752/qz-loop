@@ -29,11 +29,18 @@ export const AuthorModal: React.FC<AuthorModalProps> = ({
   const [resolvedUsername, setResolvedUsername] = useState<string>(
     authorUsername || getAuthorFallbackUsername(authorName, authorId)
   );
+  const [resolvedAvatar, setResolvedAvatar] = useState<string | undefined>(authorAvatar);
   const [publishedCount, setPublishedCount] = useState<number>(questionsCount ?? 1);
   const [examName, setExamName] = useState<string>(targetExam);
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
 
   const emoji = getAuthorEmoji(authorId || authorName);
+
+  useEffect(() => {
+    if (authorAvatar) {
+      setResolvedAvatar(authorAvatar);
+    }
+  }, [authorAvatar]);
 
   useEffect(() => {
     if (isOpen && authorId) {
@@ -44,6 +51,7 @@ export const AuthorModal: React.FC<AuthorModalProps> = ({
           if (data.success && data.user) {
             if (data.user.username) setResolvedUsername(data.user.username);
             if (data.user.target_exam) setExamName(data.user.target_exam);
+            if (data.user.avatar_url) setResolvedAvatar(data.user.avatar_url);
           }
         })
         .catch(() => {});
@@ -65,10 +73,20 @@ export const AuthorModal: React.FC<AuthorModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
       <div className="w-full max-w-xs bg-surface-container-lowest rounded-3xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col items-center text-center gap-3.5 animate-in zoom-in-95 duration-150">
-        {/* Aspirant Emoji Circle Avatar */}
+        {/* Aspirant Profile Avatar (Real photo instead of fire emoji) */}
         <div className="relative">
-          <div className="w-18 h-18 rounded-full bg-gradient-to-br from-primary-fixed via-primary-container/20 to-secondary-fixed border-3 border-surface-container-lowest shadow-md flex items-center justify-center text-3xl select-none">
-            {emoji}
+          <div className="w-18 h-18 rounded-full bg-gradient-to-br from-primary-fixed via-primary-container/20 to-secondary-fixed border-3 border-surface-container-lowest shadow-md flex items-center justify-center overflow-hidden">
+            {resolvedAvatar || authorAvatar ? (
+              <img
+                src={resolvedAvatar || authorAvatar}
+                alt={authorName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="font-bold text-lg text-primary select-none">
+                {(authorName || "A").slice(0, 2).toUpperCase()}
+              </span>
+            )}
           </div>
           <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs text-xs font-bold" title="Verified Aspirant Contributor">
             ✓

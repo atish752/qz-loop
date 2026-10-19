@@ -4,6 +4,12 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Question, Examination, UserProfile, FriendUser } from "@/types/database";
 import { QuestionReelCard, AnswerRecord } from "./QuestionReelCard";
 import { StudyChatModal } from "./StudyChatModal";
+import { SavePlaylistModal } from "./SavePlaylistModal";
+import { ShareFriendModal } from "./ShareFriendModal";
+import { CommentsModal } from "./CommentsModal";
+import { AuthorModal } from "../feed/AuthorModal";
+import { ReportModal } from "../feed/ReportModal";
+import { SuggestionModal } from "./SuggestionModal";
 import { TopHeader } from "../layout/TopHeader";
 import { ExamSwitchModal } from "../feed/ExamSwitchModal";
 import { OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
@@ -67,6 +73,35 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
   // Direct Study Chat Modal
   const [activeChatFriend, setActiveChatFriend] = useState<FriendUser | null>(null);
+
+  // Hoisted Modals State (Eliminates CSS transform positioning glitch across reels)
+  const [activeSaveQuestion, setActiveSaveQuestion] = useState<Question | null>(null);
+  const [activeShareQuestion, setActiveShareQuestion] = useState<Question | null>(null);
+  const [activeCommentsQuestion, setActiveCommentsQuestion] = useState<Question | null>(null);
+  const [activeAuthorQuestion, setActiveAuthorQuestion] = useState<Question | null>(null);
+  const [activeReportQuestionId, setActiveReportQuestionId] = useState<string | null>(null);
+  const [activeSuggestionQuestion, setActiveSuggestionQuestion] = useState<Question | null>(null);
+  const [savedQuestionIds, setSavedQuestionIds] = useState<Set<string>>(new Set());
+
+  // Load user's saved collections on mount to initialize bookmark state accurately
+  useEffect(() => {
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const url = currentUid ? `/api/collections?userId=${encodeURIComponent(currentUid)}` : "/api/collections";
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.collections)) {
+          const ids = new Set<string>();
+          data.collections.forEach((c: { question_ids?: string[] }) => {
+            if (Array.isArray(c.question_ids)) {
+              c.question_ids.forEach((id: string) => ids.add(id));
+            }
+          });
+          setSavedQuestionIds(ids);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Streak & Dopamine combo tracking
   const [comboCount, setComboCount] = useState<number>(0);
@@ -333,6 +368,14 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         hasSelectedPendingOption: false,
         submitCurrentOption: () => {},
       };
+      // Reset any open hoisted modals
+      setActiveSaveQuestion(null);
+      setActiveShareQuestion(null);
+      setActiveCommentsQuestion(null);
+      setActiveAuthorQuestion(null);
+      setActiveReportQuestionId(null);
+      setActiveSuggestionQuestion(null);
+
       setCurrentIndex((prev) => {
         const next = prev + 1;
         // Auto prefetch when remaining queue is low
@@ -361,6 +404,14 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
       hasSelectedPendingOption: false,
       submitCurrentOption: () => {},
     };
+    // Reset any open hoisted modals
+    setActiveSaveQuestion(null);
+    setActiveShareQuestion(null);
+    setActiveCommentsQuestion(null);
+    setActiveAuthorQuestion(null);
+    setActiveReportQuestionId(null);
+    setActiveSuggestionQuestion(null);
+
     setCurrentIndex((prev) => prev - 1);
     setTimeout(() => {
       isTransitioningRef.current = false;
@@ -957,7 +1008,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             {questions.map((q, idx) => (
               <div
                 key={q.id}
-                className="w-full h-full shrink-0 relative overflow-hidden"
+                className={`w-full h-full shrink-0 relative overflow-hidden ${
+                  idx === currentIndex ? "pointer-events-auto" : "pointer-events-none"
+                }`}
               >
                 <QuestionReelCard
                   question={q}
@@ -976,6 +1029,13 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                   }}
                   onOpenChatWithFriend={(friend) => setActiveChatFriend(friend)}
                   preferredLanguage={quizLanguage}
+                  onOpenSaveModal={(question) => setActiveSaveQuestion(question)}
+                  onOpenShareModal={(question) => setActiveShareQuestion(question)}
+                  onOpenCommentsModal={(question) => setActiveCommentsQuestion(question)}
+                  onOpenAuthorModal={(question) => setActiveAuthorQuestion(question)}
+                  onOpenReportModal={(qId) => setActiveReportQuestionId(qId)}
+                  onOpenSuggestionModal={(question) => setActiveSuggestionQuestion(question)}
+                  isSavedExternal={savedQuestionIds.has(q.id)}
                 />
               </div>
             ))}
@@ -1071,6 +1131,75 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           }
         }}
       />
+
+      {/* Hoisted Action Modals outside transform containing block */}
+      {activeSaveQuestion && (
+        <SavePlaylistModal
+          question={activeSaveQuestion}
+          isOpen={Boolean(activeSaveQuestion)}
+          onClose={() => setActiveSaveQuestion(null)}
+          onSavedChange={(savedList) => {
+            setSavedQuestionIds((prev) => {
+              const next = new Set(prev);
+              if (savedList.length > 0) {
+                next.add(activeSaveQuestion.id);
+              } else {
+                next.delete(activeSaveQuestion.id);
+              }
+              return next;
+            });
+          }}
+        />
+      )}
+
+      {activeShareQuestion && (
+        <ShareFriendModal
+          question={activeShareQuestion}
+          isOpen={Boolean(activeShareQuestion)}
+          onClose={() => setActiveShareQuestion(null)}
+          onOpenChatWithFriend={(friend) => {
+            setActiveShareQuestion(null);
+            setActiveChatFriend(friend);
+          }}
+        />
+      )}
+
+      {activeCommentsQuestion && (
+        <CommentsModal
+          question={activeCommentsQuestion}
+          isOpen={Boolean(activeCommentsQuestion)}
+          onClose={() => setActiveCommentsQuestion(null)}
+        />
+      )}
+
+      {activeAuthorQuestion && (
+        <AuthorModal
+          authorName={activeAuthorQuestion.author_name || "Aspirant"}
+          authorAvatar={activeAuthorQuestion.author_avatar}
+          authorUsername={activeAuthorQuestion.author_name?.toLowerCase().replace(/\s+/g, "_") || "aspirant"}
+          authorId={activeAuthorQuestion.author_id}
+          targetExam={activeExam?.name || "Target Exam"}
+          isOpen={Boolean(activeAuthorQuestion)}
+          onClose={() => setActiveAuthorQuestion(null)}
+        />
+      )}
+
+      {activeReportQuestionId && (
+        <ReportModal
+          questionId={activeReportQuestionId}
+          isOpen={Boolean(activeReportQuestionId)}
+          onClose={() => setActiveReportQuestionId(null)}
+          onReportSubmitted={() => {}}
+        />
+      )}
+
+      {activeSuggestionQuestion && (
+        <SuggestionModal
+          question={activeSuggestionQuestion}
+          isOpen={Boolean(activeSuggestionQuestion)}
+          onClose={() => setActiveSuggestionQuestion(null)}
+        />
+      )}
     </div>
   );
 };
