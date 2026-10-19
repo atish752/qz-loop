@@ -26,12 +26,11 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const { t } = useAppLanguage();
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
-  // Initialize theme from localStorage or system preference on mount
+  // Initialize theme from localStorage on mount (Light mode default for first-time visitors)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("qz_theme");
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const shouldBeDark = savedTheme === "dark" || (!savedTheme && prefersDark);
+      const shouldBeDark = savedTheme === "dark";
       setIsDarkMode(shouldBeDark);
       if (shouldBeDark) {
         document.documentElement.classList.add("dark");
@@ -39,6 +38,15 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         document.documentElement.classList.remove("dark");
       }
     }
+
+    const handleThemeChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isDark: boolean }>;
+      if (customEvent.detail && typeof customEvent.detail.isDark === "boolean") {
+        setIsDarkMode(customEvent.detail.isDark);
+      }
+    };
+    window.addEventListener("qz_theme_changed", handleThemeChange);
+    return () => window.removeEventListener("qz_theme_changed", handleThemeChange);
   }, []);
 
   // Toggle dark mode
@@ -51,6 +59,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     } else {
       document.documentElement.classList.remove("dark");
       localStorage.setItem("qz_theme", "light");
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("qz_theme_changed", { detail: { isDark: nextMode } }));
     }
   };
 

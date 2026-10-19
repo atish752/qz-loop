@@ -1117,8 +1117,47 @@ async function runTests() {
   assert(s56ProfileFile.includes("setAppLanguage"), "ProfileView provides language switcher via setAppLanguage");
   assert(s56ProfileFile.includes("App Language (भाषा)"), "ProfileView settings includes App Language option");
 
+  // Scenario 57: Light Mode Default, Target Headline, First-Time Exam Selector, Quiz Loop UI Overhaul & Guest Auth Gating
+  console.log("\n[Scenario 57] Light Mode Default, Target Headline, First-Time Exam Selector, Quiz Loop UI Overhaul & Guest Auth Gating");
+  const s57LayoutFile = fs.readFileSync(path.join(__dirname, "../app/layout.tsx"), "utf8");
+  assert(s57LayoutFile.includes("theme === 'dark'"), "Layout script activates dark mode only when explicitly saved as dark");
+  assert(!s57LayoutFile.includes("prefers-color-scheme: dark"), "Layout script does not default to dark via prefers-color-scheme");
+
+  const s57HomeFile = fs.readFileSync(path.join(__dirname, "../components/home/HomeDashboardView.tsx"), "utf8");
+  assert(s57HomeFile.includes("Your Target is") && s57HomeFile.includes("Practice Unlimited"), "HomeDashboardView renders 'Your Target is ... Practice Unlimited' headline");
+  assert(s57HomeFile.includes("<FirstTimeExamModal"), "HomeDashboardView mounts FirstTimeExamModal");
+  assert(s57HomeFile.includes("filter blur-md"), "HomeDashboardView gates lower dashboard for guests with blur container");
+
+  const s57ModalFile = fs.readFileSync(path.join(__dirname, "../components/home/FirstTimeExamModal.tsx"), "utf8");
+  assert(s57ModalFile.includes("/loop?start=true&examId="), "FirstTimeExamModal redirects with deep link parameters");
+
+  const s57ReelFile = fs.readFileSync(path.join(__dirname, "../components/loop/QuestionReelCard.tsx"), "utf8");
+  assert(!s57ReelFile.includes("Question by <strong"), "QuestionReelCard removed 'Question by' row above question text");
+  assert(!s57ReelFile.includes("I know this (hide)"), "QuestionReelCard removed bottom 'I know this (hide)' bar");
+  assert(s57ReelFile.includes("SWIPE"), "QuestionReelCard renders vertical SWIPE control button");
+  assert(s57ReelFile.includes("authorEmoji"), "QuestionReelCard renders authorEmoji avatar");
+
+  const s57LoopContainerFile = fs.readFileSync(path.join(__dirname, "../components/loop/QuizLoopContainer.tsx"), "utf8");
+  assert(s57LoopContainerFile.includes("status.isAnswerMode && !status.isAnswered"), "QuizLoopContainer only prompts skip modal if user revealed answers");
+  assert(s57LoopContainerFile.includes("qz_quiz_lang"), "QuizLoopContainer includes top bilingual switch");
+  assert(s57LoopContainerFile.includes("startParamHandledRef"), "QuizLoopContainer guards against infinite auto-start re-triggers");
+  assert(s57LoopContainerFile.includes("isAnswerMode: false"), "QuizLoopContainer resets activeStatusRef upon reel transition");
+
+  const s57TopHeaderFile = fs.readFileSync(path.join(__dirname, "../components/layout/TopHeader.tsx"), "utf8");
+  assert(s57TopHeaderFile.includes("qz_theme_changed"), "TopHeader synchronizes theme state with qz_theme_changed");
+
+  const s57CreateFile = fs.readFileSync(path.join(__dirname, "../components/create/CreateQuestionView.tsx"), "utf8");
+  assert(s57CreateFile.includes("filter blur-md"), "CreateQuestionView gates form below banner with blur container");
+
+  const s57SocialFile = fs.readFileSync(path.join(__dirname, "../components/social/SocialView.tsx"), "utf8");
+  assert(s57SocialFile.includes("filter blur-md"), "SocialView gates social lounge below header with blur container");
+
+  const s57ProfileFile = fs.readFileSync(path.join(__dirname, "../components/profile/ProfileView.tsx"), "utf8");
+  assert(s57ProfileFile.includes("filter blur-md"), "ProfileView gates profile and settings with blur container");
+  assert(s57ProfileFile.includes("Target Examination") || s57ProfileFile.includes("Target Exam"), "ProfileView provides guest exam switcher card");
+
   console.log("\n=================================================");
-  console.log("   ALL 56 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 57 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

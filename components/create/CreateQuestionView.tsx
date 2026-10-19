@@ -684,7 +684,11 @@ export const CreateQuestionView: React.FC = () => {
             </div>
           </div>
         )}
-        {publishSuccess ? (
+
+        {/* Creator Studio Form Area (Locked & Blurred for Guests) */}
+        <div className="relative my-1">
+          <div className={!isLoggedIn ? "filter blur-md select-none pointer-events-none opacity-40 transition-all" : ""}>
+            {publishSuccess ? (
           <div className="py-8 flex flex-col items-center justify-center text-center gap-4 animate-in fade-in max-w-md mx-auto">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center shadow-md">
               <span className="material-symbols-outlined text-[36px]">
@@ -1427,6 +1431,43 @@ export const CreateQuestionView: React.FC = () => {
             )}
           </div>
         )}
+      </div>
+
+          {!isLoggedIn && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-start pt-12 sm:pt-16 p-4 text-center bg-surface/30 backdrop-blur-xs rounded-2xl">
+              <div className="sticky top-20 flex flex-col items-center p-6 rounded-3xl bg-surface/95 backdrop-blur-md border border-primary/20 shadow-xl max-w-sm mx-auto">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-sm mb-3">
+                  <span className="material-symbols-outlined text-[32px]">lock</span>
+                </div>
+                <h3 className="text-lg font-bold text-on-surface">
+                  {lang === "hi" ? "क्रिएटर स्टूडियो लॉक है" : "Creator Studio Locked"}
+                </h3>
+                <p className="text-xs text-secondary mt-1.5 max-w-xs leading-relaxed mb-4">
+                  {lang === "hi"
+                    ? "प्रश्न प्रकाशित करने, शॉर्टकट ट्रिक्स साझा करने और समुदाय में योगदान देने के लिए साइन इन करें।"
+                    : "Sign in or create a free account to author verified MCQs, share shortcut tricks, and contribute to the community feed."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("open_auth_modal", {
+                        detail: {
+                          reason: "Sign in to publish questions & earn community badges",
+                          mode: "signup",
+                        },
+                      })
+                    );
+                  }}
+                  className="py-3 px-6 rounded-xl bg-primary text-on-primary font-bold text-sm flex items-center gap-2 shadow-md hover:bg-primary-container active:scale-95 transition-all cursor-pointer pointer-events-auto"
+                >
+                  <span className="material-symbols-outlined text-[18px]">login</span>
+                  <span>{t.signInToPublish || "Sign In / Sign Up to Publish"}</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Duplicate Details Modal */}

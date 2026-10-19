@@ -535,6 +535,30 @@ export const ProfileView: React.FC = () => {
               </div>
             </div>
 
+            {/* Guest Examination Switcher (The single unlocked action before sign in) */}
+            <div className="p-3.5 rounded-xl bg-surface-container border border-surface-container-high/60 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">school</span>
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] font-bold text-secondary uppercase tracking-wider block">
+                    {lang === "hi" ? "लक्ष्य परीक्षा (Target Exam)" : "Target Examination"}
+                  </span>
+                  <span className="text-xs font-bold text-on-surface truncate">
+                    {user?.target_exam || activeExam?.name || "Railways (RRB NTPC & Group D)"}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExamModal(true)}
+                className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-bold text-xs hover:bg-primary-container active:scale-95 transition-all shadow-2xs shrink-0"
+              >
+                {lang === "hi" ? "बदलें" : "Switch"}
+              </button>
+            </div>
+
             <p className="text-xs text-secondary leading-relaxed">
               {t.guestProfileBanner || "Create your account with your unique username and chosen competitive exam. Start from fresh 0 scratch and build your practice streak!"}
             </p>
@@ -550,7 +574,7 @@ export const ProfileView: React.FC = () => {
               className="w-full py-2.5 rounded-xl bg-primary text-on-primary font-bold text-sm flex items-center justify-center gap-2 shadow-sm hover:bg-primary-container active:scale-95 transition-all"
             >
               <span className="material-symbols-outlined text-[18px]">login</span>
-              <span>{t.signInCreateAccount || "Sign In with Google"}</span>
+              <span>{t.signInCreateAccount || "Sign In / Sign Up"}</span>
             </button>
           </div>
         ) : (
@@ -616,7 +640,10 @@ export const ProfileView: React.FC = () => {
           </div>
         )}
 
-        {/* All India Ranks & Standings Prominent Entry */}
+        {/* Profile Content (Locked & Blurred for Unauthenticated Guests) */}
+        <div className="relative my-1">
+          <div className={!isLoggedIn ? "filter blur-md select-none pointer-events-none opacity-40 transition-all" : ""}>
+            {/* All India Ranks & Standings Prominent Entry */}
         <div className="bg-gradient-to-r from-primary-fixed/60 via-primary-container/25 to-surface-container-low rounded-2xl p-4 mb-4 border border-primary/25 shadow-xs flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-11 h-11 rounded-2xl bg-primary text-on-primary flex items-center justify-center shrink-0 shadow-sm">
@@ -1217,6 +1244,43 @@ export const ProfileView: React.FC = () => {
               </button>
             );
           })}
+        </div>
+          </div>
+
+          {!isLoggedIn && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-start pt-12 sm:pt-16 p-4 text-center bg-surface/30 backdrop-blur-xs rounded-2xl">
+              <div className="sticky top-20 flex flex-col items-center p-6 rounded-3xl bg-surface/95 backdrop-blur-md border border-primary/20 shadow-xl max-w-sm mx-auto">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-sm mb-3">
+                  <span className="material-symbols-outlined text-[32px]">lock</span>
+                </div>
+                <h3 className="text-lg font-bold text-on-surface">
+                  {lang === "hi" ? "प्रोफ़ाइल और सेटिंग्स लॉक हैं" : "Profile & Study Playlists Locked"}
+                </h3>
+                <p className="text-xs text-secondary mt-1.5 max-w-xs leading-relaxed mb-4">
+                  {lang === "hi"
+                    ? "अपनी दैनिक प्रगति, अध्ययन प्लेलिस्ट, प्रकाशित प्रश्न और सेटिंग्स अनलॉक करने के लिए साइन इन करें।"
+                    : "Sign in or create a free account to customize your revision playlists, view authored questions, and track your practice streak."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("open_auth_modal", {
+                        detail: {
+                          reason: "Sign in or create an account to start your streak",
+                          mode: "signup",
+                        },
+                      })
+                    );
+                  }}
+                  className="py-3 px-6 rounded-xl bg-primary text-on-primary font-bold text-sm flex items-center gap-2 shadow-md hover:bg-primary-container active:scale-95 transition-all cursor-pointer pointer-events-auto"
+                >
+                  <span className="material-symbols-outlined text-[18px]">login</span>
+                  <span>{t.signInCreateAccount || "Sign In / Sign Up"}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

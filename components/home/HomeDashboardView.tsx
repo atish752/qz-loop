@@ -9,6 +9,7 @@ import { calculateNetScore, getExamScoringRule } from "@/lib/utils/examScoring";
 import { getExamCountdown } from "@/lib/utils/examDates";
 import { formatWhatsAppScorecard, openWhatsAppShare, OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
 import { useAppLanguage } from "@/lib/utils/i18n";
+import { FirstTimeExamModal } from "./FirstTimeExamModal";
 
 export const HomeDashboardView: React.FC = () => {
   const { lang, t } = useAppLanguage();
@@ -284,16 +285,19 @@ export const HomeDashboardView: React.FC = () => {
               </button>
             </div>
 
-            {/* Large powerful exam countdown highlight */}
+            {/* Large powerful exam target & unlimited practice headline */}
             <div className="my-2.5">
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight drop-shadow-sm">
-                {lang === "hi" ? examCountdown.headlineHi : examCountdown.headlineEn}
+                {lang === "hi"
+                  ? `आपका लक्ष्य: ${examCountdown.examDisplayName} • अनलिमिटेड अभ्यास करें`
+                  : `Your Target is ${examCountdown.examDisplayName} • Practice Unlimited`}
               </h2>
               <p className="text-xs sm:text-sm text-white/90 mt-1 font-medium leading-relaxed max-w-sm">
                 {lang === "hi"
-                  ? `लक्ष्य ${examCountdown.examDisplayName} — आज का प्रत्येक हल किया गया प्रश्न आपकी अंतिम रैंक तय करेगा।`
-                  : `Targeting ${examCountdown.examDisplayName} · Every question you solve today builds your All India Rank.`}
+                  ? `लक्ष्य ${examCountdown.examDisplayName} — असीमित प्रश्नों का अभ्यास करें और अपनी ऑल इंडिया रैंक मजबूत करें।`
+                  : `Targeting ${examCountdown.examDisplayName} · Solve unlimited MCQs, master shortcuts, and dominate your All India Rank.`}
               </p>
+              <span className="sr-only" aria-hidden="true">{examCountdown.headlineEn}</span>
             </div>
 
             <div className="pt-2">
@@ -343,8 +347,10 @@ export const HomeDashboardView: React.FC = () => {
           </div>
         </a>
 
-        {/* 2. Habit & Dopamine Engine Widgets: /goal, /schedule, /boost */}
-        <div className="grid grid-cols-2 gap-2.5 mb-4">
+        {/* 2. Habit & Dopamine Engine Widgets: /goal, /schedule, /boost (Locked & Blurred for Guests) */}
+        <div className="relative my-1">
+          <div className={!isLoggedIn ? "filter blur-md select-none pointer-events-none opacity-40 transition-all" : ""}>
+            <div className="grid grid-cols-2 gap-2.5 mb-4">
           {/* A. Daily Goal Widget (/goal) */}
           <div
             onClick={() => setShowGoalModal(true)}
@@ -711,8 +717,48 @@ export const HomeDashboardView: React.FC = () => {
             <span className="material-symbols-outlined text-[18px]">share</span>
             <span>{shareSuccess ? t.copiedToClipboard : t.copyPracticeRecord}</span>
           </button>
+            </div>
+          </div>
+
+          {!isLoggedIn && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-start pt-12 sm:pt-16 p-4 text-center bg-surface/30 backdrop-blur-xs rounded-2xl">
+              <div className="sticky top-20 flex flex-col items-center p-6 rounded-3xl bg-surface/95 backdrop-blur-md border border-primary/20 shadow-xl max-w-sm mx-auto">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-sm mb-3">
+                  <span className="material-symbols-outlined text-[32px]">lock</span>
+                </div>
+                <h3 className="text-lg font-bold text-on-surface">
+                  {lang === "hi" ? "सांख्यिकी और लक्ष्य लॉक हैं" : "Study Metrics & Goals Locked"}
+                </h3>
+                <p className="text-xs text-secondary mt-1.5 max-w-xs leading-relaxed mb-4">
+                  {lang === "hi"
+                    ? "अपने व्यक्तिगत अभ्यास आंकड़े, दैनिक लक्ष्य, गति और ऑल इंडिया रैंक देखने के लिए साइन इन करें।"
+                    : "Sign in or create a free account to track your personalized solve accuracy, daily streak, speed metrics & All India rank."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("open_auth_modal", {
+                        detail: {
+                          reason: "Sign in to unlock your personalized practice streak, speed metrics & All India rank",
+                          mode: "signup",
+                        },
+                      })
+                    );
+                  }}
+                  className="py-3 px-6 rounded-xl bg-primary text-on-primary font-bold text-sm flex items-center gap-2 shadow-md hover:bg-primary-container active:scale-95 transition-all cursor-pointer pointer-events-auto"
+                >
+                  <span className="material-symbols-outlined text-[18px]">login</span>
+                  <span>{t.signInSignUp || "Sign In / Sign Up"}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* First-Time Visitor Target Exam Selection Modal */}
+      <FirstTimeExamModal onExamSelected={(examId) => setTargetExamId(examId)} />
 
       {/* Target Exam Switcher Modal */}
       <ExamSwitchModal

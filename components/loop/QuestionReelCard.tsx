@@ -11,6 +11,7 @@ import { SuggestionModal } from "./SuggestionModal";
 import { formatWhatsAppChallenge, openWhatsAppShare } from "@/lib/utils/whatsapp";
 import { getExamScoringRule } from "@/lib/utils/examScoring";
 import { useAppLanguage } from "@/lib/utils/i18n";
+import { getAuthorEmoji, getAuthorFallbackUsername } from "@/lib/utils/authorEmoji";
 import confetti from "canvas-confetti";
 
 export interface AnswerRecord {
@@ -498,6 +499,8 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   };
 
   const scoringRule = getExamScoringRule(question.examination_id || "exam-ssc-cgl");
+  const authorEmoji = getAuthorEmoji(question.author_id || question.author_name);
+  const authorUsername = getAuthorFallbackUsername(question.author_name, question.author_id);
 
   return (
     <div className="relative w-full h-full flex flex-col justify-between p-4 sm:p-5 select-none text-on-surface">
@@ -561,53 +564,6 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
       {/* 2. Main Question Card Body + Floating Action Bar on the Right */}
       <div className="relative flex-1 flex flex-col justify-center py-2 pr-16 sm:pr-20 min-h-0 overflow-hidden">
-        {/* Author & Bilingual Toggle Row */}
-        <div className="flex items-center justify-between mb-2 shrink-0">
-          <button
-            onClick={() => setShowAuthorModal(true)}
-            className="flex items-center gap-2 text-left group"
-          >
-            <div className="w-6 h-6 rounded-full overflow-hidden bg-primary-fixed flex items-center justify-center shrink-0">
-              {question.author_avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={question.author_avatar}
-                  alt={question.author_name || "Author"}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="material-symbols-outlined text-[14px] text-primary">person</span>
-              )}
-            </div>
-            <span className="font-body-sm text-body-sm text-secondary group-hover:text-primary transition-colors">
-              Question by <strong className="font-medium text-on-surface">{question.author_name || "Rahul S."}</strong>
-            </span>
-          </button>
-
-          {/* Bilingual English / Hindi Toggle Pill */}
-          <div className="flex items-center rounded-lg bg-surface-container p-0.5 text-[11px] font-bold border border-surface-container-high/60">
-            <button
-              onClick={() => setDisplayLang("en")}
-              className={`px-2 py-0.5 rounded-md transition-all ${
-                displayLang === "en"
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "text-secondary hover:text-on-surface"
-              }`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => setDisplayLang("hi")}
-              className={`px-2 py-0.5 rounded-md transition-all ${
-                displayLang === "hi"
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "text-secondary hover:text-on-surface"
-              }`}
-            >
-              हिन्दी
-            </button>
-          </div>
-        </div>
 
         {/* Question Statement (Scrollable independently if large, perfectly centered vertically if short) */}
         {(() => {
@@ -670,89 +626,141 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         </div>
 
         {/* Options Stack / Answering Area (Scrollable if options are long) */}
-        <div className="shrink-0">
-          {!showOptions && !isAnswered ? (
-            <button
-              onClick={() => setShowOptions(true)}
-              className="w-full h-13 bg-primary text-on-primary rounded-xl font-label-lg text-label-lg font-bold shadow-md hover:bg-primary-container active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
-            >
-              <span className="material-symbols-outlined text-[20px] transition-transform group-hover:scale-110">
-                touch_app
+        {(() => {
+          const swipeControl = (
+            <div className="flex flex-col items-center justify-center px-1.5 py-1 rounded-xl bg-surface-container border border-surface-container-high/60 shadow-xs shrink-0 select-none my-auto">
+              <button
+                type="button"
+                onClick={onPrevQuestion}
+                disabled={index <= 1}
+                className="w-7 h-5 flex items-center justify-center text-secondary hover:text-primary disabled:opacity-20 transition-opacity active:scale-90"
+                title="Previous question (Swipe down)"
+                aria-label="Previous question"
+              >
+                <span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
+              </button>
+              <span className="font-mono text-[9px] uppercase tracking-wider font-extrabold text-secondary/90 leading-none py-0.5">
+                {t.swipeLabel || "SWIPE"}
               </span>
-              <span>{t.answerQuestion}</span>
-            </button>
-          ) : (
-            <div
-              data-reel-scrollable="true"
-              className="flex flex-col gap-2 animate-in fade-in duration-200 max-h-[38vh] overflow-y-auto overscroll-contain no-scrollbar"
-            >
-              {question.options.map((opt) => {
-                const isSelected = selectedOptionId === opt.id;
-                const isTheCorrectOne = correctOptionId === opt.id;
+              <button
+                type="button"
+                onClick={onNextQuestion}
+                className="w-7 h-5 flex items-center justify-center text-secondary hover:text-primary transition-colors active:scale-90"
+                title="Next question (Swipe up)"
+                aria-label="Next question"
+              >
+                <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
+              </button>
+            </div>
+          );
 
-                let btnStyle =
-                  "bg-surface-container-low text-on-surface hover:bg-surface-container border border-surface-container-high/40";
-                let badgeStyle = "bg-surface-container text-on-surface";
-                let iconName = "";
-
-                if (isAnswered) {
-                  if (isTheCorrectOne) {
-                    btnStyle =
-                      "bg-emerald-500/20 text-emerald-950 dark:text-emerald-100 border-2 border-emerald-600 shadow-sm font-bold";
-                    badgeStyle = "bg-emerald-600 text-white";
-                    iconName = "check";
-                  } else if (isSelected && !isCorrect) {
-                    btnStyle =
-                      "bg-rose-500/20 text-rose-950 dark:text-rose-100 border-2 border-rose-600 shadow-sm font-semibold";
-                    badgeStyle = "bg-rose-600 text-white";
-                    iconName = "close";
-                  } else {
-                    btnStyle = "bg-surface-container-lowest/50 text-secondary opacity-40 border-transparent";
-                    badgeStyle = "bg-surface-container text-secondary";
-                  }
-                }
-
-                const optText = activeOptText(opt);
-                const optFont =
-                  optText.length > 90
-                    ? "text-[11px] leading-tight"
-                    : optText.length > 45
-                    ? "text-xs leading-snug"
-                    : "text-xs sm:text-sm font-medium leading-snug";
-
-                return (
+          return (
+            <div className="shrink-0">
+              {!showOptions && !isAnswered ? (
+                <div className="flex items-center gap-2">
                   <button
-                    key={opt.id}
-                    disabled={isAnswered}
-                    onClick={() => handleSelectOption(opt.id)}
-                    className={`w-full min-h-[46px] px-3 py-2 rounded-xl flex items-center justify-between text-left transition-all active:scale-[0.99] ${btnStyle}`}
+                    onClick={() => {
+                      if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+                        window.dispatchEvent(
+                          new CustomEvent("open_auth_modal", {
+                            detail: {
+                              reason: "Sign in required to answer questions, test your accuracy & track rank",
+                              mode: "signup",
+                            },
+                          })
+                        );
+                        return;
+                      }
+                      setShowOptions(true);
+                    }}
+                    className="flex-1 h-13 bg-primary text-on-primary rounded-xl font-label-lg text-label-lg font-bold shadow-md hover:bg-primary-container active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${badgeStyle}`}
-                      >
-                        {opt.id}
-                      </span>
-                      <span className={optFont}>{optText}</span>
-                    </div>
-
-                    {isAnswered && iconName && (
-                      <span className="material-symbols-outlined text-[18px] shrink-0 font-bold">
-                        {iconName}
-                      </span>
-                    )}
+                    <span className="material-symbols-outlined text-[20px] transition-transform group-hover:scale-110">
+                      touch_app
+                    </span>
+                    <span>{t.answerQuestion || "Answer & Learn"}</span>
                   </button>
-                );
-              })}
 
-              {submitError && (
-                <div className="p-2 rounded-xl bg-error-container text-on-error-container text-xs font-semibold">
-                  {submitError}
+                  {/* Vertical Swipe Button: Up Arrow Above, Swipe in Middle, Down Arrow Below */}
+                  {swipeControl}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div
+                    data-reel-scrollable="true"
+                    className="flex-1 flex flex-col gap-2 animate-in fade-in duration-200 max-h-[38vh] overflow-y-auto overscroll-contain no-scrollbar"
+                  >
+                    {question.options.map((opt) => {
+                      const isSelected = selectedOptionId === opt.id;
+                      const isTheCorrectOne = correctOptionId === opt.id;
+
+                      let btnStyle =
+                        "bg-surface-container-low text-on-surface hover:bg-surface-container border border-surface-container-high/40";
+                      let badgeStyle = "bg-surface-container text-on-surface";
+                      let iconName = "";
+
+                      if (isAnswered) {
+                        if (isTheCorrectOne) {
+                          btnStyle =
+                            "bg-emerald-500/20 text-emerald-950 dark:text-emerald-100 border-2 border-emerald-600 shadow-sm font-bold";
+                          badgeStyle = "bg-emerald-600 text-white";
+                          iconName = "check";
+                        } else if (isSelected && !isCorrect) {
+                          btnStyle =
+                            "bg-rose-500/20 text-rose-950 dark:text-rose-100 border-2 border-rose-600 shadow-sm font-semibold";
+                          badgeStyle = "bg-rose-600 text-white";
+                          iconName = "close";
+                        } else {
+                          btnStyle = "bg-surface-container-lowest/50 text-secondary opacity-40 border-transparent";
+                          badgeStyle = "bg-surface-container text-secondary";
+                        }
+                      }
+
+                      const optText = activeOptText(opt);
+                      const optFont =
+                        optText.length > 90
+                          ? "text-[11px] leading-tight"
+                          : optText.length > 45
+                          ? "text-xs leading-snug"
+                          : "text-xs sm:text-sm font-medium leading-snug";
+
+                      return (
+                        <button
+                          key={opt.id}
+                          disabled={isAnswered}
+                          onClick={() => handleSelectOption(opt.id)}
+                          className={`w-full min-h-[46px] px-3 py-2 rounded-xl flex items-center justify-between text-left transition-all active:scale-[0.99] ${btnStyle}`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${badgeStyle}`}
+                            >
+                              {opt.id}
+                            </span>
+                            <span className={optFont}>{optText}</span>
+                          </div>
+
+                          {isAnswered && iconName && (
+                            <span className="material-symbols-outlined text-[18px] shrink-0 font-bold">
+                              {iconName}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+
+                    {submitError && (
+                      <div className="p-2 rounded-xl bg-error-container text-on-error-container text-xs font-semibold">
+                        {submitError}
+                      </div>
+                    )}
+                  </div>
+                  {swipeControl}
                 </div>
               )}
             </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* 3. Explanation & Quick Proof Card (With Scroll Isolation & Spaced Repetition) */}
         {isAnswered && (
@@ -877,20 +885,14 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           {/* Creator Avatar & Follow Button */}
           <div className="relative mb-1">
             <button
+              type="button"
               onClick={() => setShowAuthorModal(true)}
-              className="w-10 h-10 rounded-full overflow-hidden bg-primary-fixed border-2 border-surface-container-lowest shadow-sm flex items-center justify-center group"
-              title="Creator Profile"
+              className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-fixed via-primary-container/20 to-secondary-fixed border-2 border-surface-container-lowest shadow-sm flex items-center justify-center group active:scale-95 transition-transform"
+              title={`Question by ${question.author_name || "Aspirant"} (@${authorUsername})`}
             >
-              {question.author_avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={question.author_avatar}
-                  alt={question.author_name || "Author"}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="material-symbols-outlined text-[20px] text-primary">person</span>
-              )}
+              <span className="text-xl leading-none select-none drop-shadow-xs">
+                {authorEmoji}
+              </span>
             </button>
             <button
               onClick={() => {
@@ -1036,36 +1038,6 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         </div>
       </div>
 
-      {/* 5. Bottom Navigation Bar on Reel Card */}
-      <div className="pt-2 border-t border-surface-container-high/30 flex items-center justify-between shrink-0">
-        <button
-          onClick={() => onHideQuestion(question.id)}
-          className="px-2.5 py-1 rounded-lg text-secondary hover:text-error hover:bg-surface-container text-xs font-semibold flex items-center gap-1 transition-colors"
-          title="Exclude from future feed"
-        >
-          <span className="material-symbols-outlined text-[15px]">visibility_off</span>
-          <span>{t.hideQuestion}</span>
-        </button>
-
-        <div className="flex items-center gap-1 text-secondary text-xs">
-          <button
-            onClick={onPrevQuestion}
-            disabled={index <= 1}
-            className="p-1 rounded-full hover:text-primary disabled:opacity-20 transition-opacity"
-            title="Previous question (Swipe down)"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
-          </button>
-          <span className="font-mono text-[11px]">{t.swipeLabel}</span>
-          <button
-            onClick={onNextQuestion}
-            className="p-1 rounded-full hover:text-primary transition-colors"
-            title="Next question (Swipe up)"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_downward</span>
-          </button>
-        </div>
-      </div>
 
       {/* Three-Dot Options Modal / Bottom Sheet */}
       {showThreeDotMenu && (
@@ -1143,8 +1115,11 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         onClose={() => setShowCommentsModal(false)}
       />
       <AuthorModal
-        authorName={question.author_name || "Rahul S."}
+        authorName={question.author_name || "Aspirant"}
         authorAvatar={question.author_avatar}
+        authorUsername={authorUsername}
+        authorId={question.author_id}
+        targetExam={scoringRule.shortName}
         isOpen={showAuthorModal}
         onClose={() => setShowAuthorModal(false)}
       />

@@ -483,8 +483,11 @@ export const SocialView: React.FC = () => {
             </div>
           </div>
         )}
-        {/* Header Title */}
-        <div className="flex items-center justify-between pb-3">
+        {/* Social Lounge Content (Locked & Blurred for Guests) */}
+        <div className="relative my-1">
+          <div className={!isLoggedIn ? "filter blur-md select-none pointer-events-none opacity-40 transition-all" : ""}>
+            {/* Header Title */}
+            <div className="flex items-center justify-between pb-3">
           <div>
             <h1 className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface">
               {t.socialLounge || "Social Lounge"}
@@ -1151,6 +1154,43 @@ export const SocialView: React.FC = () => {
             })()}
           </div>
         )}
+      </div>
+
+          {!isLoggedIn && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-start pt-12 sm:pt-16 p-4 text-center bg-surface/30 backdrop-blur-xs rounded-2xl">
+              <div className="sticky top-20 flex flex-col items-center p-6 rounded-3xl bg-surface/95 backdrop-blur-md border border-primary/20 shadow-xl max-w-sm mx-auto">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-sm mb-3">
+                  <span className="material-symbols-outlined text-[32px]">lock</span>
+                </div>
+                <h3 className="text-lg font-bold text-on-surface">
+                  {lang === "hi" ? "सोशल लाउंज लॉक है" : "Social Lounge Locked"}
+                </h3>
+                <p className="text-xs text-secondary mt-1.5 max-w-xs leading-relaxed mb-4">
+                  {lang === "hi"
+                    ? "एस्पिरेंट्स के साथ चैट करने, क्विज़ रील्स शेयर करने और 1-ऑन-1 स्टडी पार्टनर्स खोजने के लिए साइन इन करें।"
+                    : "Sign in or create a free account to connect with study partners by @username, challenge friends, and chat in real time."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("open_auth_modal", {
+                        detail: {
+                          reason: "Sign in to connect and study with aspirants",
+                          mode: "signup",
+                        },
+                      })
+                    );
+                  }}
+                  className="py-3 px-6 rounded-xl bg-primary text-on-primary font-bold text-sm flex items-center gap-2 shadow-md hover:bg-primary-container active:scale-95 transition-all cursor-pointer pointer-events-auto"
+                >
+                  <span className="material-symbols-outlined text-[18px]">login</span>
+                  <span>{t.signInSignUp || "Sign In / Sign Up"}</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ============================================================== */}

@@ -46,15 +46,14 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
           rel="stylesheet"
         />
-        {/* Instant theme initializer to prevent theme flicker on page load */}
+        {/* Instant theme initializer: Light mode is default unless user explicitly chose dark */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
                   var theme = localStorage.getItem('qz_theme');
-                  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  if (theme === 'dark' || (!theme && prefersDark)) {
+                  if (theme === 'dark') {
                     document.documentElement.classList.add('dark');
                   } else {
                     document.documentElement.classList.remove('dark');

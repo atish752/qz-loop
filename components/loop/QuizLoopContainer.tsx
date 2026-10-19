@@ -59,6 +59,8 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     submitCurrentOption: () => {},
   });
 
+  const startParamHandledRef = useRef<boolean>(false);
+
   // Intercept Swipe Confirmation Modal ("Answer or Skip?")
   const [showAnswerOrSkipModal, setShowAnswerOrSkipModal] = useState<boolean>(false);
   const pendingSwipeActionRef = useRef<(() => void) | null>(null);
@@ -71,12 +73,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const [comboToast, setComboToast] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
-  // Synchronize theme with TopHeader and system preference
+  // Synchronize theme with TopHeader and localStorage (Light mode default)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("qz_theme");
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setIsDarkMode(savedTheme === "dark" || (!savedTheme && prefersDark));
+      setIsDarkMode(savedTheme === "dark");
     }
     const handleThemeChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ isDark: boolean }>;
@@ -194,26 +195,6 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    // Deep link directly to a shared quiz question: /loop?q=...
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const qParam = params.get("q") || params.get("questionId");
-      if (qParam) {
-        fetch(`/api/questions/${qParam}`)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.success && data.question) {
-              setQuestions([data.question]);
-              setCurrentIndex(0);
-              setIsStarted(true);
-            }
-          })
-          .catch(() => {});
-      }
-    }
-  }, []);
-
   // Fetch Questions for the chosen subject flow and language
   const loadFeedQuestions = useCallback(
     async (subjects = selectedSubjects, exam = currentExamId, lang = quizLanguage, reset = false) => {
@@ -276,6 +257,41 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     [selectedSubjects, currentExamId, quizLanguage]
   );
 
+  useEffect(() => {
+    // Deep link directly to a shared quiz question: /loop?q=... or auto-start: /loop?start=true
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const qParam = params.get("q") || params.get("questionId");
+      const startParam = params.get("start");
+      const examParam = params.get("examId");
+
+      if (qParam) {
+        fetch(`/api/questions/${qParam}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success && data.question) {
+              setQuestions([data.question]);
+              setCurrentIndex(0);
+              setIsStarted(true);
+            }
+          })
+          .catch(() => {});
+      } else if ((startParam === "true" || startParam === "1") && !startParamHandledRef.current) {
+        startParamHandledRef.current = true;
+        const targetExam = examParam || localStorage.getItem("qz_target_exam") || currentExamId;
+        if (targetExam) {
+          setCurrentExamId(targetExam);
+        }
+        setIsStarted(true);
+        loadFeedQuestions(selectedSubjects, targetExam, quizLanguage, true);
+        try {
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, "", newUrl);
+        } catch {}
+      }
+    }
+  }, [loadFeedQuestions, selectedSubjects, currentExamId, quizLanguage]);
+
   // Subject Flow Multi-Select toggle handler
   const handleToggleSubject = (slug: string) => {
     if (slug === "all") {
@@ -310,6 +326,13 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
     if (currentIndex < questions.length - 1) {
       isTransitioningRef.current = true;
+      // Immediately reset answering status so the new question does not inherit stale answer mode!
+      activeStatusRef.current = {
+        isAnswerMode: false,
+        isAnswered: false,
+        hasSelectedPendingOption: false,
+        submitCurrentOption: () => {},
+      };
       setCurrentIndex((prev) => {
         const next = prev + 1;
         // Auto prefetch when remaining queue is low
@@ -331,17 +354,23 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     if (isTransitioningRef.current || currentIndex <= 0) return;
 
     isTransitioningRef.current = true;
+    // Immediately reset answering status so the previous question does not inherit stale answer mode!
+    activeStatusRef.current = {
+      isAnswerMode: false,
+      isAnswered: false,
+      hasSelectedPendingOption: false,
+      submitCurrentOption: () => {},
+    };
     setCurrentIndex((prev) => prev - 1);
     setTimeout(() => {
       isTransitioningRef.current = false;
     }, 360);
   }, [currentIndex]);
 
-  // Swipe Attempt Interception Handler
+  // Swipe Attempt Interception Handler: Only prompt if user clicked Answer and options are showing!
   const attemptNextQuestion = useCallback(() => {
     const status = activeStatusRef.current;
-    // Explicit Choice: If student swipes before answering, prompt with Answer vs Skip modal
-    if (!status.isAnswered) {
+    if (status.isAnswerMode && !status.isAnswered) {
       pendingSwipeActionRef.current = executeNextQuestion;
       setShowAnswerOrSkipModal(true);
       return;
@@ -795,19 +824,51 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     <div className="flex flex-col h-[100dvh] bg-surface overflow-hidden pb-16">
       {/* Subtle Top Reel Bar with Flow Pill & Combo Streak */}
       <div className="h-12 px-4 flex items-center justify-between bg-surface-container-lowest/80 backdrop-blur-md border-b border-surface-container-high/40 z-30 shrink-0">
-        <button
-          onClick={() => setIsStarted(false)}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-bold transition-colors"
-          title="Change Subject Flow"
-        >
-          <span className="material-symbols-outlined text-[15px] text-primary">tune</span>
-          <span className="capitalize">
-            {selectedSubjects.includes("all")
-              ? "All Subjects"
-              : selectedSubjects.join(" + ")}
-          </span>
-          <span className="material-symbols-outlined text-[13px] text-secondary">expand_more</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setIsStarted(false)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-bold transition-colors"
+            title="Change Subject Flow"
+          >
+            <span className="material-symbols-outlined text-[15px] text-primary">tune</span>
+            <span className="capitalize">
+              {selectedSubjects.includes("all")
+                ? "All Subjects"
+                : selectedSubjects.join(" + ")}
+            </span>
+            <span className="material-symbols-outlined text-[13px] text-secondary">expand_more</span>
+          </button>
+
+          {/* Bilingual English / Hindi Switch Button beside All Subject */}
+          <div className="flex items-center rounded-lg bg-surface-container p-0.5 text-[11px] font-bold border border-surface-container-high/60 shadow-2xs">
+            <button
+              onClick={() => {
+                setQuizLanguage("en");
+                localStorage.setItem("qz_quiz_lang", "en");
+              }}
+              className={`px-2 py-0.5 rounded-md transition-all ${
+                quizLanguage === "en" || (quizLanguage === "all" && lang === "en")
+                  ? "bg-primary text-on-primary shadow-xs"
+                  : "text-secondary hover:text-on-surface"
+              }`}
+            >
+              EN
+            </button>
+            <button
+              onClick={() => {
+                setQuizLanguage("hi");
+                localStorage.setItem("qz_quiz_lang", "hi");
+              }}
+              className={`px-2 py-0.5 rounded-md transition-all ${
+                quizLanguage === "hi" || (quizLanguage === "all" && lang === "hi")
+                  ? "bg-primary text-on-primary shadow-xs"
+                  : "text-secondary hover:text-on-surface"
+              }`}
+            >
+              हिन्दी
+            </button>
+          </div>
+        </div>
 
         {/* Right Section: Theme Toggle, Combo Streak, and Question Counter */}
         <div className="flex items-center gap-2">
