@@ -108,7 +108,7 @@ export const SuggestionModal: React.FC<SuggestionModalProps> = ({
               rows={4}
               value={suggestionText}
               onChange={(e) => setSuggestionText(e.target.value)}
-              placeholder={t.suggestionPlaceholder || "e.g. In Option B, the calculation should be 24 instead of 28 because..."}
+              placeholder={t.suggestionPlaceholder || "e.g. In Option B, crossing over occurs in Pachytene instead of Diplotene because..."}
               className="w-full p-3 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary resize-none"
             />
 

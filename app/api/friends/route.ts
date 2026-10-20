@@ -20,15 +20,26 @@ export async function GET(request: NextRequest) {
       try {
         const supabase = await createServerSupabaseClient();
         if (supabase && cleanSearch) {
-          const { data: remoteProfiles } = await supabase
+          // Query by username and display_name without fragile PostgREST .or() URL encoding issues
+          const { data: byUsername } = await supabase
             .from("profiles")
             .select("id, display_name, username, avatar_url, target_exam, current_streak, preferred_examination_id")
-            .or(`username.ilike.%${cleanSearch}%,display_name.ilike.%${cleanSearch}%`)
+            .ilike("username", `%${cleanSearch}%`)
             .neq("id", requestedUserId)
             .limit(25);
 
-          if (remoteProfiles && remoteProfiles.length > 0) {
-            for (const rp of remoteProfiles) {
+          const { data: byName } = await supabase
+            .from("profiles")
+            .select("id, display_name, username, avatar_url, target_exam, current_streak, preferred_examination_id")
+            .ilike("display_name", `%${cleanSearch}%`)
+            .neq("id", requestedUserId)
+            .limit(25);
+
+          const combined = [...(byUsername || []), ...(byName || [])];
+          const seen = new Set<string>();
+          for (const rp of combined) {
+            if (!seen.has(rp.id) && rp.id !== requestedUserId) {
+              seen.add(rp.id);
               db.syncUserFromAuth({
                 id: rp.id,
                 display_name: rp.display_name,
@@ -141,18 +152,18 @@ export async function POST(request: NextRequest) {
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase && result.friend) {
-        await supabase.from("friendships").upsert([
-          {
-            user_id: currentUserId,
-            friend_id: result.friend.id,
-            status: "friend",
-          },
-          {
+        await supabase.from("friendships").upsert({
+          user_id: currentUserId,
+          friend_id: result.friend.id,
+          status: "friend",
+        });
+        try {
+          await supabase.from("friendships").upsert({
             user_id: result.friend.id,
             friend_id: currentUserId,
             status: "friend",
-          },
-        ]);
+          });
+        } catch {}
       }
     } catch (err) {
       console.error("Supabase friendship persist notice:", err);

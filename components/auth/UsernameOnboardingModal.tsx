@@ -40,9 +40,23 @@ export const UsernameOnboardingModal: React.FC = () => {
       }
 
       const needsUsername = localStorage.getItem("qz_needs_username") === "true";
-      // Persistent guard: Stop re-prompting only if details already saved for this specific user
+      const cachedAuthUserRaw = localStorage.getItem("qz_auth_user");
+      let cachedUsername = "";
+      if (cachedAuthUserRaw) {
+        try {
+          const parsed = JSON.parse(cachedAuthUserRaw);
+          cachedUsername = parsed.username || "";
+        } catch {}
+      }
+      const hasCustomCachedUsername =
+        Boolean(cachedUsername) &&
+        !cachedUsername.startsWith("aspirant_") &&
+        cachedUsername.length >= 3;
+
+      // Persistent guard: Stop re-prompting only if details already saved for this specific user AND username is custom
       const completed =
         !needsUsername &&
+        hasCustomCachedUsername &&
         (localStorage.getItem("qz_onboarding_completed") === "true" ||
           localStorage.getItem("qz_details_submitted") === "true") &&
         (localStorage.getItem("qz_onboarded_user_id") === uid ||
@@ -74,17 +88,24 @@ export const UsernameOnboardingModal: React.FC = () => {
               setEmail(data.user.email);
             }
 
-            // Open onboarding if user has not completed onboarding
-            if (data.user.onboarding_completed && !needsUsername) {
+            const hasCustomUname =
+              Boolean(data.user.username) &&
+              !data.user.username.startsWith("aspirant_") &&
+              data.user.username.length >= 3;
+
+            // Only mark complete if user has completed onboarding AND chosen a custom unique username
+            if (data.user.onboarding_completed && hasCustomUname && !needsUsername) {
               localStorage.setItem("qz_onboarding_completed", "true");
               localStorage.setItem("qz_details_submitted", "true");
               localStorage.setItem(`qz_onboarded_${data.user.id}`, "true");
               localStorage.setItem("qz_onboarded_user_id", data.user.id);
+              localStorage.removeItem("qz_needs_username");
               setIsOpen(false);
               return;
             }
 
             // Force unique username setup for first-time signups
+            localStorage.setItem("qz_needs_username", "true");
             setIsOpen(true);
           }
         })
@@ -213,8 +234,8 @@ export const UsernameOnboardingModal: React.FC = () => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in">
-      <div className="w-full max-w-sm max-h-[92vh] overflow-y-auto bg-surface-container-lowest rounded-3xl p-6 shadow-2xl border border-surface-container-high/60 flex flex-col gap-4 animate-in zoom-in-95">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in overflow-y-auto">
+      <div className="w-full max-w-sm max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto overscroll-contain bg-surface-container-lowest rounded-3xl p-5 sm:p-6 shadow-2xl border border-surface-container-high/60 flex flex-col gap-3.5 sm:gap-4 animate-in zoom-in-95 no-scrollbar my-auto">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center gap-2">
           <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md border-2 border-primary/20 bg-primary">

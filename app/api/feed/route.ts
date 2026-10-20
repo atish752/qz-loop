@@ -12,7 +12,10 @@ export async function GET(request: NextRequest) {
     const cookieUserId = request.cookies.get("qz_user_id")?.value;
     const requestedUserId =
       searchParams.get("userId") || request.headers.get("x-user-id") || cookieUserId;
-    const user = requestedUserId ? db.getProfileById(requestedUserId) || db.getCurrentUser() : db.getCurrentUser();
+    const user =
+      requestedUserId && requestedUserId !== "guest"
+        ? db.getProfileById(requestedUserId) || null
+        : null;
     const examId = searchParams.get("examId") || user?.preferred_examination_id || "exam-neet-ug";
     const excludedParam = searchParams.get("excludedIds");
     const sessionExcludedIds = excludedParam ? excludedParam.split(",") : [];

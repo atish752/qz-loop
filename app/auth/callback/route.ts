@@ -139,17 +139,29 @@ export async function GET(request: Request) {
           console.error("Supabase profiles table query/insert notice:", dbErr);
         }
 
+        // Determine if unique username onboarding is required
+        const currentUname = username || existingProfile?.username || ("aspirant_" + user.id.slice(0, 6));
+        const isCustomHandle =
+          Boolean(currentUname) &&
+          !currentUname.startsWith("aspirant_") &&
+          currentUname.length >= 3;
+        const needsUsernameSetup =
+          isNewUser ||
+          !existingProfile ||
+          !existingProfile.onboarding_completed ||
+          !isCustomHandle;
+
         // Sync into application store
         const syncedUser = db.syncUserFromAuth({
           id: user.id,
           display_name: existingProfile?.display_name || name,
-          username: username || existingProfile?.username || ("aspirant_" + user.id.slice(0, 6)),
+          username: currentUname,
           avatar_url: existingProfile?.avatar_url || avatar,
           target_exam: existingProfile?.target_exam || "NEET UG (Medical Entrance)",
           preferred_examination_id: existingProfile?.preferred_examination_id || "exam-neet-ug",
           email: existingProfile?.email || email,
           language_preference: existingProfile?.language_preference || "en",
-          onboarding_completed: isNewUser ? false : (existingProfile?.onboarding_completed ?? true),
+          onboarding_completed: !needsUsernameSetup,
         });
 
         // 3. Return client bridge HTML that instantly populates localStorage & dispatches event
@@ -198,14 +210,16 @@ export async function GET(request: Request) {
       localStorage.setItem("qz_user_id", uid);
       localStorage.setItem("qz_auth_user", JSON.stringify(profileData));
       ${
-        !isNewUser
-          ? `localStorage.setItem("qz_onboarding_completed", "true");
-      localStorage.setItem("qz_details_submitted", "true");
-      localStorage.setItem("qz_onboarded_user_id", uid);`
-          : `localStorage.removeItem("qz_onboarding_completed");
+        needsUsernameSetup
+          ? `localStorage.removeItem("qz_onboarding_completed");
       localStorage.removeItem("qz_details_submitted");
+      localStorage.removeItem("qz_onboarded_user_id");
       localStorage.setItem("qz_just_signed_up", "true");
       localStorage.setItem("qz_needs_username", "true");`
+          : `localStorage.setItem("qz_onboarding_completed", "true");
+      localStorage.setItem("qz_details_submitted", "true");
+      localStorage.setItem("qz_onboarded_user_id", uid);
+      localStorage.removeItem("qz_needs_username");`
       }
       document.cookie = "qz_user_id=" + uid + "; path=/; max-age=2592000; SameSite=Lax";
       window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: profileData } }));

@@ -12,10 +12,18 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
--- 2. Ensure all required columns exist on 'profiles' table
+-- 2. Ensure all required columns exist on 'profiles' table with correct defaults
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS language_preference TEXT DEFAULT 'en';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT false;
+
+-- Fix onboarding_completed default to false so new accounts always complete handle selection
+ALTER TABLE profiles ALTER COLUMN onboarding_completed SET DEFAULT false;
+
+-- Reset any uncustomized placeholder accounts so they get prompted for username setup:
+UPDATE profiles 
+SET onboarding_completed = false 
+WHERE username LIKE 'aspirant_%' OR username IS NULL;
 
 -- 3. High-performance indexes for username & display_name instant search
 CREATE INDEX IF NOT EXISTS idx_profiles_username_lower ON profiles (lower(username));
@@ -29,6 +37,7 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 -- 4a. Public profiles must be viewable by all authenticated & anonymous users
 --     (so peers can be searched by @handle or name in the Social study partner lounge)
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON profiles;
+DROP POLICY IF EXISTS "Users can view all profiles" ON profiles;
 CREATE POLICY "Public profiles are viewable by everyone" ON profiles
   FOR SELECT
   USING (true);
@@ -50,8 +59,9 @@ CREATE TABLE IF NOT EXISTS friendships (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   user_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   friend_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  status TEXT NOT NULL DEFAULT 'friend',
+  status TEXT NOT NULL DEFAULT 'friend' CHECK (status IN ('friend', 'request_sent', 'request_received', 'pending_incoming')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(user_id, friend_id)
 );
 
@@ -61,14 +71,17 @@ CREATE INDEX IF NOT EXISTS idx_friendships_friend_id ON friendships(friend_id);
 ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view friendships" ON friendships;
+DROP POLICY IF EXISTS "Users can view their own friendships" ON friendships;
 CREATE POLICY "Users can view friendships" ON friendships
   FOR SELECT
   USING (auth.uid()::text = user_id OR auth.uid()::text = friend_id);
 
+-- Drop previous restrictive insert policy that prevented reciprocal friendship row insertion
+DROP POLICY IF EXISTS "Users can insert friendships" ON friendships;
 DROP POLICY IF EXISTS "Users can insert friend requests" ON friendships;
 CREATE POLICY "Users can insert friend requests" ON friendships
   FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (auth.uid()::text = user_id OR auth.uid()::text = friend_id);
 
 DROP POLICY IF EXISTS "Users can update friendships" ON friendships;
 CREATE POLICY "Users can update friendships" ON friendships
@@ -85,22 +98,24 @@ CREATE TABLE IF NOT EXISTS direct_messages (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   from_user_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   to_user_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  text TEXT,
+  text TEXT NOT NULL,
   question_id TEXT REFERENCES questions(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_direct_messages_from_to ON direct_messages(from_user_id, to_user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_direct_messages_to_from ON direct_messages(to_user_id, from_user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_direct_messages_participants ON direct_messages(from_user_id, to_user_id);
+CREATE INDEX IF NOT EXISTS idx_direct_messages_created ON direct_messages(created_at DESC);
 
 ALTER TABLE direct_messages ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view own messages" ON direct_messages;
+DROP POLICY IF EXISTS "Users can view their direct messages" ON direct_messages;
 CREATE POLICY "Users can view own messages" ON direct_messages
   FOR SELECT
   USING (auth.uid()::text = from_user_id OR auth.uid()::text = to_user_id);
 
 DROP POLICY IF EXISTS "Users can send messages" ON direct_messages;
+DROP POLICY IF EXISTS "Users can send direct messages" ON direct_messages;
 CREATE POLICY "Users can send messages" ON direct_messages
   FOR INSERT
   WITH CHECK (auth.uid()::text = from_user_id);

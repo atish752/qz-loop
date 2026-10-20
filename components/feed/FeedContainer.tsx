@@ -45,7 +45,9 @@ export const FeedContainer: React.FC<FeedContainerProps> = ({
     if (savedExam) setCurrentExamId(savedExam);
 
     // Fetch user profile
-    fetch("/api/profile")
+    const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const profileUrl = uid ? `/api/profile?userId=${encodeURIComponent(uid)}` : "/api/profile";
+    fetch(profileUrl, { headers: uid ? { "x-user-id": uid } : {} })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -68,10 +70,12 @@ export const FeedContainer: React.FC<FeedContainerProps> = ({
       setError(null);
 
       try {
+        const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
         const excludedList = Array.from(displayedQuestionIdsRef.current).join(",");
-        const url = `/api/feed?subject=${subject}&examId=${exam}&excludedIds=${reset ? "" : excludedList}`;
+        const userParam = uid ? `&userId=${encodeURIComponent(uid)}` : "";
+        const url = `/api/feed?subject=${subject}&examId=${exam}&excludedIds=${reset ? "" : excludedList}${userParam}`;
 
-        const res = await fetch(url);
+        const res = await fetch(url, { headers: uid ? { "x-user-id": uid } : {} });
         const data = await res.json();
 
         if (data.success) {
@@ -133,7 +137,9 @@ export const FeedContainer: React.FC<FeedContainerProps> = ({
     }
 
     // Refresh user profile streak/stats in background
-    fetch("/api/profile")
+    const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const profileUrl = uid ? `/api/profile?userId=${encodeURIComponent(uid)}` : "/api/profile";
+    fetch(profileUrl, { headers: uid ? { "x-user-id": uid } : {} })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setUser(data.user);

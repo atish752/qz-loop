@@ -17,12 +17,12 @@ export async function POST(request: NextRequest) {
       let targetUsername = baseUsername;
       let counter = 1;
       while (!db.isUsernameAvailable(targetUsername)) {
-        // If it's existing profile, switch to it
+        // If it's existing profile, return it for this session
         const existing = db.getAllProfiles().find((p) => p.username === targetUsername);
         if (existing) {
-          const switched = db.setCurrentUser(existing.id);
-          const res = NextResponse.json({ success: true, user: switched, isExisting: true });
-          res.cookies.set("qz_user_id", switched.id, { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
+          const targetUser = db.getProfileById(existing.id) || existing;
+          const res = NextResponse.json({ success: true, user: targetUser, isExisting: true });
+          res.cookies.set("qz_user_id", targetUser.id, { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
           return res;
         }
         targetUsername = `${baseUsername}_${counter++}`;
@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
     );
 
     if (matched) {
-      const switched = db.setCurrentUser(matched.id);
-      const res = NextResponse.json({ success: true, user: switched });
-      res.cookies.set("qz_user_id", switched.id, { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
+      const targetUser = db.getProfileById(matched.id) || matched;
+      const res = NextResponse.json({ success: true, user: targetUser });
+      res.cookies.set("qz_user_id", targetUser.id, { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
       return res;
     }
 

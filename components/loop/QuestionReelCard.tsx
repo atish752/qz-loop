@@ -220,17 +220,21 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
   // Load question like status, comment count, and quality vote
   useEffect(() => {
-    fetch(`/api/questions/like?questionId=${question.id}`)
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const likeUrl = currentUid
+      ? `/api/questions/like?questionId=${encodeURIComponent(question.id)}&userId=${encodeURIComponent(currentUid)}`
+      : `/api/questions/like?questionId=${encodeURIComponent(question.id)}`;
+    fetch(likeUrl, { headers: currentUid ? { "x-user-id": currentUid } : {} })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          setIsLiked(data.liked);
-          setLikesCount(data.totalLikes);
+          setIsLiked(data.liked ?? data.isLiked ?? false);
+          setLikesCount(data.totalLikes ?? data.likesCount ?? 0);
         }
       })
       .catch(() => {});
 
-    fetch(`/api/comments?questionId=${question.id}`)
+    fetch(`/api/comments?questionId=${encodeURIComponent(question.id)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.comments)) {
@@ -239,7 +243,10 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       })
       .catch(() => {});
 
-    fetch(`/api/questions/quality?questionId=${question.id}`)
+    const qualityUrl = currentUid
+      ? `/api/questions/quality?questionId=${encodeURIComponent(question.id)}&userId=${encodeURIComponent(currentUid)}`
+      : `/api/questions/quality?questionId=${encodeURIComponent(question.id)}`;
+    fetch(qualityUrl, { headers: currentUid ? { "x-user-id": currentUid } : {} })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -449,11 +456,15 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       });
     }
 
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
     try {
       await fetch("/api/questions/like", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: question.id }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
+        body: JSON.stringify({ questionId: question.id, userId: currentUid || undefined }),
       });
     } catch {
       // Handled
@@ -486,11 +497,15 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       setDownvotes((p) => p + 1);
       if (prevVote === "up") setUpvotes((p) => Math.max(0, p - 1));
     }
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
     try {
       await fetch("/api/questions/quality", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: question.id, vote }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
+        body: JSON.stringify({ questionId: question.id, vote, userId: currentUid || undefined }),
       });
     } catch {
       // optimistic

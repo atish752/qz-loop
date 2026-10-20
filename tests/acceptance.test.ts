@@ -1328,14 +1328,31 @@ async function runTests() {
   // 4. Mobile Profile Edit Modal Sticky Buttons & Overflow Scroll
   const profileViewFile = fs.readFileSync(path.join(__dirname, "../components/profile/ProfileView.tsx"), "utf8");
   assert(profileViewFile.includes("max-h-[88vh]"), "Profile edit modal has max-height boundary for mobile viewports");
+  assert(profileViewFile.includes("h-[88dvh] max-h-[88dvh]"), "Profile edit modal enforces dynamic mobile viewport height");
   assert(profileViewFile.includes("overflow-y-auto"), "Profile edit modal form has scrollable body");
   assert(profileViewFile.includes("border-t border-surface-container-high/40 bg-surface-container-lowest shrink-0"), "Profile edit modal has fixed sticky footer for Save and Cancel buttons");
   assert(profileViewFile.includes("form=\"edit-student-profile-form\""), "Save Profile button submits form from sticky footer");
+  assert(profileViewFile.includes("safe-area-inset-bottom"), "Profile edit modal sticky footer accounts for mobile safe area");
 
   // 5. Username onboarding guard & first-time prompt logic
   const usernameModalFile = fs.readFileSync(path.join(__dirname, "../components/auth/UsernameOnboardingModal.tsx"), "utf8");
   assert(usernameModalFile.includes("qz_onboarded_user_id"), "UsernameOnboardingModal scopes completion state to specific user ID");
   assert(usernameModalFile.includes("qz_needs_username"), "UsernameOnboardingModal checks first-time signup username trigger");
+
+  // 6. Authentic NEET Biology placeholders in i18n
+  const i18nFile = fs.readFileSync(path.join(__dirname, "../lib/utils/i18n.ts"), "utf8");
+  assert(i18nFile.includes("NEET Biology Notes, High-Yield PYQs"), "English i18n features NEET Biology collection placeholder");
+  assert(i18nFile.includes("NEET बायोलॉजी नोट्स"), "Hindi i18n features NEET Biology collection placeholder");
+  assert(i18nFile.includes("crossing over occurs in Pachytene"), "English i18n features NEET Biology crossing over suggestion placeholder");
+  assert(i18nFile.includes("NCERT आधारित स्पष्टीकरण देखें"), "Hindi onboarding features NCERT explanation copy instead of short tricks");
+
+  // 7. Supabase SQL Migration script
+  const sqlMigrationPath = path.join(__dirname, "../supabase/migrations/20261020_social_search_and_auth_fix.sql");
+  assert(fs.existsSync(sqlMigrationPath), "Supabase SQL migration file exists");
+  const sqlMigrationContent = fs.readFileSync(sqlMigrationPath, "utf8");
+  assert(sqlMigrationContent.includes("pg_trgm"), "Migration enables pg_trgm extension for search");
+  assert(sqlMigrationContent.includes("idx_profiles_username_trgm"), "Migration creates trigram GIN index on username");
+  assert(sqlMigrationContent.includes("auth.uid()::text = user_id OR auth.uid()::text = friend_id"), "Migration provides reciprocal friendship RLS insertion");
 
   console.log("\n=================================================");
   console.log("   ALL 59 ACCEPTANCE TEST SUITES PASSED (100%)   ");

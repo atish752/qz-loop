@@ -73,7 +73,9 @@ export const HomeDashboardView: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetch("/api/habits")
+    const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const url = uid ? `/api/habits?userId=${encodeURIComponent(uid)}` : "/api/habits";
+    fetch(url, { headers: uid ? { "x-user-id": uid } : {} })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setHabit(data.settings);
@@ -128,10 +130,14 @@ export const HomeDashboardView: React.FC = () => {
 
   const handleSaveGoal = async () => {
     try {
+      const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       const res = await fetch("/api/habits", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dailyGoal: Number(newGoalInput) }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(uid ? { "x-user-id": uid } : {}),
+        },
+        body: JSON.stringify({ dailyGoal: Number(newGoalInput), userId: uid || undefined }),
       });
       const data = await res.json();
       if (data.success) {
@@ -173,7 +179,10 @@ export const HomeDashboardView: React.FC = () => {
           target_exam: examName,
         }),
       });
-      const res = await fetch(`/api/matrix?period=${period}`);
+      const matrixUrl = uid
+        ? `/api/matrix?period=${period}&userId=${encodeURIComponent(uid)}`
+        : `/api/matrix?period=${period}`;
+      const res = await fetch(matrixUrl, { headers: uid ? { "x-user-id": uid } : {} });
       const data = await res.json();
       if (data.success) {
         setStats(data.stats);

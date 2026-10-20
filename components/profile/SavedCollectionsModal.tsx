@@ -219,7 +219,7 @@ export const SavedCollectionsModal: React.FC<SavedCollectionsModalProps> = ({
             type="text"
             value={newCollectionName}
             onChange={(e) => setNewCollectionName(e.target.value)}
-            placeholder={t.newCollectionPlaceholder || "e.g. Maths Formulas, Hard PYQs..."}
+            placeholder={t.newCollectionPlaceholder || "e.g. NEET Biology Notes, High-Yield PYQs..."}
             className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs text-on-surface focus:outline-none focus:border-primary"
           />
           <button

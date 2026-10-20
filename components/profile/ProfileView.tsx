@@ -140,7 +140,9 @@ export const ProfileView: React.FC = () => {
     loadAuthoredQuestions();
 
     // Fetch hidden questions
-    fetch("/api/questions/hidden")
+    const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") || user?.id : user?.id;
+    const hiddenUrl = uid ? `/api/questions/hidden?userId=${encodeURIComponent(uid)}` : "/api/questions/hidden";
+    fetch(hiddenUrl, { headers: uid ? { "x-user-id": uid } : {} })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -303,10 +305,14 @@ export const ProfileView: React.FC = () => {
 
   const handleRestoreQuestion = async (questionId: string) => {
     try {
+      const uid = (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null) || user?.id;
       const res = await fetch("/api/questions/restore", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(uid ? { "x-user-id": uid } : {}),
+        },
+        body: JSON.stringify({ questionId, userId: uid || undefined }),
       });
       if (res.ok) {
         setHiddenQuestions((prev) => prev.filter((q) => q.id !== questionId));
@@ -320,8 +326,10 @@ export const ProfileView: React.FC = () => {
     const confirmMsg = t.deleteConfirm || "Are you sure you want to delete this question? This cannot be undone.";
     if (!window.confirm(confirmMsg)) return;
     try {
+      const uid = (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null) || user?.id;
       const res = await fetch(`/api/questions/${encodeURIComponent(questionId)}`, {
         method: "DELETE",
+        headers: uid ? { "x-user-id": uid } : {},
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -1358,8 +1366,8 @@ export const ProfileView: React.FC = () => {
 
       {/* Edit Profile & Unique Username Modal */}
       {showEditProfileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md max-h-[88vh] bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high/60 flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md h-[88dvh] max-h-[88dvh] sm:h-auto sm:max-h-[88vh] bg-surface-container-lowest rounded-3xl shadow-2xl border border-surface-container-high/60 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-4 sm:p-5 pb-3 border-b border-surface-container-high/40 shrink-0 flex items-center justify-between">
               <div>
                 <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface">
@@ -1379,7 +1387,11 @@ export const ProfileView: React.FC = () => {
               )}
             </div>
 
-            <form id="edit-student-profile-form" onSubmit={handleSaveProfile} className="p-4 sm:p-5 flex-1 overflow-y-auto flex flex-col gap-3.5">
+            <form
+              id="edit-student-profile-form"
+              onSubmit={handleSaveProfile}
+              className="p-4 sm:p-5 flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-3.5 no-scrollbar"
+            >
               {/* Profile Photo */}
               <div className="flex items-center gap-3.5 p-2.5 rounded-2xl bg-surface-container-low/70 border border-surface-container-high/50">
                 <div className="relative">
@@ -1576,7 +1588,7 @@ export const ProfileView: React.FC = () => {
             </form>
 
             {/* Sticky Action Footer */}
-            <div className="p-3 sm:p-4 border-t border-surface-container-high/40 bg-surface-container-lowest shrink-0 flex items-center gap-2">
+            <div className="p-3 sm:p-4 border-t border-surface-container-high/40 bg-surface-container-lowest shrink-0 flex items-center gap-2 sticky bottom-0 z-10 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               {user?.username && (
                 <button
                   type="button"

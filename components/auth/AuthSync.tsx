@@ -25,7 +25,11 @@ export const AuthSync: React.FC = () => {
           .then((d) => {
             if (d.success && d.user) {
               localStorage.setItem("qz_auth_user", JSON.stringify(d.user));
-              if (d.user.onboarding_completed) {
+              const hasCustomHandle =
+                Boolean(d.user.username) &&
+                !d.user.username.startsWith("aspirant_") &&
+                d.user.username.length >= 3;
+              if (d.user.onboarding_completed && hasCustomHandle) {
                 localStorage.setItem("qz_onboarding_completed", "true");
                 localStorage.setItem("qz_details_submitted", "true");
                 localStorage.setItem(`qz_onboarded_${d.user.id}`, "true");
@@ -34,6 +38,8 @@ export const AuthSync: React.FC = () => {
               } else {
                 localStorage.removeItem("qz_onboarding_completed");
                 localStorage.removeItem("qz_details_submitted");
+                localStorage.removeItem(`qz_onboarded_${d.user.id}`);
+                localStorage.removeItem("qz_onboarded_user_id");
                 localStorage.setItem("qz_needs_username", "true");
               }
               window.dispatchEvent(
@@ -64,9 +70,22 @@ export const AuthSync: React.FC = () => {
             .then((d) => {
               if (d.success && d.user) {
                 localStorage.setItem("qz_auth_user", JSON.stringify(d.user));
-                if (d.user.onboarding_completed) {
+                const hasCustomHandle =
+                  Boolean(d.user.username) &&
+                  !d.user.username.startsWith("aspirant_") &&
+                  d.user.username.length >= 3;
+                if (d.user.onboarding_completed && hasCustomHandle) {
                   localStorage.setItem("qz_onboarding_completed", "true");
                   localStorage.setItem("qz_details_submitted", "true");
+                  localStorage.setItem(`qz_onboarded_${d.user.id}`, "true");
+                  localStorage.setItem("qz_onboarded_user_id", d.user.id);
+                  localStorage.removeItem("qz_needs_username");
+                } else {
+                  localStorage.removeItem("qz_onboarding_completed");
+                  localStorage.removeItem("qz_details_submitted");
+                  localStorage.removeItem(`qz_onboarded_${d.user.id}`);
+                  localStorage.removeItem("qz_onboarded_user_id");
+                  localStorage.setItem("qz_needs_username", "true");
                 }
                 window.dispatchEvent(
                   new CustomEvent("qz_auth_changed", { detail: { user: d.user } })
@@ -91,7 +110,11 @@ export const AuthSync: React.FC = () => {
           .then((d) => {
             if (d.success && d.user) {
               localStorage.setItem("qz_auth_user", JSON.stringify(d.user));
-              if (d.user.onboarding_completed) {
+              const hasCustomHandle =
+                Boolean(d.user.username) &&
+                !d.user.username.startsWith("aspirant_") &&
+                d.user.username.length >= 3;
+              if (d.user.onboarding_completed && hasCustomHandle) {
                 localStorage.setItem("qz_onboarding_completed", "true");
                 localStorage.setItem("qz_details_submitted", "true");
                 localStorage.setItem(`qz_onboarded_${d.user.id}`, "true");
@@ -100,6 +123,8 @@ export const AuthSync: React.FC = () => {
               } else {
                 localStorage.removeItem("qz_onboarding_completed");
                 localStorage.removeItem("qz_details_submitted");
+                localStorage.removeItem(`qz_onboarded_${d.user.id}`);
+                localStorage.removeItem("qz_onboarded_user_id");
                 localStorage.setItem("qz_needs_username", "true");
               }
               window.dispatchEvent(

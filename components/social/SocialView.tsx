@@ -423,14 +423,20 @@ export const SocialView: React.FC = () => {
     setPracticeSelectedOption(optionId);
     setIsSubmittingPractice(true);
 
+    const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
+
     try {
       const res = await fetch("/api/questions/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(currentUid ? { "x-user-id": currentUid } : {}),
+        },
         body: JSON.stringify({
           questionId: practiceQuestion.id,
           selectedOptionId: optionId,
           responseTimeMs: elapsedMs,
+          userId: currentUid || undefined,
         }),
       });
 

@@ -115,7 +115,11 @@ export async function GET(request: NextRequest) {
       exams,
       subjects,
       hiddenCount,
-      allProfiles: db.getAllProfiles(),
+      allProfiles: db
+        .getAllProfiles()
+        .filter((p) =>
+          ["user-current", "user-amit", "user-priya", "user-vikram", "user-ananya"].includes(p.id)
+        ),
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to load profile";

@@ -253,11 +253,12 @@ class DataStore {
     return this.attempts.filter((a) => a.user_id === userId);
   }
 
-  public getCurrentUser(): UserProfile {
-    const user = this.profiles.find((p) => p.id === this.currentUserId);
-    if (!user) {
-      return this.profiles[0];
-    }
+  public getCurrentUser(userId?: string): UserProfile {
+    const targetId = userId || "user-current";
+    const user =
+      this.profiles.find((p) => p.id === targetId) ||
+      this.profiles.find((p) => p.id === "user-current") ||
+      this.profiles[0];
     // Update today's count based on attempts in Asia/Kolkata
     const todayAttempts = this.getAttemptsInPeriod(user.id, "today");
     user.today_solved_count = todayAttempts.length;
@@ -268,10 +269,10 @@ class DataStore {
   }
 
   public setCurrentUser(userId: string): UserProfile {
+    // Pure getter for switched user, never mutating a global server singleton variable
     const user = this.profiles.find((p) => p.id === userId);
     if (user) {
-      this.currentUserId = userId;
-      return this.getCurrentUser();
+      return this.getCurrentUser(userId);
     }
     return this.getCurrentUser();
   }
@@ -318,9 +319,10 @@ class DataStore {
       targetUserId = typeof targetUserIdOrUpdates === "string" ? targetUserIdOrUpdates : undefined;
     }
 
-    const targetId = targetUserId || updates.id;
-    let user = targetId ? this.profiles.find((p) => p.id === targetId) : null;
-    if (!user && targetId) {
+    const targetId = targetUserId || updates.id || "user-current";
+
+    let user = this.profiles.find((p) => p.id === targetId);
+    if (!user) {
       user = {
         id: targetId,
         display_name: updates.display_name || "Aspirant",
@@ -340,8 +342,6 @@ class DataStore {
         created_at: new Date().toISOString(),
       };
       this.profiles.push(user);
-    } else if (!user) {
-      user = this.getCurrentUser();
     }
 
     if (updates.username !== undefined) {
@@ -368,14 +368,26 @@ class DataStore {
       }
     }
 
-    Object.assign(user, updates);
+    const { id: _ignoredId, ...safeUpdates } = updates as any;
+    Object.assign(user, safeUpdates);
+    user.id = targetId; // Strictly preserve target user id
 
-    // Keep friends list sync if current user is represented
+    // Keep friends list sync across user-scoped friend maps
+    for (const friendsList of this.userFriends.values()) {
+      const matchingFriend = friendsList.find((f) => f.id === user.id);
+      if (matchingFriend) {
+        if (user.display_name) matchingFriend.display_name = user.display_name;
+        if (user.username) matchingFriend.username = user.username;
+        if (user.target_exam) matchingFriend.target_exam = user.target_exam;
+        if (user.avatar_url) matchingFriend.avatar_url = user.avatar_url;
+      }
+    }
     const matchingFriend = this.friends.find((f) => f.id === user.id);
     if (matchingFriend) {
       if (user.display_name) matchingFriend.display_name = user.display_name;
       if (user.username) matchingFriend.username = user.username;
       if (user.target_exam) matchingFriend.target_exam = user.target_exam;
+      if (user.avatar_url) matchingFriend.avatar_url = user.avatar_url;
     }
 
     return user;
@@ -768,7 +780,7 @@ class DataStore {
       fastest_correct_seconds: number | null;
     };
   } {
-    const userId = params.userId || this.currentUserId;
+    const userId = params.userId || "user-current";
     const q = this.questions.find((item) => item.id === params.questionId);
     if (!q) {
       throw new Error("Question not found");
@@ -832,28 +844,30 @@ class DataStore {
     }
     q.total_time_ms += validTime;
 
-    // Update User Streak (Asia/Kolkata check)
-    const user = this.profiles.find((p) => p.id === userId) || this.getCurrentUser();
-    const todayStr = this.getAsiaKolkataDateString(new Date());
-    if (!user.current_streak || user.current_streak === 0) {
-      user.current_streak = 1;
-      user.last_active_date = todayStr;
-    } else if (user.last_active_date !== todayStr) {
-      if (user.last_active_date) {
-        const lastDate = new Date(user.last_active_date + "T00:00:00Z");
-        const currDate = new Date(todayStr + "T00:00:00Z");
-        const diffDays = Math.round((currDate.getTime() - lastDate.getTime()) / 86400000);
-        if (diffDays === 1) {
-          user.current_streak += 1;
-        } else if (diffDays > 1) {
+    // Update User Streak (Asia/Kolkata check) for logged in user only
+    const user = userId && userId !== "guest" ? this.profiles.find((p) => p.id === userId) : null;
+    if (user) {
+      const todayStr = this.getAsiaKolkataDateString(new Date());
+      if (!user.current_streak || user.current_streak === 0) {
+        user.current_streak = 1;
+        user.last_active_date = todayStr;
+      } else if (user.last_active_date !== todayStr) {
+        if (user.last_active_date) {
+          const lastDate = new Date(user.last_active_date + "T00:00:00Z");
+          const currDate = new Date(todayStr + "T00:00:00Z");
+          const diffDays = Math.round((currDate.getTime() - lastDate.getTime()) / 86400000);
+          if (diffDays === 1) {
+            user.current_streak += 1;
+          } else if (diffDays > 1) {
+            user.current_streak = 1;
+          }
+        } else {
           user.current_streak = 1;
         }
-      } else {
-        user.current_streak = 1;
+        user.last_active_date = todayStr;
       }
-      user.last_active_date = todayStr;
+      user.today_solved_count = (user.today_solved_count || 0) + 1;
     }
-    user.today_solved_count = (user.today_solved_count || 0) + 1;
 
     const accuracy = Math.round((q.correct_attempts / q.total_attempts) * 100);
     const avgTimeSec = Math.round(q.total_time_ms / q.total_attempts / 1000);
@@ -1404,15 +1418,15 @@ class DataStore {
     if (!q) {
       throw new Error("Question not found");
     }
-    const callerId = userId || this.currentUserId;
-    const authorUser = this.getCurrentUser();
+    const callerId = userId || "guest";
+    const authorUser = userId ? this.profiles.find((p) => p.id === userId) : null;
     const isAuthorized =
-      q.author_id === callerId ||
-      callerId === "user-current" ||
-      q.author_id === authorUser.id ||
-      q.author_name === authorUser.display_name ||
-      q.author_id === "user-1" ||
-      q.author_name === "Rahul S.";
+      callerId !== "guest" &&
+      (q.author_id === callerId ||
+        callerId === "user-current" ||
+        (authorUser && (q.author_id === authorUser.id || q.author_name === authorUser.display_name)) ||
+        q.author_id === "user-1" ||
+        q.author_name === "Rahul S.");
     if (!isAuthorized) {
       throw new Error("Unauthorized to edit this question");
     }
@@ -1663,7 +1677,8 @@ class DataStore {
   private userFriends: Map<string, FriendUser[]> = new Map();
 
   public getFriends(userId?: string): FriendUser[] {
-    const targetId = userId || this.currentUserId;
+    const targetId = userId || "guest";
+    if (targetId === "guest") return [];
     if (!this.userFriends.has(targetId)) {
       if (targetId === "user-current") {
         this.userFriends.set(targetId, [...this.friends]);
@@ -1683,17 +1698,19 @@ class DataStore {
   public searchUsers(query: string, currentUserId?: string): (UserProfile & { isFriend: boolean; friendStatus?: string })[] {
     const q = query.trim().toLowerCase().replace(/^@/, "");
     if (!q) return [];
-    const currId = currentUserId || this.currentUserId;
-    const userFriends = this.getFriends(currId);
+    const currId = currentUserId || "";
+    const userFriends = currId ? this.getFriends(currId) : [];
 
     return this.profiles
-      .filter((p) => p.id !== currId)
+      .filter((p) => !currId || p.id !== currId)
       .filter((p) =>
-        p.username.toLowerCase().includes(q) ||
-        p.display_name.toLowerCase().includes(q)
+        (Boolean(p.username) && p.username.toLowerCase().includes(q)) ||
+        (Boolean(p.display_name) && p.display_name.toLowerCase().includes(q))
       )
       .map((p) => {
-        const friend = userFriends.find((f) => f.id === p.id || f.username?.toLowerCase() === p.username.toLowerCase());
+        const friend = userFriends.find(
+          (f) => f.id === p.id || (f.username && p.username && f.username.toLowerCase() === p.username.toLowerCase())
+        );
         return {
           ...p,
           isFriend: friend?.status === "friend",
@@ -1711,7 +1728,10 @@ class DataStore {
     const query = cleanTarget.toLowerCase().replace(/^@+/, "");
 
     // 0. Prevent adding oneself
-    const currentUser = this.profiles.find((p) => p.id === userId) || this.getCurrentUser();
+    const currentUser = this.profiles.find((p) => p.id === userId);
+    if (!currentUser) {
+      return { success: false, message: "User session required to send friend request" };
+    }
     if (
       targetUserIdOrName === currentUser.id ||
       query === currentUser.username.toLowerCase() ||
@@ -1919,11 +1939,11 @@ class DataStore {
   // --- Habit Formation, Goals & Boosts ---
   public getHabitSettings(userId: string): HabitSettings {
     let settings = this.habitSettings.get(userId);
-    const user = (userId ? this.profiles.find((p) => p.id === userId) : null) || this.getCurrentUser();
+    const user = userId ? this.profiles.find((p) => p.id === userId) : null;
     if (!settings) {
       settings = {
-        daily_goal: user.daily_goal || 25,
-        solved_today: user.today_solved_count || 0,
+        daily_goal: user?.daily_goal || 25,
+        solved_today: user?.today_solved_count || 0,
         combo_streak: 0,
         boost_multiplier: 1.5,
         schedule_slots: [
@@ -1934,15 +1954,19 @@ class DataStore {
       };
       this.habitSettings.set(userId, settings);
     }
-    settings.solved_today = user.today_solved_count || 0;
+    if (user) {
+      settings.solved_today = user.today_solved_count || 0;
+    }
     return settings;
   }
 
   public updateDailyGoal(userId: string, goal: number): HabitSettings {
     const settings = this.getHabitSettings(userId);
     settings.daily_goal = Math.max(5, Math.min(goal, 200));
-    const user = (userId ? this.profiles.find((p) => p.id === userId) : null) || this.getCurrentUser();
-    user.daily_goal = settings.daily_goal;
+    const user = userId ? this.profiles.find((p) => p.id === userId) : null;
+    if (user) {
+      user.daily_goal = settings.daily_goal;
+    }
     return settings;
   }
 
