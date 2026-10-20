@@ -1,6 +1,6 @@
 // Automated Acceptance Test Suite for Qz Loop
 // Validates all requirements and scenarios end-to-end
-process.env.NODE_ENV = "test";
+(process.env as Record<string, string | undefined>).NODE_ENV = "test";
 
 import fs from "fs";
 import path from "path";
@@ -545,7 +545,7 @@ async function runTests() {
   assert(guestMatrix.total_solved === 0, "Guest matrix total solved is 0");
   assert(guestMatrix.accuracy_percentage === 0, "Guest matrix accuracy is 0%");
   assert(guestMatrix.fastest_correct_seconds === null, "Guest matrix fastest time is null");
-  assert(guestMatrix.weekly_activity.every((w) => w.count === 0), "Guest weekly activity has 0 counts");
+  assert(Boolean(guestMatrix.weekly_activity?.every((w) => w.count === 0)), "Guest weekly activity has 0 counts");
 
   // Scenario 34: Username Availability Strictness & Conflict Block
   console.log("\n[Scenario 34] Username Availability Strictness & Conflict Block");
@@ -814,7 +814,7 @@ async function runTests() {
   const authorInbox = db.getAllMessagesForUser(authorUserId);
   const foundSuggestion = authorInbox.find((m) => m.id === testMsg44.id);
   assert(Boolean(foundSuggestion), "Author inbox receives non-friend question suggestion directly");
-  assert(foundSuggestion?.text?.includes("💡 Correction"), "Suggestion message body faithfully preserved");
+  assert(Boolean(foundSuggestion?.text?.includes("💡 Correction")), "Suggestion message body faithfully preserved");
 
   // Scenario 45: Authored Questions Deletion & Store Clean-up
   console.log("\n[Scenario 45] Authored Questions Deletion & Store Clean-up");
@@ -1256,7 +1256,7 @@ async function runTests() {
   const dueQ = feedDueUser[0];
   db.submitAttempt({ userId: dueUser.id, questionId: dueQ.id, selectedOptionId: "C", responseTimeMs: 6000 });
   db.setQuestionRepeatInterval(dueUser.id, dueQ.id, "week");
-  const duePref = db.repeatPreferences.get(`${dueUser.id}:${dueQ.id}`)!;
+  const duePref = (db as unknown as { repeatPreferences: Map<string, { next_review_at: string }> }).repeatPreferences.get(`${dueUser.id}:${dueQ.id}`)!;
   duePref.next_review_at = new Date(Date.now() - 50000).toISOString(); // Time in past
 
   const feedWithDue = db.getFeedQuestions({ userId: dueUser.id, examId: "exam-ssc-cgl", limit: 5 });
@@ -1286,8 +1286,59 @@ async function runTests() {
   assert(s58ReelFile.includes("showPostAnswerModal"), "QuestionReelCard manages Post-Answer Pop-up Modal state");
   assert(s58ReelFile.includes("Skip & Next Question"), "QuestionReelCard renders large prominent Skip & Next button");
 
+  // Scenario 59: NEET Biology Onboarding, Multi-Device Isolation, User Search & Mobile Edit Modal
+  console.log("\n[Scenario 59] NEET Biology Onboarding, Multi-Device Isolation, User Search & Mobile Edit Modal");
+
+  // 1. Interactive Onboarding Modal NEET Biology verification
+  const onboardingFile = fs.readFileSync(path.join(__dirname, "../components/onboarding/InteractiveOnboardingModal.tsx"), "utf8");
+  assert(onboardingFile.includes("NEET Biology · Cell Cycle"), "Onboarding slide 1 displays NEET Biology topic badge");
+  assert(onboardingFile.includes("meiosis does crossing over between non-sister chromatids"), "Onboarding slide 1 features authentic NEET Biology meiotic crossing over question");
+  assert(onboardingFile.includes("Pachytene"), "Onboarding slide 1 includes Pachytene as correct answer");
+  assert(!onboardingFile.includes("Maths · Profit & Loss"), "Maths question completely removed from onboarding");
+  assert(onboardingFile.includes("High-Yield Biology"), "Onboarding slide 4 includes High-Yield Biology playlist");
+
+  // 2. Multi-device identity isolation in store & profile updates
+  const testUserA = db.syncUserFromAuth({
+    id: "usr-laptop-test-1",
+    display_name: "Laptop User",
+    username: "laptop_aspirant",
+    target_exam: "NEET UG (Medical Entrance)",
+  });
+  const testUserB = db.syncUserFromAuth({
+    id: "usr-phone-test-2",
+    display_name: "Phone User",
+    username: "phone_aspirant",
+    target_exam: "NEET UG (Medical Entrance)",
+  });
+  assert(testUserA.id !== testUserB.id, "Multi-device users have separate distinct IDs");
+
+  // Updating user B's username must NOT affect user A
+  const updatedB = db.updateProfile({ username: "phone_superstar" }, testUserB.id);
+  assert(updatedB.username === "phone_superstar", "User B username updated to new unique handle");
+  const recheckA = db.getProfileById(testUserA.id);
+  assert(recheckA?.username === "laptop_aspirant", "User A username remains completely unpolluted across devices");
+
+  // 3. User search by username and display name
+  const searchResults1 = db.searchUsers("phone_super", testUserA.id);
+  assert(searchResults1.some((u) => u.id === testUserB.id), "User search finds peer by username substring");
+  const searchResults2 = db.searchUsers("Laptop User", testUserB.id);
+  assert(searchResults2.some((u) => u.id === testUserA.id), "User search finds peer by display name substring");
+  assert(!searchResults1.some((u) => u.id === testUserA.id), "User search strictly excludes the searching user themselves");
+
+  // 4. Mobile Profile Edit Modal Sticky Buttons & Overflow Scroll
+  const profileViewFile = fs.readFileSync(path.join(__dirname, "../components/profile/ProfileView.tsx"), "utf8");
+  assert(profileViewFile.includes("max-h-[88vh]"), "Profile edit modal has max-height boundary for mobile viewports");
+  assert(profileViewFile.includes("overflow-y-auto"), "Profile edit modal form has scrollable body");
+  assert(profileViewFile.includes("border-t border-surface-container-high/40 bg-surface-container-lowest shrink-0"), "Profile edit modal has fixed sticky footer for Save and Cancel buttons");
+  assert(profileViewFile.includes("form=\"edit-student-profile-form\""), "Save Profile button submits form from sticky footer");
+
+  // 5. Username onboarding guard & first-time prompt logic
+  const usernameModalFile = fs.readFileSync(path.join(__dirname, "../components/auth/UsernameOnboardingModal.tsx"), "utf8");
+  assert(usernameModalFile.includes("qz_onboarded_user_id"), "UsernameOnboardingModal scopes completion state to specific user ID");
+  assert(usernameModalFile.includes("qz_needs_username"), "UsernameOnboardingModal checks first-time signup username trigger");
+
   console.log("\n=================================================");
-  console.log("   ALL 58 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 59 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

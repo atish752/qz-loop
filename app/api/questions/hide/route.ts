@@ -5,13 +5,20 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { questionId } = body;
-    const currentUser = db.getCurrentUser();
+    const userId =
+      body.userId ||
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value;
+
+    if (!userId || userId === "guest") {
+      return NextResponse.json({ success: false, error: "Unauthorized: User ID required" }, { status: 401 });
+    }
 
     if (!questionId) {
       return NextResponse.json({ success: false, error: "Question ID is required" }, { status: 400 });
     }
 
-    db.hideQuestion(currentUser.id, questionId);
+    db.hideQuestion(userId, questionId);
 
     return NextResponse.json({
       success: true,

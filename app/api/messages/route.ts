@@ -1,19 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/data/store";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const friendId = searchParams.get("friendId");
-    const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id") || request.cookies.get("qz_user_id")?.value;
-    if (requestedUserId === "guest") {
+    const requestedUserId =
+      searchParams.get("userId") ||
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value;
+
+    if (!requestedUserId || requestedUserId === "guest") {
       return NextResponse.json({ success: true, messages: [], isGuest: true });
     }
-    const effectiveUserId = requestedUserId || db.getCurrentUser().id;
+
+    // Sync cloud direct messages from Supabase
+    try {
+      const supabase = await createServerSupabaseClient();
+      if (supabase && requestedUserId) {
+        let query = supabase.from("direct_messages").select("*");
+        if (friendId) {
+          query = query.or(
+            `and(from_user_id.eq.${requestedUserId},to_user_id.eq.${friendId}),and(from_user_id.eq.${friendId},to_user_id.eq.${requestedUserId})`
+          );
+        } else {
+          query = query.or(
+            `from_user_id.eq.${requestedUserId},to_user_id.eq.${requestedUserId}`
+          );
+        }
+        const { data: cloudMsgs } = await query
+          .order("created_at", { ascending: true })
+          .limit(50);
+
+        if (cloudMsgs && cloudMsgs.length > 0) {
+          for (const cm of cloudMsgs) {
+            const existingMsgs = db.getAllMessagesForUser(requestedUserId);
+            if (!existingMsgs.some((m) => m.id === cm.id)) {
+              db.sendMessage({
+                fromUserId: cm.from_user_id,
+                toUserId: cm.to_user_id,
+                text: cm.text,
+                questionId: cm.question_id || undefined,
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Supabase direct_messages sync notice:", err);
+    }
 
     if (!friendId) {
       // Return all messages involving requested user
-      const allMsgs = db.getAllMessagesForUser(effectiveUserId);
+      const allMsgs = db.getAllMessagesForUser(requestedUserId);
       const enhanced = allMsgs.map((m) => {
         if (m.question_id) {
           const q = db.getQuestionById(m.question_id);
@@ -24,7 +64,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, messages: enhanced });
     }
 
-    const messages = db.getMessages(effectiveUserId, friendId);
+    const messages = db.getMessages(requestedUserId, friendId);
 
     // Enhance any question references with question preview
     const enhanced = messages.map((m) => {
@@ -49,14 +89,38 @@ export async function POST(request: NextRequest) {
     if (!toUserId) {
       return NextResponse.json({ success: false, error: "Recipient user ID is required" }, { status: 400 });
     }
-    const headerUserId = request.headers.get("x-user-id") || body.fromUserId || request.cookies.get("qz_user_id")?.value;
-    const currentUser = headerUserId ? (db.getProfileById(headerUserId) || db.getCurrentUser()) : db.getCurrentUser();
+    const fromUserId =
+      body.fromUserId ||
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value;
+
+    if (!fromUserId || fromUserId === "guest") {
+      return NextResponse.json({ success: false, error: "Unauthorized: Sender user ID required" }, { status: 401 });
+    }
+
     const message = db.sendMessage({
-      fromUserId: currentUser.id,
+      fromUserId,
       toUserId,
       text,
       questionId,
     });
+
+    // Sync to Supabase direct_messages table
+    try {
+      const supabase = await createServerSupabaseClient();
+      if (supabase) {
+        await supabase.from("direct_messages").insert({
+          id: message.id,
+          from_user_id: fromUserId,
+          to_user_id: toUserId,
+          text: text || "",
+          question_id: questionId || null,
+        });
+      }
+    } catch (err) {
+      console.error("Supabase direct message persist notice:", err);
+    }
+
     return NextResponse.json({ success: true, message });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to send chat message";

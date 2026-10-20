@@ -8,8 +8,11 @@ export async function GET(request: NextRequest) {
     const targetUserId =
       searchParams.get("userId") ||
       request.headers.get("x-user-id") ||
-      request.cookies.get("qz_user_id")?.value ||
-      db.getCurrentUser().id;
+      request.cookies.get("qz_user_id")?.value;
+
+    if (!targetUserId || targetUserId === "guest") {
+      return NextResponse.json({ success: true, collections: [], isGuest: true });
+    }
     const collections = db.getUserCollections(targetUserId);
 
     if (includeQuestions) {
@@ -34,8 +37,11 @@ export async function POST(request: NextRequest) {
     const targetUserId =
       body.userId ||
       request.headers.get("x-user-id") ||
-      request.cookies.get("qz_user_id")?.value ||
-      db.getCurrentUser().id;
+      request.cookies.get("qz_user_id")?.value;
+
+    if (!targetUserId || targetUserId === "guest") {
+      return NextResponse.json({ success: false, error: "Unauthorized: User ID required" }, { status: 401 });
+    }
 
     if (!collectionName || typeof collectionName !== "string") {
       return NextResponse.json({ success: false, error: "Playlist name is required" }, { status: 400 });

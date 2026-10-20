@@ -70,19 +70,19 @@ export const InteractiveOnboardingModal: React.FC = () => {
       visual: (
         <div className="w-full p-4 rounded-2xl bg-surface-container-low border border-surface-container-high/60 shadow-xs flex flex-col gap-2.5">
           <div className="flex items-center justify-between text-[11px] font-bold text-secondary">
-            <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-primary text-[10px]">Maths · Profit & Loss</span>
+            <span className="px-2 py-0.5 rounded-full bg-primary-fixed text-primary text-[10px]">NEET Biology · Cell Cycle</span>
             <span className="text-emerald-500 flex items-center gap-1 font-bold">
               <span className="material-symbols-outlined text-[14px]">bolt</span>
               Instant Proof
             </span>
           </div>
           <p className="text-xs font-semibold text-on-surface line-clamp-2">
-            If selling price is doubled, profit triples. Find the original profit %!
+            During which stage of meiosis does crossing over between non-sister chromatids take place?
           </p>
           <div className="grid grid-cols-2 gap-1.5 pt-1">
-            <div className="p-2 rounded-xl bg-surface-container text-[11px] font-medium text-secondary">A. 50%</div>
+            <div className="p-2 rounded-xl bg-surface-container text-[11px] font-medium text-secondary">A. Leptotene</div>
             <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500 text-[11px] font-bold text-emerald-950 dark:text-emerald-200 flex items-center justify-between">
-              <span>B. 100%</span>
+              <span>B. Pachytene</span>
               <span className="material-symbols-outlined text-[14px] text-emerald-500">check_circle</span>
             </div>
           </div>
@@ -175,10 +175,10 @@ export const InteractiveOnboardingModal: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
             <span className="px-2.5 py-1 rounded-lg bg-surface-container text-xs font-semibold text-on-surface whitespace-nowrap">
-              📁 Quick Revision (12)
+              📁 High-Yield Biology (14)
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-surface-container text-xs font-semibold text-on-surface whitespace-nowrap">
-              📁 Maths Shortcuts (8)
+              📁 Genetics & Biotechnology (9)
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-primary-fixed text-primary text-xs font-bold whitespace-nowrap">
               + New Playlist

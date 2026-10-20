@@ -8,8 +8,14 @@ export async function GET(request: NextRequest) {
     if (!questionId) {
       return NextResponse.json({ success: false, error: "Question ID required" }, { status: 400 });
     }
-    const currentUser = db.getCurrentUser();
-    const status = db.getQuestionLikeStatus(currentUser.id, questionId);
+    const userId =
+      searchParams.get("userId") ||
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value;
+    if (!userId || userId === "guest") {
+      return NextResponse.json({ success: true, isLiked: false, likesCount: 0 });
+    }
+    const status = db.getQuestionLikeStatus(userId, questionId);
     return NextResponse.json({ success: true, ...status });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to get like status";
@@ -24,8 +30,14 @@ export async function POST(request: NextRequest) {
     if (!questionId) {
       return NextResponse.json({ success: false, error: "Question ID required" }, { status: 400 });
     }
-    const currentUser = db.getCurrentUser();
-    const result = db.toggleLikeQuestion(currentUser.id, questionId);
+    const userId =
+      body.userId ||
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value;
+    if (!userId || userId === "guest") {
+      return NextResponse.json({ success: false, error: "Unauthorized: User ID required" }, { status: 401 });
+    }
+    const result = db.toggleLikeQuestion(userId, questionId);
     return NextResponse.json({ success: true, ...result });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to toggle like";

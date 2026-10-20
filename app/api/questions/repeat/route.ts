@@ -19,10 +19,10 @@ export async function POST(request: NextRequest) {
     const cookieUserId = request.cookies.get("qz_user_id")?.value;
     const requestedUserId =
       body.userId || request.headers.get("x-user-id") || cookieUserId;
-    const currentUser = requestedUserId
-      ? db.getProfileById(requestedUserId) || db.getCurrentUser()
-      : db.getCurrentUser();
-    const pref = db.setQuestionRepeatInterval(currentUser.id, questionId, interval);
+    if (!requestedUserId || requestedUserId === "guest") {
+      return NextResponse.json({ success: false, error: "Unauthorized: User ID required" }, { status: 401 });
+    }
+    const pref = db.setQuestionRepeatInterval(requestedUserId, questionId, interval);
 
     return NextResponse.json({
       success: true,

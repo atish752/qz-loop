@@ -5,7 +5,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { questionId, reason, details } = body;
-    const currentUser = db.getCurrentUser();
+    const reporterId =
+      body.userId ||
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value ||
+      "guest";
 
     if (!questionId || !reason) {
       return NextResponse.json(
@@ -15,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     db.reportQuestion({
-      reporterId: currentUser.id,
+      reporterId,
       questionId,
       reason,
       details,

@@ -34,7 +34,11 @@ export async function PUT(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const currentUser = db.getCurrentUser();
+    const callerId =
+      body.userId ||
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value ||
+      db.getCurrentUser().id;
     const updated = db.updateQuestion(
       id,
       {
@@ -51,7 +55,7 @@ export async function PUT(
         subject_id: body.subjectId || body.subject_id,
         examination_id: body.examinationId || body.examination_id,
       },
-      currentUser.id
+      callerId
     );
 
     return NextResponse.json({
@@ -70,8 +74,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params;
-    const currentUser = db.getCurrentUser();
-    const deleted = db.deleteQuestion(id, currentUser.id);
+    const callerId =
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value ||
+      db.getCurrentUser().id;
+    const deleted = db.deleteQuestion(id, callerId);
 
     if (!deleted) {
       return NextResponse.json(

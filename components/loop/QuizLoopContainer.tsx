@@ -620,10 +620,15 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
       window.dispatchEvent(new CustomEvent("qz_exam_changed", { detail: { examId: exam.id, examName: exam.name } }));
     }
     try {
+      const uid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
       await fetch("/api/profile", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(uid ? { "x-user-id": uid } : {}),
+        },
         body: JSON.stringify({
+          userId: uid || undefined,
           preferred_examination_id: exam.id,
           target_exam: exam.name,
         }),

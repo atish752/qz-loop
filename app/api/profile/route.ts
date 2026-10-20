@@ -9,10 +9,31 @@ export async function GET(request: NextRequest) {
 
     if (checkUsername) {
       const requestedUserId = searchParams.get("userId") || request.headers.get("x-user-id");
-      const isAvailable = db.isUsernameAvailable(checkUsername, requestedUserId || undefined);
+      let isAvailable = db.isUsernameAvailable(checkUsername, requestedUserId || undefined);
+      
+      // Also verify uniqueness against Supabase profiles table
+      if (isAvailable) {
+        try {
+          const supabase = await createServerSupabaseClient();
+          if (supabase) {
+            const clean = checkUsername.trim().toLowerCase().replace(/^@+/, "");
+            let query = supabase.from("profiles").select("id").eq("username", clean);
+            if (requestedUserId) {
+              query = query.neq("id", requestedUserId);
+            }
+            const { data: existingUser } = await query.maybeSingle();
+            if (existingUser) {
+              isAvailable = false;
+            }
+          }
+        } catch {
+          // Cloud check best-effort fallback to in-memory
+        }
+      }
+
       return NextResponse.json({
         success: true,
-        username: checkUsername.trim().toLowerCase().replace(/^@/, ""),
+        username: checkUsername.trim().toLowerCase().replace(/^@+/, ""),
         available: isAvailable,
       });
     }
@@ -23,10 +44,24 @@ export async function GET(request: NextRequest) {
       request.headers.get("x-user-id") ||
       cookieUserId;
 
-    let user = requestedUserId ? db.getProfileById(requestedUserId) || null : null;
+    if (!requestedUserId || requestedUserId === "guest") {
+      const exams = db.getExaminations();
+      const subjects = db.getSubjects("exam-neet-ug");
+      return NextResponse.json({
+        success: true,
+        user: null,
+        isGuest: true,
+        exams,
+        subjects,
+        hiddenCount: 0,
+        allProfiles: [],
+      });
+    }
+
+    let user = db.getProfileById(requestedUserId) || null;
 
     // Cloud recovery: if user is not in in-memory store, recover from Supabase
-    if (!user && requestedUserId) {
+    if (!user) {
       try {
         const supabase = await createServerSupabaseClient();
         if (supabase) {
@@ -67,6 +102,7 @@ export async function GET(request: NextRequest) {
         console.error("Supabase profile recovery notice:", recoveryErr);
       }
     }
+
     const exams = db.getExaminations();
     const activeExamId = user?.preferred_examination_id || "exam-neet-ug";
     const subjects = db.getSubjects(activeExamId);
@@ -93,20 +129,43 @@ export async function PATCH(request: NextRequest) {
     const cookieUserId = request.cookies.get("qz_user_id")?.value;
     const requestedUserId =
       body.userId || body.id || request.headers.get("x-user-id") || cookieUserId;
+
+    if (!requestedUserId) {
+      return NextResponse.json({ success: false, error: "Unauthorized: User ID required" }, { status: 401 });
+    }
+
+    // Recover from Supabase if not yet in store memory
+    let existing = db.getProfileById(requestedUserId);
+    if (!existing) {
+      try {
+        const supabase = await createServerSupabaseClient();
+        if (supabase) {
+          const { data: dbProfile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", requestedUserId)
+            .maybeSingle();
+          if (dbProfile) {
+            existing = db.syncUserFromAuth(dbProfile);
+          }
+        }
+      } catch {}
+    }
+
     const payload = {
       ...body,
       preferred_examination_id: body.preferred_examination_id || body.preferredExaminationId,
       target_exam: body.target_exam || body.targetExam,
       display_name: body.display_name || body.displayName,
     };
-    const updated = db.updateProfile(payload, requestedUserId || undefined);
+    const updated = db.updateProfile(payload, requestedUserId);
 
     // Sync to Supabase cloud if connected
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase && updated) {
         await supabase.from("profiles").upsert({
-          id: updated.id,
+          id: requestedUserId,
           display_name: updated.display_name,
           username: updated.username,
           target_exam: updated.target_exam,
@@ -121,10 +180,16 @@ export async function PATCH(request: NextRequest) {
       console.error("Supabase profile sync error:", supabaseErr);
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: updated,
     });
+    response.cookies.set("qz_user_id", requestedUserId, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+      sameSite: "lax",
+    });
+    return response;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to update profile";
     return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -139,18 +204,38 @@ export async function POST(request: NextRequest) {
       body.userId || request.headers.get("x-user-id") || cookieUserId;
 
     if (body.userId) {
-      const switched = db.setCurrentUser(body.userId);
-      return NextResponse.json({ success: true, user: switched });
+      let targetUser = db.getProfileById(body.userId);
+      if (!targetUser) {
+        try {
+          const supabase = await createServerSupabaseClient();
+          if (supabase) {
+            const { data: dbProfile } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", body.userId)
+              .maybeSingle();
+            if (dbProfile) {
+              targetUser = db.syncUserFromAuth(dbProfile);
+            }
+          }
+        } catch {}
+      }
+      const res = NextResponse.json({ success: true, user: targetUser });
+      res.cookies.set("qz_user_id", body.userId, { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
+      return res;
     }
 
     const examId = body.preferred_examination_id || body.preferredExaminationId;
     if (examId) {
+      if (!requestedUserId) {
+        return NextResponse.json({ success: false, error: "Unauthorized: User ID required" }, { status: 401 });
+      }
       const updated = db.updateProfile(
         {
           preferred_examination_id: examId,
           target_exam: body.target_exam || body.targetExam,
         },
-        requestedUserId || undefined
+        requestedUserId
       );
 
       // Sync updated exam to Supabase

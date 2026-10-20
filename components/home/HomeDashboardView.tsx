@@ -160,10 +160,15 @@ export const HomeDashboardView: React.FC = () => {
       window.dispatchEvent(new CustomEvent("qz_exam_changed", { detail: { examId, examName } }));
     }
     try {
+      const uid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
       await fetch("/api/profile", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(uid ? { "x-user-id": uid } : {}),
+        },
         body: JSON.stringify({
+          userId: uid || undefined,
           preferred_examination_id: examId,
           target_exam: examName,
         }),

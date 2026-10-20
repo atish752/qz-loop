@@ -318,10 +318,31 @@ class DataStore {
       targetUserId = typeof targetUserIdOrUpdates === "string" ? targetUserIdOrUpdates : undefined;
     }
 
-    const user =
-      (targetUserId ? this.profiles.find((p) => p.id === targetUserId) : null) ||
-      (updates.id ? this.profiles.find((p) => p.id === updates.id) : null) ||
-      this.getCurrentUser();
+    const targetId = targetUserId || updates.id;
+    let user = targetId ? this.profiles.find((p) => p.id === targetId) : null;
+    if (!user && targetId) {
+      user = {
+        id: targetId,
+        display_name: updates.display_name || "Aspirant",
+        username: updates.username || `aspirant_${targetId.slice(0, 6)}`,
+        target_exam: updates.target_exam || "NEET UG (Medical Entrance)",
+        preferred_examination_id: updates.preferred_examination_id || "exam-neet-ug",
+        avatar_url: updates.avatar_url || "",
+        email: updates.email,
+        language_preference: updates.language_preference || "en",
+        role: "student",
+        current_streak: 0,
+        daily_goal: 10,
+        today_solved_count: 0,
+        total_questions_answered: 0,
+        overall_accuracy: 0,
+        onboarding_completed: updates.onboarding_completed ?? true,
+        created_at: new Date().toISOString(),
+      };
+      this.profiles.push(user);
+    } else if (!user) {
+      user = this.getCurrentUser();
+    }
 
     if (updates.username !== undefined) {
       const cleanUsername = updates.username.trim().toLowerCase().replace(/^@+/, "");
@@ -404,7 +425,6 @@ class DataStore {
     };
 
     this.profiles.push(newProfile);
-    this.currentUserId = newUserId;
 
     // Fresh 0-scratch habit engine settings
     this.habitSettings.set(newUserId, {
@@ -494,7 +514,6 @@ class DataStore {
       if (data.language_preference) existing.language_preference = data.language_preference;
       if (data.onboarding_completed !== undefined) existing.onboarding_completed = data.onboarding_completed;
     }
-    this.currentUserId = data.id;
     return existing;
   }
 
@@ -525,9 +544,9 @@ class DataStore {
     limit?: number;
   }): Question[] {
     const isExplicitUser = Boolean(options.userId);
-    const userId = options.userId || this.currentUserId;
-    const userProfile = this.profiles.find((p) => p.id === userId);
-    const examId = options.examId || userProfile?.preferred_examination_id || this.getCurrentUser()?.preferred_examination_id || "exam-neet-ug";
+    const userId = options.userId;
+    const userProfile = userId ? this.profiles.find((p) => p.id === userId) : null;
+    const examId = options.examId || userProfile?.preferred_examination_id || "exam-neet-ug";
     const subjectSlug = options.subjectSlug || "all";
     const sessionExcludedIds = new Set(options.sessionExcludedIds || []);
     const limit = options.limit || 10;
@@ -535,7 +554,7 @@ class DataStore {
 
     // 1. Exclude questions hidden by user
     const userHiddenIds = new Set(
-      this.hiddenQuestions.filter((h) => h.user_id === userId).map((h) => h.question_id)
+      userId ? this.hiddenQuestions.filter((h) => h.user_id === userId).map((h) => h.question_id) : []
     );
 
     // Multi-subject resolution (supports "maths,reasoning", ["maths", "gk"], or "all")
@@ -563,7 +582,7 @@ class DataStore {
       if (q.publication_status !== "published" || q.moderation_status !== "active") return false;
       if (userHiddenIds.has(q.id)) return false;
       if (sessionExcludedIds.has(q.id)) return false;
-      const repeatPref = this.repeatPreferences.get(`${userId}:${q.id}`);
+      const repeatPref = userId ? this.repeatPreferences.get(`${userId}:${q.id}`) : undefined;
       if (repeatPref?.interval === "never") return false;
 
       // Language filter
@@ -1758,6 +1777,7 @@ class DataStore {
       last_active: "Active just now",
     };
     userFriends.unshift(newFriend);
+    this.userFriends.set(userId, userFriends);
     if (userId === "user-current") {
       this.friends = userFriends;
     }
@@ -1777,6 +1797,7 @@ class DataStore {
           status: "pending_incoming",
           last_active: "Active just now",
         });
+        this.userFriends.set(matchedProfile.id, recipientFriends);
         if (matchedProfile.id === "user-current") {
           this.friends = recipientFriends;
         }
@@ -1873,7 +1894,7 @@ class DataStore {
     userId: string;
     text: string;
   }): QuestionComment {
-    const user = this.getCurrentUser();
+    const user = (params.userId ? this.profiles.find((p) => p.id === params.userId) : null) || this.getCurrentUser();
     const newCmt: QuestionComment = {
       id: `cmt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       question_id: params.questionId,
@@ -1898,7 +1919,7 @@ class DataStore {
   // --- Habit Formation, Goals & Boosts ---
   public getHabitSettings(userId: string): HabitSettings {
     let settings = this.habitSettings.get(userId);
-    const user = this.getCurrentUser();
+    const user = (userId ? this.profiles.find((p) => p.id === userId) : null) || this.getCurrentUser();
     if (!settings) {
       settings = {
         daily_goal: user.daily_goal || 25,
@@ -1920,7 +1941,7 @@ class DataStore {
   public updateDailyGoal(userId: string, goal: number): HabitSettings {
     const settings = this.getHabitSettings(userId);
     settings.daily_goal = Math.max(5, Math.min(goal, 200));
-    const user = this.getCurrentUser();
+    const user = (userId ? this.profiles.find((p) => p.id === userId) : null) || this.getCurrentUser();
     user.daily_goal = settings.daily_goal;
     return settings;
   }

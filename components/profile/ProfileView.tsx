@@ -945,7 +945,10 @@ export const ProfileView: React.FC = () => {
               if (user?.id) {
                 fetch("/api/profile", {
                   method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
+                  headers: {
+                    "Content-Type": "application/json",
+                    "x-user-id": user.id,
+                  },
                   body: JSON.stringify({ userId: user.id, language_preference: nextLang }),
                 }).catch(() => {});
               }
@@ -1355,9 +1358,9 @@ export const ProfileView: React.FC = () => {
 
       {/* Edit Profile & Unique Username Modal */}
       {showEditProfileModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-surface-container-lowest rounded-2xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md max-h-[88vh] bg-surface-container-lowest rounded-2xl shadow-2xl border border-surface-container-high/60 flex flex-col overflow-hidden">
+            <div className="p-4 sm:p-5 pb-3 border-b border-surface-container-high/40 shrink-0 flex items-center justify-between">
               <div>
                 <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface">
                   {user?.username ? t.editStudentProfile : t.setUpUsername}
@@ -1376,7 +1379,7 @@ export const ProfileView: React.FC = () => {
               )}
             </div>
 
-            <form onSubmit={handleSaveProfile} className="py-4 flex flex-col gap-3.5">
+            <form id="edit-student-profile-form" onSubmit={handleSaveProfile} className="p-4 sm:p-5 flex-1 overflow-y-auto flex flex-col gap-3.5">
               {/* Profile Photo */}
               <div className="flex items-center gap-3.5 p-2.5 rounded-2xl bg-surface-container-low/70 border border-surface-container-high/50">
                 <div className="relative">
@@ -1570,30 +1573,32 @@ export const ProfileView: React.FC = () => {
                   <span>{editError}</span>
                 </div>
               )}
-
-              <div className="pt-2 flex items-center gap-2">
-                {user?.username && (
-                  <button
-                    type="button"
-                    onClick={() => setShowEditProfileModal(false)}
-                    className="flex-1 py-2.5 rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors"
-                  >
-                    {t.cancel}
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  disabled={isSavingProfile || usernameStatus.available === false}
-                  className="flex-1 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold shadow-md hover:bg-primary-container disabled:opacity-40 transition-all flex items-center justify-center gap-1.5"
-                >
-                  {isSavingProfile ? (
-                    <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <span>{t.saveProfileBtn}</span>
-                  )}
-                </button>
-              </div>
             </form>
+
+            {/* Sticky Action Footer */}
+            <div className="p-3 sm:p-4 border-t border-surface-container-high/40 bg-surface-container-lowest shrink-0 flex items-center gap-2">
+              {user?.username && (
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfileModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors"
+                >
+                  {t.cancel}
+                </button>
+              )}
+              <button
+                type="submit"
+                form="edit-student-profile-form"
+                disabled={isSavingProfile || usernameStatus.available === false}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold shadow-md hover:bg-primary-container disabled:opacity-40 transition-all flex items-center justify-center gap-1.5"
+              >
+                {isSavingProfile ? (
+                  <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span>{t.saveProfileBtn}</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1610,10 +1615,18 @@ export const ProfileView: React.FC = () => {
             window.dispatchEvent(new CustomEvent("qz_exam_changed", { detail: { examId: exam.id, examName: exam.name } }));
           }
           if (user) {
+            const uid = user.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
             fetch("/api/profile", {
               method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ preferred_examination_id: exam.id, target_exam: exam.name }),
+              headers: {
+                "Content-Type": "application/json",
+                ...(uid ? { "x-user-id": uid } : {}),
+              },
+              body: JSON.stringify({
+                userId: uid || undefined,
+                preferred_examination_id: exam.id,
+                target_exam: exam.name,
+              }),
             })
               .then((res) => res.json())
               .then((data) => {

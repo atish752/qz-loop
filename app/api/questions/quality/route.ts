@@ -7,8 +7,14 @@ export async function GET(request: NextRequest) {
     if (!questionId) {
       return NextResponse.json({ success: false, error: "Question ID required" }, { status: 400 });
     }
-    const user = db.getCurrentUser();
-    const result = db.getQuestionQualityVote(user.id, questionId);
+    const userId =
+      request.nextUrl.searchParams.get("userId") ||
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value;
+    if (!userId || userId === "guest") {
+      return NextResponse.json({ success: true, userVote: null });
+    }
+    const result = db.getQuestionQualityVote(userId, questionId);
     return NextResponse.json({ success: true, ...result });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to get quality vote";
@@ -23,8 +29,14 @@ export async function POST(request: NextRequest) {
     if (!questionId || (vote !== "up" && vote !== "down")) {
       return NextResponse.json({ success: false, error: "Valid questionId and vote ('up' | 'down') required" }, { status: 400 });
     }
-    const user = db.getCurrentUser();
-    const result = db.voteQuestionQuality(user.id, questionId, vote);
+    const userId =
+      body.userId ||
+      request.headers.get("x-user-id") ||
+      request.cookies.get("qz_user_id")?.value;
+    if (!userId || userId === "guest") {
+      return NextResponse.json({ success: false, error: "Unauthorized: User ID required" }, { status: 401 });
+    }
+    const result = db.voteQuestionQuality(userId, questionId, vote);
     return NextResponse.json({ success: true, ...result });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to vote";

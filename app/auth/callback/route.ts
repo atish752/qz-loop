@@ -113,16 +113,10 @@ export async function GET(request: Request) {
             .maybeSingle();
 
           existingProfile = dbProfile;
-          username = existingProfile?.username;
-
           if (!existingProfile) {
             isNewUser = true;
-            const cleanBase = (meta.name || (email ? email.split("@")[0] : "aspirant"))
-              .toLowerCase()
-              .replace(/[^a-z0-9_]/g, "")
-              .slice(0, 15);
-            const rand = Math.floor(1000 + Math.random() * 9000);
-            username = `${cleanBase || "aspirant"}_${rand}`;
+            const rand = Math.floor(100000 + Math.random() * 900000);
+            username = `aspirant_${rand}`;
 
             await supabase.from("profiles").insert({
               id: user.id,
@@ -138,6 +132,7 @@ export async function GET(request: Request) {
               today_solved_count: 0,
               total_questions_answered: 0,
               overall_accuracy: 0,
+              onboarding_completed: false,
             });
           }
         } catch (dbErr) {
@@ -154,7 +149,7 @@ export async function GET(request: Request) {
           preferred_examination_id: existingProfile?.preferred_examination_id || "exam-neet-ug",
           email: existingProfile?.email || email,
           language_preference: existingProfile?.language_preference || "en",
-          onboarding_completed: existingProfile?.onboarding_completed ?? (existingProfile ? true : false),
+          onboarding_completed: isNewUser ? false : (existingProfile?.onboarding_completed ?? true),
         });
 
         // 3. Return client bridge HTML that instantly populates localStorage & dispatches event
@@ -202,7 +197,16 @@ export async function GET(request: Request) {
       var profileData = ${JSON.stringify(syncedUser)};
       localStorage.setItem("qz_user_id", uid);
       localStorage.setItem("qz_auth_user", JSON.stringify(profileData));
-      ${!isNewUser ? 'localStorage.setItem("qz_onboarding_completed", "true");\n      localStorage.setItem("qz_details_submitted", "true");' : 'localStorage.setItem("qz_just_signed_up", "true");'}
+      ${
+        !isNewUser
+          ? `localStorage.setItem("qz_onboarding_completed", "true");
+      localStorage.setItem("qz_details_submitted", "true");
+      localStorage.setItem("qz_onboarded_user_id", uid);`
+          : `localStorage.removeItem("qz_onboarding_completed");
+      localStorage.removeItem("qz_details_submitted");
+      localStorage.setItem("qz_just_signed_up", "true");
+      localStorage.setItem("qz_needs_username", "true");`
+      }
       document.cookie = "qz_user_id=" + uid + "; path=/; max-age=2592000; SameSite=Lax";
       window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: profileData } }));
     } catch(err) {

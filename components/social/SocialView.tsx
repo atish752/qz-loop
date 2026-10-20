@@ -155,7 +155,40 @@ export const SocialView: React.FC = () => {
 
   const [respondingId, setRespondingId] = useState<string | null>(null);
 
-  // Search Users by unique username
+  // Auto search as user types with debouncing (finds friends instantly by name or handle)
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults([]);
+      setHasSearched(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      setHasSearched(true);
+      try {
+        const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+        const url = currentUid
+          ? `/api/friends?search=${encodeURIComponent(query)}&userId=${encodeURIComponent(currentUid)}`
+          : `/api/friends?search=${encodeURIComponent(query)}`;
+        const headers: Record<string, string> = currentUid ? { "x-user-id": currentUid } : {};
+        const res = await fetch(url, { headers });
+        const data = await res.json();
+        if (data.success) {
+          setSearchResults(data.users || []);
+        }
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Search Users by unique username (manual submit or enter key)
   const handleSearchUsers = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -1436,10 +1469,18 @@ export const SocialView: React.FC = () => {
         onClose={() => setShowExamModal(false)}
         onSelectExam={(exam) => {
           if (user) {
+            const uid = user.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
             fetch("/api/profile", {
               method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ preferred_examination_id: exam.id, target_exam: exam.name }),
+              headers: {
+                "Content-Type": "application/json",
+                ...(uid ? { "x-user-id": uid } : {}),
+              },
+              body: JSON.stringify({
+                userId: uid || undefined,
+                preferred_examination_id: exam.id,
+                target_exam: exam.name,
+              }),
             })
               .then((res) => res.json())
               .then((data) => {

@@ -28,6 +28,13 @@ export const AuthSync: React.FC = () => {
               if (d.user.onboarding_completed) {
                 localStorage.setItem("qz_onboarding_completed", "true");
                 localStorage.setItem("qz_details_submitted", "true");
+                localStorage.setItem(`qz_onboarded_${d.user.id}`, "true");
+                localStorage.setItem("qz_onboarded_user_id", d.user.id);
+                localStorage.removeItem("qz_needs_username");
+              } else {
+                localStorage.removeItem("qz_onboarding_completed");
+                localStorage.removeItem("qz_details_submitted");
+                localStorage.setItem("qz_needs_username", "true");
               }
               window.dispatchEvent(
                 new CustomEvent("qz_auth_changed", { detail: { user: d.user } })
@@ -87,6 +94,13 @@ export const AuthSync: React.FC = () => {
               if (d.user.onboarding_completed) {
                 localStorage.setItem("qz_onboarding_completed", "true");
                 localStorage.setItem("qz_details_submitted", "true");
+                localStorage.setItem(`qz_onboarded_${d.user.id}`, "true");
+                localStorage.setItem("qz_onboarded_user_id", d.user.id);
+                localStorage.removeItem("qz_needs_username");
+              } else {
+                localStorage.removeItem("qz_onboarding_completed");
+                localStorage.removeItem("qz_details_submitted");
+                localStorage.setItem("qz_needs_username", "true");
               }
               window.dispatchEvent(
                 new CustomEvent("qz_auth_changed", { detail: { user: d.user } })

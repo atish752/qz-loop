@@ -33,18 +33,28 @@ export const UsernameOnboardingModal: React.FC = () => {
     if (typeof window === "undefined") return;
 
     const checkOnboardingState = () => {
-      // Persistent guard: Stop re-prompting if details already saved
+      const uid = localStorage.getItem("qz_user_id");
+      if (!uid) {
+        setIsOpen(false);
+        return;
+      }
+
+      const needsUsername = localStorage.getItem("qz_needs_username") === "true";
+      // Persistent guard: Stop re-prompting only if details already saved for this specific user
       const completed =
-        localStorage.getItem("qz_onboarding_completed") === "true" ||
-        localStorage.getItem("qz_details_submitted") === "true";
+        !needsUsername &&
+        (localStorage.getItem("qz_onboarding_completed") === "true" ||
+          localStorage.getItem("qz_details_submitted") === "true") &&
+        (localStorage.getItem("qz_onboarded_user_id") === uid ||
+          localStorage.getItem(`qz_onboarded_${uid}`) === "true");
+
       if (completed) {
         setIsOpen(false);
         return;
       }
 
-      const uid = localStorage.getItem("qz_user_id");
-      const url = uid ? `/api/profile?userId=${encodeURIComponent(uid)}` : "/api/profile";
-      const headers: Record<string, string> = uid ? { "x-user-id": uid } : {};
+      const url = `/api/profile?userId=${encodeURIComponent(uid)}`;
+      const headers: Record<string, string> = { "x-user-id": uid };
 
       fetch(url, { headers })
         .then((res) => res.json())
@@ -64,24 +74,18 @@ export const UsernameOnboardingModal: React.FC = () => {
               setEmail(data.user.email);
             }
 
-            // Open onboarding only if user does not have a finalized username and hasn't submitted yet
-            if (data.user.onboarding_completed) {
+            // Open onboarding if user has not completed onboarding
+            if (data.user.onboarding_completed && !needsUsername) {
               localStorage.setItem("qz_onboarding_completed", "true");
               localStorage.setItem("qz_details_submitted", "true");
+              localStorage.setItem(`qz_onboarded_${data.user.id}`, "true");
+              localStorage.setItem("qz_onboarded_user_id", data.user.id);
               setIsOpen(false);
               return;
             }
 
-            const uname = (data.user.username || "").trim();
-            const isGeneric = !uname || uname.startsWith("user-") || uname.startsWith("aspirant_") || uname.startsWith("user_");
-            if (isGeneric && !completed) {
-              setIsOpen(true);
-            } else {
-              // Already finalized: persist flags so it never prompts again on future refresh
-              localStorage.setItem("qz_onboarding_completed", "true");
-              localStorage.setItem("qz_details_submitted", "true");
-              setIsOpen(false);
-            }
+            // Force unique username setup for first-time signups
+            setIsOpen(true);
           }
         })
         .catch(() => {});
@@ -172,7 +176,7 @@ export const UsernameOnboardingModal: React.FC = () => {
           display_name: name.trim(),
           username: username.trim().toLowerCase(),
           preferred_examination_id: examId,
-          target_exam: selectedExam?.name || "Railways (RRB NTPC & Group D)",
+          target_exam: selectedExam?.name || "NEET UG (Medical Entrance)",
           language_preference: languagePref,
           avatar_url: avatarUrl || undefined,
           email: email.trim() || undefined,
@@ -186,8 +190,11 @@ export const UsernameOnboardingModal: React.FC = () => {
         localStorage.setItem("qz_user_id", data.user.id);
         localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
         localStorage.setItem("qz_quiz_lang", languagePref);
+        localStorage.removeItem("qz_needs_username");
         localStorage.setItem("qz_onboarding_completed", "true");
         localStorage.setItem("qz_details_submitted", "true");
+        localStorage.setItem(`qz_onboarded_${data.user.id}`, "true");
+        localStorage.setItem("qz_onboarded_user_id", data.user.id);
         document.cookie = `qz_user_id=${data.user.id}; path=/; max-age=2592000; SameSite=Lax`;
         window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: data.user } }));
         window.dispatchEvent(new CustomEvent("qz_account_completed", { detail: { user: data.user } }));
