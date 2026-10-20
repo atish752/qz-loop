@@ -189,6 +189,9 @@ CREATE POLICY "Users can update comments" ON question_comments
   FOR UPDATE
   USING (true);
 
+-- 8. Questions Table Hardening & Default
+ALTER TABLE questions ALTER COLUMN normalized_fingerprint SET DEFAULT '';
+
 -- 9. Baseline NEET UG Seed Questions (Guarantees foreign key integrity if strict schema is kept)
 INSERT INTO examinations (id, name, slug, description, category, display_order, marks_per_question, negative_marks, is_active)
 VALUES ('exam-neet-ug', 'NEET UG (Medical Entrance)', 'neet-ug', 'National Eligibility cum Entrance Test for Undergraduate Medical Programs (~24 Lakh candidates)', 'Medical Entrance', 3, 4, 1, true)
@@ -204,7 +207,7 @@ ON CONFLICT (examination_id, slug) DO UPDATE SET name = EXCLUDED.name, icon = EX
 INSERT INTO questions (
   id, examination_id, subject_id, question_text, hindi_question_text, language,
   options, correct_option_id, explanation, hindi_explanation, difficulty,
-  syllabus_tag, pyq_info, publication_status, moderation_status
+  syllabus_tag, pyq_info, publication_status, moderation_status, normalized_fingerprint
 ) VALUES 
 (
   'q-neet-bio-1', 'exam-neet-ug', 'subj-neet-bio',
@@ -213,7 +216,8 @@ INSERT INTO questions (
   '[{"id":"A","text":"1:2:1","hindi_text":"1:2:1"},{"id":"B","text":"3:1","hindi_text":"3:1"},{"id":"C","text":"9:3:3:1","hindi_text":"9:3:3:1"},{"id":"D","text":"2:1","hindi_text":"2:1"}]'::jsonb,
   'B', 'In a monohybrid cross (e.g. Tt x Tt), the phenotypic ratio is 3 Dominant : 1 Recessive (3:1), while the genotypic ratio is 1 TT : 2 Tt : 1 tt (1:2:1).',
   'मोनोहाइब्रिड क्रॉस में F2 पीढ़ी का लक्षणप्ररूपी (phenotypic) अनुपात 3:1 (3 लंबा : 1 बौना) और जीनप्ररूपी अनुपात 1:2:1 होता है।',
-  'easy', 'Genetics & Molecular Basis of Inheritance', 'NEET UG Biology PYQ', 'published', 'active'
+  'easy', 'Genetics & Molecular Basis of Inheritance', 'NEET UG Biology PYQ', 'published', 'active',
+  'whatistheexpectedphenotypicratiointhef2generationofaclassicmendelianmonohybridcrosswithcompletedominance'
 ),
 (
   'q-neet-bio-2', 'exam-neet-ug', 'subj-neet-bio',
@@ -222,7 +226,8 @@ INSERT INTO questions (
   '[{"id":"A","text":"Ribosome","hindi_text":"राइबोसोम (Ribosome)"},{"id":"B","text":"Mitochondria","hindi_text":"माइटोकॉन्ड्रिया (Mitochondria)"},{"id":"C","text":"Golgi Apparatus","hindi_text":"गॉल्जी काय (Golgi)"},{"id":"D","text":"Lysosome","hindi_text":"लाइसोसोम (Lysosome)"}]'::jsonb,
   'B', 'Mitochondria produce cellular energy in the form of ATP via the Krebs cycle and electron transport system on their inner cristae membranes.',
   'माइटोकॉन्ड्रिया में क्रेब्स चक्र और ईटीएस के माध्यम से एटीपी (ATP) का उत्पादन होता है, इसलिए इसे कोशिका का पावरहाउस कहा जाता है।',
-  'easy', 'Cell Biology: Structure, Function & Division', 'NEET UG Biology PYQ', 'published', 'active'
+  'easy', 'Cell Biology: Structure, Function & Division', 'NEET UG Biology PYQ', 'published', 'active',
+  'whichorganelleisconsideredthepowerhouseofthecellduetooxidativephosphorylationandatpsynthesis'
 ),
 (
   'q-neet-chem-1', 'exam-neet-ug', 'subj-neet-chem',
@@ -231,7 +236,8 @@ INSERT INTO questions (
   '[{"id":"A","text":"H2O","hindi_text":"H2O (जल)"},{"id":"B","text":"BeCl2","hindi_text":"BeCl2 (बेरिलियम क्लोराइड)"},{"id":"C","text":"NH3","hindi_text":"NH3 (अमोनिया)"},{"id":"D","text":"CH4","hindi_text":"CH4 (मीथेन)"}]'::jsonb,
   'B', 'BeCl2 has sp hybridization with 2 bond pairs and 0 lone pairs on the central Be atom, giving it a 180° linear geometry.',
   'BeCl2 में sp संकरण होता है तथा केंद्रीय Be परमाणु पर शून्य एकाकी युग्म होने के कारण इसकी आकृति 180° रैखिक (linear) होती है।',
-  'easy', 'Chemical Bonding & Molecular Structure', 'NEET UG Chemistry PYQ', 'published', 'active'
+  'easy', 'Chemical Bonding & Molecular Structure', 'NEET UG Chemistry PYQ', 'published', 'active',
+  'whichofthefollowingmoleculeshasalinearmoleculargeometryaccordingtovseprtheory'
 ),
 (
   'q-neet-phy-1', 'exam-neet-ug', 'subj-neet-phy',
@@ -240,7 +246,8 @@ INSERT INTO questions (
   '[{"id":"A","text":"Rarer to denser medium at angle > critical angle","hindi_text":"विरल से सघन माध्यम में क्रांतिक कोण से अधिक कोण पर"},{"id":"B","text":"Denser to rarer medium at an angle of incidence greater than the critical angle","hindi_text":"सघन से विरल माध्यम में क्रांतिक कोण से अधिक आपतन कोण पर"},{"id":"C","text":"Denser to rarer medium at an angle less than critical angle","hindi_text":"सघन से विरल माध्यम में क्रांतिक कोण से कम आपतन कोण पर"},{"id":"D","text":"Vacuum into any transparent material","hindi_text":"निर्वात से किसी पारदर्शी पदार्थ में"}]'::jsonb,
   'B', 'Two conditions for TIR: 1) Light must travel from optically denser to rarer medium. 2) Angle of incidence must exceed the critical angle (i > C).',
   'पूर्ण आंतरिक परावर्तन की दो आवश्यक शर्तें हैं: 1) प्रकाश किरण सघन से विरल माध्यम में प्रवेश करे। 2) आपतन कोण का मान क्रांतिक कोण से अधिक हो (i > C)।',
-  'medium', 'Optics: Ray Optics & Wave Optics', 'NEET UG Physics PYQ', 'published', 'active'
+  'medium', 'Optics: Ray Optics & Wave Optics', 'NEET UG Physics PYQ', 'published', 'active',
+  'totalinternalreflectiontiroccursonlywhenlighttravelsfroma'
 )
 ON CONFLICT (id) DO UPDATE SET
   question_text = EXCLUDED.question_text,
@@ -248,4 +255,5 @@ ON CONFLICT (id) DO UPDATE SET
   options = EXCLUDED.options,
   correct_option_id = EXCLUDED.correct_option_id,
   explanation = EXCLUDED.explanation,
-  hindi_explanation = EXCLUDED.hindi_explanation;
+  hindi_explanation = EXCLUDED.hindi_explanation,
+  normalized_fingerprint = EXCLUDED.normalized_fingerprint;
