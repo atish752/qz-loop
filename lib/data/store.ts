@@ -1596,12 +1596,38 @@ class DataStore {
     };
   }
 
-  public getQuestionLikeStatus(userId: string, questionId: string): { liked: boolean; totalLikes: number } {
-    const set = this.likes.get(questionId) || new Set<string>();
+  public toggleQuestionLike(arg1: string, arg2: string): { liked: boolean; totalLikes: number } {
+    const isFirstQ = this.questions.some((q) => q.id === arg1);
+    const qId = isFirstQ ? arg1 : arg2;
+    const uId = isFirstQ ? arg2 : arg1;
+    return this.toggleLikeQuestion(uId, qId);
+  }
+
+  public getQuestionLikeStatus(arg1?: string, arg2?: string): { liked: boolean; totalLikes: number } {
+    let qId = "";
+    let uId: string | undefined = undefined;
+    if (arg1 && this.questions.some((q) => q.id === arg1)) {
+      qId = arg1;
+      uId = arg2;
+    } else {
+      uId = arg1;
+      qId = arg2 || "";
+    }
+    const set = this.likes.get(qId) || new Set<string>();
     return {
-      liked: set.has(userId),
+      liked: Boolean(uId && uId !== "guest" && set.has(uId)),
       totalLikes: set.size,
     };
+  }
+
+  public syncQuestionLikes(questionId: string, userIds: string[]): void {
+    if (!this.likes.has(questionId)) {
+      this.likes.set(questionId, new Set<string>());
+    }
+    const set = this.likes.get(questionId)!;
+    userIds.forEach((uid) => {
+      if (uid) set.add(uid);
+    });
   }
 
   // --- Playlists / Collections System ---
@@ -1686,7 +1712,18 @@ class DataStore {
         this.userFriends.set(targetId, []);
       }
     }
-    return this.userFriends.get(targetId)!;
+    const list = this.userFriends.get(targetId)!;
+    // Strict self-exclusion: never include target user themselves
+    const currentProf = this.profiles.find((p) => p.id === targetId);
+    const filtered = list.filter(
+      (f) =>
+        f.id !== targetId &&
+        (!currentProf?.username || f.username?.toLowerCase() !== currentProf.username.toLowerCase())
+    );
+    if (filtered.length !== list.length) {
+      this.userFriends.set(targetId, filtered);
+    }
+    return filtered;
   }
 
   public getIncomingFriendRequests(userId?: string): FriendUser[] {
@@ -1699,10 +1736,17 @@ class DataStore {
     const q = query.trim().toLowerCase().replace(/^@/, "");
     if (!q) return [];
     const currId = currentUserId || "";
+    const currentUser = currId ? this.profiles.find((p) => p.id === currId) : null;
     const userFriends = currId ? this.getFriends(currId) : [];
 
     return this.profiles
-      .filter((p) => !currId || p.id !== currId)
+      .filter(
+        (p) =>
+          !currId ||
+          (p.id !== currId &&
+            (!currentUser?.username || p.username.toLowerCase() !== currentUser.username.toLowerCase()) &&
+            (!currentUser?.display_name || p.display_name.toLowerCase() !== currentUser.display_name.toLowerCase()))
+      )
       .filter((p) =>
         (Boolean(p.username) && p.username.toLowerCase().includes(q)) ||
         (Boolean(p.display_name) && p.display_name.toLowerCase().includes(q))
@@ -1722,7 +1766,7 @@ class DataStore {
   public sendFriendRequest(
     userId: string,
     targetUserIdOrName: string
-  ): { success: boolean; message: string; friend?: FriendUser } {
+  ): { success: boolean; message: string; friend?: FriendUser; status?: string } {
     const cleanTarget = targetUserIdOrName.trim();
     const isHandle = cleanTarget.startsWith("@");
     const query = cleanTarget.toLowerCase().replace(/^@+/, "");
@@ -1758,12 +1802,25 @@ class DataStore {
           friend: existing,
         };
       }
-      existing.status = "friend";
-      return {
-        success: true,
-        message: `Connected with @${existing.username || existing.display_name}!`,
-        friend: existing,
-      };
+      if (existing.status === "request_sent") {
+        return {
+          success: true,
+          message: `Friend request already sent to @${existing.username || existing.display_name}!`,
+          friend: existing,
+        };
+      }
+      if (existing.status === "pending_incoming" || existing.status === "request_received") {
+        // Reciprocal acceptance
+        existing.status = "friend";
+        const otherFriends = this.getFriends(existing.id);
+        const otherEntry = otherFriends.find((f) => f.id === userId);
+        if (otherEntry) otherEntry.status = "friend";
+        return {
+          success: true,
+          message: `Accepted friend request from @${existing.username || existing.display_name}! You are now study partners.`,
+          friend: existing,
+        };
+      }
     }
 
     // 2. Check in registered user profiles (Exact match on ID, username, or display name)
@@ -1792,8 +1849,8 @@ class DataStore {
       username: generatedUsername,
       avatar_url: matchedProfile?.avatar_url,
       streak_days: matchedProfile ? matchedProfile.current_streak : Math.floor(Math.random() * 15) + 3,
-      target_exam: matchedProfile?.target_exam || "SSC CGL Aspirant",
-      status: "friend",
+      target_exam: matchedProfile?.target_exam || "NEET UG Aspirant",
+      status: "request_sent",
       last_active: "Active just now",
     };
     userFriends.unshift(newFriend);
@@ -1826,6 +1883,7 @@ class DataStore {
 
     return {
       success: true,
+      status: "request_sent",
       message: `Friend request sent to @${newFriend.username}!`,
       friend: newFriend,
     };
@@ -1843,7 +1901,7 @@ class DataStore {
     }
     if (action === "accept") {
       friend.status = "friend";
-      // Also ensure reciprocity
+      // Reciprocal acceptance
       const otherFriends = this.getFriends(friendId);
       const otherEntry = otherFriends.find((f) => f.id === userId);
       if (otherEntry) {
@@ -1867,6 +1925,19 @@ class DataStore {
     } else {
       const idx = userFriends.findIndex((f) => f.id === friendId);
       if (idx !== -1) userFriends.splice(idx, 1);
+      this.userFriends.set(userId, userFriends);
+      if (userId === "user-current") {
+        this.friends = userFriends;
+      }
+
+      const otherFriends = this.getFriends(friendId);
+      const otherIdx = otherFriends.findIndex((f) => f.id === userId);
+      if (otherIdx !== -1) otherFriends.splice(otherIdx, 1);
+      this.userFriends.set(friendId, otherFriends);
+      if (friendId === "user-current") {
+        this.friends = otherFriends;
+      }
+
       return { success: true, message: `Declined friend request` };
     }
   }
@@ -1909,20 +1980,31 @@ class DataStore {
     return this.comments.filter((c) => c.question_id === questionId);
   }
 
+  public syncComments(questionId: string, remoteComments: QuestionComment[]): void {
+    const existingIds = new Set(this.comments.map((c) => c.id));
+    for (const rc of remoteComments) {
+      if (!existingIds.has(rc.id)) {
+        this.comments.unshift(rc);
+        existingIds.add(rc.id);
+      }
+    }
+  }
+
   public addComment(params: {
     questionId: string;
     userId: string;
     text: string;
+    id?: string;
   }): QuestionComment {
     const user = (params.userId ? this.profiles.find((p) => p.id === params.userId) : null) || this.getCurrentUser();
     const newCmt: QuestionComment = {
-      id: `cmt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: params.id || `cmt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       question_id: params.questionId,
       user_id: user.id,
       user_name: user.display_name,
       user_avatar: user.avatar_url,
       comment_text: params.text.trim(),
-      likes_count: 1,
+      likes_count: 0,
       created_at: new Date().toISOString(),
     };
     this.comments.unshift(newCmt);

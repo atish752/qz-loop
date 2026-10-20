@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/data/store";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,11 +13,35 @@ export async function GET(request: NextRequest) {
       searchParams.get("userId") ||
       request.headers.get("x-user-id") ||
       request.cookies.get("qz_user_id")?.value;
-    if (!userId || userId === "guest") {
-      return NextResponse.json({ success: true, isLiked: false, likesCount: 0 });
+
+    // Sync cloud likes from Supabase
+    try {
+      const supabase = await createServerSupabaseClient();
+      if (supabase) {
+        const { data: cloudLikes } = await supabase
+          .from("question_likes")
+          .select("user_id")
+          .eq("question_id", questionId);
+
+        if (cloudLikes && cloudLikes.length > 0) {
+          db.syncQuestionLikes(
+            questionId,
+            cloudLikes.map((l) => l.user_id)
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Supabase likes sync notice:", err);
     }
-    const status = db.getQuestionLikeStatus(userId, questionId);
-    return NextResponse.json({ success: true, ...status });
+
+    const status = db.getQuestionLikeStatus(userId && userId !== "guest" ? userId : undefined, questionId);
+    return NextResponse.json({
+      success: true,
+      liked: status.liked,
+      isLiked: status.liked,
+      totalLikes: status.totalLikes,
+      likesCount: status.totalLikes,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to get like status";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
@@ -37,10 +62,42 @@ export async function POST(request: NextRequest) {
     if (!userId || userId === "guest") {
       return NextResponse.json({ success: false, error: "Unauthorized: User ID required" }, { status: 401 });
     }
+
     const result = db.toggleLikeQuestion(userId, questionId);
-    return NextResponse.json({ success: true, ...result });
+
+    // Sync like state to Supabase question_likes
+    try {
+      const supabase = await createServerSupabaseClient();
+      if (supabase) {
+        if (result.liked) {
+          await supabase.from("question_likes").upsert(
+            {
+              user_id: userId,
+              question_id: questionId,
+            },
+            { onConflict: "user_id,question_id" }
+          );
+        } else {
+          await supabase
+            .from("question_likes")
+            .delete()
+            .match({ user_id: userId, question_id: questionId });
+        }
+      }
+    } catch (err) {
+      console.error("Supabase like persist notice:", err);
+    }
+
+    return NextResponse.json({
+      success: true,
+      liked: result.liked,
+      isLiked: result.liked,
+      totalLikes: result.totalLikes,
+      likesCount: result.totalLikes,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to toggle like";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
+

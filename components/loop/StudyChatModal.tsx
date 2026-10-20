@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FriendUser, DirectMessage } from "@/types/database";
 
 interface StudyChatModalProps {
@@ -16,12 +16,45 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
   onClose,
   onSelectSharedQuestion,
 }) => {
+  const [peerProfile, setPeerProfile] = useState<FriendUser | null>(friend);
   const [messages, setMessages] = useState<(DirectMessage & { question?: any })[]>([]);
   const [inputText, setInputText] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (isOpen && friend) {
+    setPeerProfile(friend);
+  }, [friend]);
+
+  const cleanHandle = (username?: string | null, id?: string | null): string => {
+    if (!username && !id) return "aspirant";
+    const raw = (username || "").replace(/^@/, "").trim();
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw) ||
+      (raw.length >= 24 && raw.includes("-")) ||
+      (raw.length >= 30 && !raw.includes(" "));
+    if (isUuid || !raw) {
+      const seed = (id || raw).replace(/[^0-9a-zA-Z]/g, "").slice(0, 6) || "peer";
+      return `aspirant_${seed}`;
+    }
+    return raw.replace(/^user-/, "aspirant_");
+  };
+
+  const cleanDisplayName = (name?: string | null, rawUsername?: string | null, id?: string | null): string => {
+    if (name && name.trim()) {
+      const trimmed = name.trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed);
+      if (!isUuid && trimmed !== "Study Partner" && trimmed !== "User") return trimmed;
+    }
+    const handle = cleanHandle(rawUsername, id);
+    return `Aspirant ${handle.replace(/^aspirant_/, "").slice(0, 4).toUpperCase() || "Study"}`;
+  };
+
+  useEffect(() => {
+    if (!isOpen || !friend) return;
+
+    let isMounted = true;
+    const fetchChatThread = () => {
       const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       const url = currentUid
         ? `/api/messages?friendId=${friend.id}&userId=${encodeURIComponent(currentUid)}`
@@ -29,13 +62,44 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
       fetch(url)
         .then((res) => res.json())
         .then((data) => {
+          if (!isMounted) return;
           if (data.success && data.messages) {
-            setMessages(data.messages);
+            setMessages((prev) => {
+              const pendingOptimistic = prev.filter((m) => m.id.startsWith("temp-"));
+              const stillPending = pendingOptimistic.filter(
+                (om) => !data.messages.some((sm: any) => sm.text === om.text && sm.from_user_id === om.from_user_id)
+              );
+              return [...data.messages, ...stillPending];
+            });
+            if (data.peers && data.peers[friend.id]) {
+              const p = data.peers[friend.id];
+              setPeerProfile((prev) => ({
+                ...(prev || friend),
+                display_name: p.display_name || prev?.display_name || friend.display_name,
+                username: p.username || prev?.username || friend.username,
+                avatar_url: p.avatar_url || prev?.avatar_url || friend.avatar_url,
+                target_exam: p.target_exam || prev?.target_exam || friend.target_exam,
+                streak_days: p.current_streak || prev?.streak_days || friend.streak_days,
+              }));
+            }
           }
         })
         .catch(() => {});
-    }
+    };
+
+    fetchChatThread();
+    const interval = setInterval(fetchChatThread, 1200);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [isOpen, friend]);
+
+  useEffect(() => {
+    if (chatBottomRef.current) {
+      chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   if (!isOpen || !friend) return null;
 
@@ -43,25 +107,38 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const currentUid = (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null) || "user-current";
+    const text = inputText.trim();
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: DirectMessage = {
+      id: tempId,
+      from_user_id: currentUid,
+      to_user_id: friend.id,
+      text,
+      created_at: new Date().toISOString(),
+    };
+
+    // Instant optimistic update
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setInputText("");
     setIsSending(true);
+
     try {
       const res = await fetch("/api/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(currentUid ? { "x-user-id": currentUid } : {}),
+          ...(currentUid && currentUid !== "user-current" ? { "x-user-id": currentUid } : {}),
         },
         body: JSON.stringify({
-          fromUserId: currentUid || undefined,
+          fromUserId: currentUid,
           toUserId: friend.id,
-          text: inputText.trim(),
+          text,
         }),
       });
       const data = await res.json();
       if (data.success && data.message) {
-        setMessages((prev) => [...prev, data.message]);
-        setInputText("");
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
       }
     } catch {
       // Handled
@@ -70,6 +147,13 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
     }
   };
 
+  const currentPeer = peerProfile || friend;
+  const peerDispName = cleanDisplayName(currentPeer.display_name, currentPeer.username, currentPeer.id);
+  const peerHandle = cleanHandle(currentPeer.username, currentPeer.id);
+  const peerAvatar = currentPeer.avatar_url;
+  const peerStreak = currentPeer.streak_days || 1;
+  const peerExam = currentPeer.target_exam || currentPeer.last_active || "Study Partner";
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
       <div className="w-full max-w-md bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-4 shadow-2xl border border-surface-container-high/60 flex flex-col h-[90vh] sm:h-[650px] animate-in slide-in-from-bottom duration-200">
@@ -77,29 +161,27 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-full overflow-hidden bg-primary-fixed shrink-0 border border-surface-container-high">
-              {friend.avatar_url ? (
+              {peerAvatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={friend.avatar_url}
-                  alt={friend.display_name}
+                  src={peerAvatar}
+                  alt={peerDispName}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
-                  {friend.display_name.charAt(0)}
+                  {peerDispName.charAt(0)}
                 </div>
               )}
             </div>
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
-                <h3 className="font-bold text-on-surface text-sm truncate">{friend.display_name}</h3>
-                {friend.username && (
-                  <span className="text-[11px] font-bold text-primary">@{friend.username}</span>
-                )}
-                <span className="text-[10px] text-tertiary font-bold">🔥 {friend.streak_days}d</span>
+                <h3 className="font-bold text-on-surface text-sm truncate">{peerDispName}</h3>
+                <span className="text-[11px] font-bold text-primary">@{peerHandle}</span>
+                <span className="text-[10px] text-tertiary font-bold">🔥 {peerStreak}d</span>
               </div>
               <p className="text-[10px] text-secondary truncate">
-                {friend.target_exam || friend.last_active || "Study Partner"}
+                {peerExam}
               </p>
             </div>
           </div>
@@ -167,13 +249,14 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
               </div>
             );
           })}
+          <div ref={chatBottomRef} />
         </div>
 
         {/* Input Field */}
         <form onSubmit={handleSendMessage} className="pt-2 border-t border-surface-container-high/40 flex items-center gap-2">
           <input
             type="text"
-            placeholder={`Message ${friend.display_name}...`}
+            placeholder={`Message ${peerDispName}...`}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"

@@ -27,16 +27,54 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
   const [isAdding, setIsAdding] = useState(false);
   const [shareToast, setShareToast] = useState<string | null>(null);
 
+  const cleanHandle = (username?: string | null, id?: string | null): string => {
+    if (!username && !id) return "aspirant";
+    const raw = (username || "").replace(/^@/, "").trim();
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw) ||
+      (raw.length >= 24 && raw.includes("-")) ||
+      (raw.length >= 30 && !raw.includes(" "));
+    if (isUuid || !raw) {
+      const seed = (id || raw).replace(/[^0-9a-zA-Z]/g, "").slice(0, 6) || "peer";
+      return `aspirant_${seed}`;
+    }
+    return raw.replace(/^user-/, "aspirant_");
+  };
+
+  const cleanDisplayName = (name?: string | null, rawUsername?: string | null, id?: string | null): string => {
+    if (name && name.trim()) {
+      const trimmed = name.trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed);
+      if (!isUuid && trimmed !== "Study Partner" && trimmed !== "User") return trimmed;
+    }
+    const handle = cleanHandle(rawUsername, id);
+    return `Aspirant ${handle.replace(/^aspirant_/, "").slice(0, 4).toUpperCase() || "Study"}`;
+  };
+
   useEffect(() => {
     if (isOpen) {
       const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      let myUsername = "";
+      if (typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem("qz_auth_user");
+          if (raw) myUsername = JSON.parse(raw)?.username?.toLowerCase() || "";
+        } catch {}
+      }
       const url = currentUid ? `/api/friends?userId=${encodeURIComponent(currentUid)}` : "/api/friends";
       const headers: Record<string, string> = currentUid ? { "x-user-id": currentUid } : {};
       fetch(url, { headers })
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.friends) {
-            setFriends(data.friends);
+            // Strictly accepted friends only, excluding current user by ID and username
+            const accepted = data.friends.filter(
+              (f: FriendUser) =>
+                f.status === "friend" &&
+                f.id !== currentUid &&
+                (!myUsername || f.username?.toLowerCase() !== myUsername)
+            );
+            setFriends(accepted);
           }
         })
         .catch(() => {});
@@ -63,7 +101,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
 
     try {
       setSentMap((prev) => ({ ...prev, [friend.id]: true }));
-      setShareToast(`Question sent to ${friend.display_name}! 🚀`);
+      setShareToast(`Sent to @${friend.username || friend.display_name}! 🚀`);
       setTimeout(() => setShareToast(null), 2500);
 
       await fetch("/api/messages", {
@@ -75,7 +113,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
         body: JSON.stringify({
           fromUserId: currentUid,
           toUserId: friend.id,
-          text: `Check out this ${question.subject_name || "General"} question on Qz Loop: "${question.question_text.substring(0, 60)}..."`,
+          text: `Can you solve this ${question.subject_name || "Quiz"} question? Check your speed!`,
           questionId: question.id,
         }),
       });
@@ -83,6 +121,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
       // Sent optimistic
     }
   };
+
 
   const handleSendFriendRequest = async () => {
     if (!addFriendInput.trim()) return;
@@ -119,7 +158,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
       if (data.success) {
         setAddStatusMsg(data.message || "Friend request sent!");
         setAddFriendInput("");
-        if (data.friend) {
+        if (data.friend && data.friend.status === "friend") {
           setFriends((prev) => [data.friend, ...prev.filter((f) => f.id !== data.friend.id)]);
         }
       } else {
@@ -199,13 +238,18 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
       <div className="w-full max-w-md bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col max-h-[88vh] animate-in slide-in-from-bottom duration-200">
+        {/* Top Drag Indicator (Instagram Sheet Style) */}
+        <div className="w-12 h-1.5 rounded-full bg-surface-container-high mx-auto mb-3" />
+
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[24px]">send</span>
+            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[20px]">send</span>
+            </div>
             <div>
               <h3 className="font-bold text-on-surface text-base">Share Question</h3>
-              <p className="text-xs text-secondary">Challenge peers & post to study groups</p>
+              <p className="text-xs text-secondary">Challenge friends directly in study chat</p>
             </div>
           </div>
           <button
@@ -224,69 +268,8 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
           </div>
         )}
 
-        {/* 1-Click WhatsApp Viral Challenge Card (Top Priority for Indian Students) */}
-        <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-emerald-600/5 to-surface-container-low border border-emerald-500/30 flex flex-col gap-2.5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-xs">
-                <span className="material-symbols-outlined text-[18px]">chat</span>
-              </div>
-              <div>
-                <span className="text-xs font-bold text-on-surface flex items-center gap-1">
-                  <span>WhatsApp Study Group Challenge</span>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold">VIRAL</span>
-                </span>
-                <p className="text-[11px] text-secondary">Pre-formatted MCQ text with speed hook & instant link</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={handleWhatsAppShare}
-              className="py-2.5 px-3 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all"
-            >
-              <span className="material-symbols-outlined text-[17px]">share</span>
-              <span>Send to WhatsApp</span>
-            </button>
-            <button
-              onClick={handleCopyFormattedText}
-              className="py-2.5 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high active:scale-95 text-on-surface font-semibold text-xs border border-surface-container-high/60 flex items-center justify-center gap-1.5 transition-all"
-            >
-              <span className="material-symbols-outlined text-[17px] text-primary">content_copy</span>
-              <span>{copiedText ? "Copied Text!" : "Copy Post Text"}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Question Preview Snippet */}
-        <div className="my-2.5 p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-surface-container-highest text-secondary">
-                {question.subject_name || "Question"}
-              </span>
-              {question.pyq_info && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-tertiary-fixed/30 text-tertiary">
-                  {question.pyq_info}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-on-surface font-medium truncate mt-1">
-              {question.question_text}
-            </p>
-          </div>
-          <button
-            onClick={handleCopyLink}
-            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-surface-container text-xs font-bold text-primary hover:bg-surface-container-high transition-colors flex items-center gap-1"
-          >
-            <span className="material-symbols-outlined text-[14px]">link</span>
-            <span>{copied ? "Copied!" : "Copy Link"}</span>
-          </button>
-        </div>
-
-        {/* Friend Search Bar */}
-        <div className="relative mb-3">
+        {/* Quick Search Bar */}
+        <div className="relative mt-3 mb-2">
           <span className="material-symbols-outlined absolute left-3 top-2.5 text-secondary text-[18px]">
             search
           </span>
@@ -295,61 +278,58 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
             placeholder="Search study friends by name or @username..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
+            className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
           />
         </div>
 
-        {/* Friends List with Direct Send */}
-        <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2 min-h-[160px] max-h-[240px]">
+        {/* Friends List with Direct 1-Tap Send Pill */}
+        <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2 min-h-[160px] max-h-[260px] py-1">
           {filteredFriends.length > 0 ? (
             filteredFriends.map((friend) => {
               const isSent = sentMap[friend.id];
+              const dispName = cleanDisplayName(friend.display_name, friend.username, friend.id);
+              const handle = cleanHandle(friend.username, friend.id);
               return (
                 <div
                   key={friend.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-low border border-surface-container-high/30 transition-colors"
+                  className="flex items-center justify-between p-2.5 rounded-2xl bg-surface-container-low/70 hover:bg-surface-container-low border border-surface-container-high/30 transition-colors"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-full overflow-hidden bg-primary-fixed shrink-0 border border-surface-container-high">
-                      {friend.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={friend.avatar_url}
-                          alt={friend.display_name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
-                          {friend.display_name.charAt(0)}
-                        </div>
-                      )}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative shrink-0">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high">
+                        {friend.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={friend.avatar_url}
+                            alt={dispName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
+                            {dispName.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-surface-container-lowest" />
                     </div>
                     <div className="min-w-0 flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-on-surface text-xs truncate">
-                          {friend.display_name}
-                        </span>
-                        <span className="text-[10px] text-primary font-bold">
-                          @{friend.username || friend.display_name.toLowerCase().replace(/\s+/g, "_")}
-                        </span>
-                        <span className="text-[10px] text-tertiary font-semibold">
-                          🔥 {friend.streak_days}d
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-secondary truncate">
-                        {friend.target_exam}
+                      <span className="font-bold text-on-surface text-xs truncate">
+                        {dispName}
+                      </span>
+                      <span className="text-[11px] text-primary font-bold truncate">
+                        @{handle}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                  <div className="flex items-center gap-2 shrink-0 pl-2">
                     <button
                       onClick={() => handleSendToFriend(friend)}
                       disabled={isSent}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-xs ${
                         isSent
-                          ? "bg-tertiary-fixed text-on-tertiary-fixed"
-                          : "bg-primary text-on-primary hover:bg-primary-container active:scale-95 shadow-xs"
+                          ? "bg-emerald-600 text-white"
+                          : "bg-primary text-on-primary hover:bg-primary-container active:scale-95"
                       }`}
                     >
                       {isSent ? "Sent ✓" : "Send"}
@@ -360,7 +340,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
                           onClose();
                           onOpenChatWithFriend(friend);
                         }}
-                        className="p-1.5 rounded-lg bg-surface-container text-secondary hover:text-primary transition-colors"
+                        className="p-1.5 rounded-xl bg-surface-container text-secondary hover:text-primary transition-colors"
                         title="Open study chat"
                       >
                         <span className="material-symbols-outlined text-[16px]">chat</span>
@@ -371,38 +351,54 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
               );
             })
           ) : (
-            <div className="py-6 text-center text-xs text-secondary">
-              No matching study partners found
+            <div className="py-8 text-center text-xs text-secondary flex flex-col items-center gap-1.5">
+              <span className="material-symbols-outlined text-[28px] text-primary/50">groups</span>
+              <p>No study friends found.</p>
+              <p className="text-[11px]">Send a friend request below or in the Social lounge.</p>
             </div>
           )}
         </div>
 
-        {/* Add Friend / Connect Aspirant */}
-        <div className="mt-3 pt-3 border-t border-surface-container-high/40">
-          <label className="text-[11px] font-bold text-secondary uppercase tracking-wider block mb-1">
-            Send Friend Request
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Enter unique @username (e.g. @priya_neet)..."
-              value={addFriendInput}
-              onChange={(e) => setAddFriendInput(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
-            />
-            <button
-              onClick={handleSendFriendRequest}
-              disabled={isAdding || !addFriendInput.trim()}
-              className="px-3.5 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs disabled:opacity-40 hover:bg-primary-container active:scale-95 transition-all shrink-0"
-            >
-              {isAdding ? "Adding..." : "Add"}
-            </button>
-          </div>
-          {addStatusMsg && (
-            <p className="text-[11px] text-primary font-medium mt-1">{addStatusMsg}</p>
-          )}
+        {/* 1-Click WhatsApp & Copy Link Bar */}
+        <div className="pt-2.5 border-t border-surface-container-high/40 grid grid-cols-2 gap-2">
+          <button
+            onClick={handleWhatsAppShare}
+            className="py-2 px-3 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all"
+          >
+            <span className="material-symbols-outlined text-[16px]">share</span>
+            <span>WhatsApp Challenge</span>
+          </button>
+          <button
+            onClick={handleCopyLink}
+            className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high active:scale-95 text-on-surface font-semibold text-xs border border-surface-container-high/60 flex items-center justify-center gap-1.5 transition-all"
+          >
+            <span className="material-symbols-outlined text-[16px] text-primary">link</span>
+            <span>{copied ? "Copied Link!" : "Copy Quiz Link"}</span>
+          </button>
         </div>
+
+        {/* Send Friend Request Quick Action */}
+        <div className="mt-2.5 pt-2 border-t border-surface-container-high/40 flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Send request: Enter @username..."
+            value={addFriendInput}
+            onChange={(e) => setAddFriendInput(e.target.value)}
+            className="flex-1 px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
+          />
+          <button
+            onClick={handleSendFriendRequest}
+            disabled={isAdding || !addFriendInput.trim()}
+            className="px-3 py-1.5 rounded-xl bg-primary-container text-on-primary font-bold text-xs disabled:opacity-40 hover:bg-primary transition-all shrink-0"
+          >
+            {isAdding ? "Sending..." : "Send Request"}
+          </button>
+        </div>
+        {addStatusMsg && (
+          <p className="text-[11px] text-primary font-medium mt-1">{addStatusMsg}</p>
+        )}
       </div>
     </div>
   );
 };
+

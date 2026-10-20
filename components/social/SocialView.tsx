@@ -38,7 +38,33 @@ export const SocialView: React.FC = () => {
   const [chatInputText, setChatInputText] = useState<string>("");
   const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false);
   const [isLoadingChat, setIsLoadingChat] = useState<boolean>(false);
+  const [peerProfiles, setPeerProfiles] = useState<Record<string, any>>({});
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
+
+  // Helper functions for clean handle & display name formatting (no raw UUIDs)
+  const cleanHandle = (username?: string | null, id?: string | null): string => {
+    if (!username && !id) return "aspirant";
+    const raw = (username || "").replace(/^@/, "").trim();
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw) ||
+      (raw.length >= 24 && raw.includes("-")) ||
+      (raw.length >= 30 && !raw.includes(" "));
+    if (isUuid || !raw) {
+      const seed = (id || raw).replace(/[^0-9a-zA-Z]/g, "").slice(0, 6) || "peer";
+      return `aspirant_${seed}`;
+    }
+    return raw.replace(/^user-/, "aspirant_");
+  };
+
+  const cleanDisplayName = (name?: string | null, rawUsername?: string | null, id?: string | null): string => {
+    if (name && name.trim()) {
+      const trimmed = name.trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed);
+      if (!isUuid && trimmed !== "Study Partner" && trimmed !== "User") return trimmed;
+    }
+    const handle = cleanHandle(rawUsername, id);
+    return `Aspirant ${handle.replace(/^aspirant_/, "").slice(0, 4).toUpperCase() || "Study"}`;
+  };
 
   // Quick Share Question Modal inside Chat
   const [showQuickShareModal, setShowQuickShareModal] = useState<boolean>(false);
@@ -66,6 +92,16 @@ export const SocialView: React.FC = () => {
       if (typeof window !== "undefined") {
         const uid = localStorage.getItem("qz_user_id");
         setIsLoggedIn(Boolean(uid));
+
+        const cachedUserRaw = localStorage.getItem("qz_auth_user");
+        if (cachedUserRaw) {
+          try {
+            const parsed = JSON.parse(cachedUserRaw);
+            if (parsed && (!uid || parsed.id === uid)) {
+              setUser(parsed);
+            }
+          } catch {}
+        }
 
         if (uid) {
           fetch(`/api/profile?userId=${encodeURIComponent(uid)}`)
@@ -105,12 +141,23 @@ export const SocialView: React.FC = () => {
       return;
     }
 
+    let myUsername = user?.username?.toLowerCase();
+    if (!myUsername && typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("qz_auth_user");
+        if (raw) myUsername = JSON.parse(raw)?.username?.toLowerCase();
+      } catch {}
+    }
+
     setIsLoadingFriends(true);
     fetch(`/api/friends?userId=${encodeURIComponent(currentUid)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.friends) {
-          setFriends(data.friends);
+          const filtered = data.friends.filter(
+            (f: FriendUser) => f.id !== currentUid && (!myUsername || f.username?.toLowerCase() !== myUsername)
+          );
+          setFriends(filtered);
         }
       })
       .catch(() => {})
@@ -121,30 +168,55 @@ export const SocialView: React.FC = () => {
       .then((data) => {
         if (data.success && data.messages) {
           setAllMessages(data.messages);
+          if (data.peers) {
+            setPeerProfiles((prev) => ({ ...prev, ...data.peers }));
+          }
         }
       })
       .catch(() => {});
   };
 
-  // Load Chat thread when a friend is selected
+  // Load Chat thread when a friend is selected with rapid 1.2s polling
   useEffect(() => {
-    if (selectedFriend) {
-      setIsLoadingChat(true);
-      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    if (!selectedFriend) return;
+
+    let isMounted = true;
+    const fetchChatThread = (showSpinner = false) => {
+      if (showSpinner) setIsLoadingChat(true);
+      const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
       const url = currentUid
         ? `/api/messages?friendId=${selectedFriend.id}&userId=${encodeURIComponent(currentUid)}`
         : `/api/messages?friendId=${selectedFriend.id}`;
       fetch(url)
         .then((res) => res.json())
         .then((data) => {
+          if (!isMounted) return;
           if (data.success && data.messages) {
-            setMessages(data.messages);
+            setMessages((prev) => {
+              const pendingOptimistic = prev.filter((m) => m.id.startsWith("temp-"));
+              const stillPending = pendingOptimistic.filter(
+                (om) => !data.messages.some((sm: any) => sm.text === om.text && sm.from_user_id === om.from_user_id)
+              );
+              return [...data.messages, ...stillPending];
+            });
+            if (data.peers) {
+              setPeerProfiles((prev) => ({ ...prev, ...data.peers }));
+            }
           }
         })
         .catch(() => {})
-        .finally(() => setIsLoadingChat(false));
-    }
-  }, [selectedFriend]);
+        .finally(() => {
+          if (isMounted && showSpinner) setIsLoadingChat(false);
+        });
+    };
+
+    fetchChatThread(true);
+    const pollInterval = setInterval(() => fetchChatThread(false), 1200);
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
+  }, [selectedFriend, user?.id]);
 
   // Scroll to bottom of chat on new message
   useEffect(() => {
@@ -168,7 +240,8 @@ export const SocialView: React.FC = () => {
       setIsSearching(true);
       setHasSearched(true);
       try {
-        const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+        const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
+        const myUsername = user?.username?.toLowerCase();
         const url = currentUid
           ? `/api/friends?search=${encodeURIComponent(query)}&userId=${encodeURIComponent(currentUid)}`
           : `/api/friends?search=${encodeURIComponent(query)}`;
@@ -176,7 +249,10 @@ export const SocialView: React.FC = () => {
         const res = await fetch(url, { headers });
         const data = await res.json();
         if (data.success) {
-          setSearchResults(data.users || []);
+          const filtered = (data.users || []).filter(
+            (u: any) => u.id !== currentUid && (!myUsername || u.username?.toLowerCase() !== myUsername)
+          );
+          setSearchResults(filtered);
         }
       } catch {
         setSearchResults([]);
@@ -186,7 +262,7 @@ export const SocialView: React.FC = () => {
     }, 280);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, user?.id, user?.username]);
 
   // Search Users by unique username (manual submit or enter key)
   const handleSearchUsers = async (e: React.FormEvent) => {
@@ -196,7 +272,8 @@ export const SocialView: React.FC = () => {
     setIsSearching(true);
     setHasSearched(true);
     try {
-      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
+      const myUsername = user?.username?.toLowerCase();
       const url = currentUid
         ? `/api/friends?search=${encodeURIComponent(searchQuery.trim())}&userId=${encodeURIComponent(currentUid)}`
         : `/api/friends?search=${encodeURIComponent(searchQuery.trim())}`;
@@ -204,7 +281,10 @@ export const SocialView: React.FC = () => {
       const res = await fetch(url, { headers });
       const data = await res.json();
       if (data.success) {
-        setSearchResults(data.users || []);
+        const filtered = (data.users || []).filter(
+          (u: any) => u.id !== currentUid && (!myUsername || u.username?.toLowerCase() !== myUsername)
+        );
+        setSearchResults(filtered);
       }
     } catch {
       setSearchResults([]);
@@ -220,7 +300,7 @@ export const SocialView: React.FC = () => {
     setAddStatus(null);
 
     try {
-      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
       const res = await fetch("/api/friends", {
         method: "POST",
         headers: {
@@ -234,19 +314,20 @@ export const SocialView: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
-        setAddStatus({ type: "success", message: data.message || "Friend added successfully!" });
+        setAddStatus({ type: "success", message: data.message || "Friend request sent!" });
         setAddInput("");
         loadFriendsAndMessages();
-        // Update search results if relevant
+        const cleanTarget = targetUsernameOrName.trim().toLowerCase().replace(/^@/, "");
+        // Update search results to reflect request_sent status (pending acceptance)
         setSearchResults((prev) =>
           prev.map((u) =>
-            u.username.toLowerCase() === targetUsernameOrName.trim().toLowerCase().replace(/^@/, "")
-              ? { ...u, isFriend: true, friendStatus: "friend" }
+            u.username.toLowerCase() === cleanTarget || u.id === targetUsernameOrName.trim()
+              ? { ...u, isFriend: false, friendStatus: "request_sent" }
               : u
           )
         );
       } else {
-        setAddStatus({ type: "error", message: data.error || "Failed to add friend" });
+        setAddStatus({ type: "error", message: data.error || "Failed to send friend request" });
       }
     } catch {
       setAddStatus({ type: "error", message: "Network error. Please try again." });
@@ -277,6 +358,18 @@ export const SocialView: React.FC = () => {
         if (action === "accept") {
           confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
         }
+        setSearchResults((prev) =>
+          prev.map((u) => {
+            if (u.id === friendId) {
+              return {
+                ...u,
+                isFriend: action === "accept",
+                friendStatus: action === "accept" ? "friend" : undefined,
+              };
+            }
+            return u;
+          })
+        );
         loadFriendsAndMessages();
       }
     } catch {
@@ -287,13 +380,25 @@ export const SocialView: React.FC = () => {
   };
 
 
-  // Send Direct Chat Message
+  // Send Direct Chat Message with instant optimistic UI update
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInputText.trim() || !selectedFriend) return;
 
     const text = chatInputText.trim();
-    const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
+    const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null) || "user-current";
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage: DirectMessage & { question?: Question } = {
+      id: tempId,
+      from_user_id: currentUid,
+      to_user_id: selectedFriend.id,
+      text,
+      created_at: new Date().toISOString(),
+    };
+
+    // Instant optimistic update
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setAllMessages((prev) => [...prev, optimisticMessage]);
     setChatInputText("");
     setIsSendingMessage(true);
 
@@ -302,21 +407,21 @@ export const SocialView: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(currentUid ? { "x-user-id": currentUid } : {}),
+          ...(currentUid && currentUid !== "user-current" ? { "x-user-id": currentUid } : {}),
         },
         body: JSON.stringify({
-          fromUserId: currentUid || undefined,
+          fromUserId: currentUid,
           toUserId: selectedFriend.id,
           text,
         }),
       });
       const data = await res.json();
       if (data.success && data.message) {
-        setMessages((prev) => [...prev, data.message]);
-        setAllMessages((prev) => [...prev, data.message]);
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
+        setAllMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
       }
     } catch {
-      // optimistic error recovery
+      // optimistic error recovery: retains user message
     } finally {
       setIsSendingMessage(false);
     }
@@ -339,31 +444,46 @@ export const SocialView: React.FC = () => {
     }
   };
 
-  // Send Shared Quiz into Chat
+  // Send Shared Quiz into Chat with instant optimistic UI update
   const handleShareQuizToFriend = async (question: Question) => {
     if (!selectedFriend) return;
     setShowQuickShareModal(false);
 
+    const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null) || "user-current";
+    const tempId = `temp-${Date.now()}`;
+    const shareText = `Can you solve this ${question.subject_name || "General"} quiz? Check your speed!`;
+    const optimisticMessage: DirectMessage & { question?: Question } = {
+      id: tempId,
+      from_user_id: currentUid,
+      to_user_id: selectedFriend.id,
+      text: shareText,
+      question_id: question.id,
+      question,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setAllMessages((prev) => [...prev, optimisticMessage]);
+
     try {
-      const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
       const res = await fetch("/api/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(currentUid ? { "x-user-id": currentUid } : {}),
+          ...(currentUid && currentUid !== "user-current" ? { "x-user-id": currentUid } : {}),
         },
         body: JSON.stringify({
-          fromUserId: currentUid || undefined,
+          fromUserId: currentUid,
           toUserId: selectedFriend.id,
-          text: `Can you solve this ${question.subject_name || "General"} quiz? Check your speed!`,
+          text: shareText,
           questionId: question.id,
         }),
       });
       const data = await res.json();
       if (data.success && data.message) {
         const fullMessage = { ...data.message, question };
-        setMessages((prev) => [...prev, fullMessage]);
-        setAllMessages((prev) => [...prev, fullMessage]);
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? fullMessage : m)));
+        setAllMessages((prev) => prev.map((m) => (m.id === tempId ? fullMessage : m)));
       }
     } catch {
       // Handled
@@ -600,36 +720,46 @@ export const SocialView: React.FC = () => {
                     >
                       <span className="material-symbols-outlined text-[20px]">arrow_back</span>
                     </button>
-                    <div className="w-9 h-9 rounded-full overflow-hidden bg-primary-fixed shrink-0 border border-surface-container-high">
-                      {selectedFriend.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={selectedFriend.avatar_url}
-                          alt={selectedFriend.display_name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
-                          {selectedFriend.display_name.charAt(0)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-on-surface text-sm truncate">
-                          {selectedFriend.display_name}
-                        </span>
-                        <span className="text-[11px] font-bold text-primary">
-                          @{selectedFriend.username}
-                        </span>
-                        <span className="text-[10px] text-tertiary font-bold">
-                          🔥 {selectedFriend.streak_days}d
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-secondary truncate">
-                        {selectedFriend.target_exam}
-                      </span>
-                    </div>
+                    {(() => {
+                      const peerData = peerProfiles[selectedFriend.id] || selectedFriend;
+                      const dispName = cleanDisplayName(peerData.display_name, peerData.username, selectedFriend.id);
+                      const handle = cleanHandle(peerData.username, selectedFriend.id);
+                      const avatar = peerData.avatar_url || selectedFriend.avatar_url;
+                      return (
+                        <>
+                          <div className="w-9 h-9 rounded-full overflow-hidden bg-primary-fixed shrink-0 border border-surface-container-high">
+                            {avatar ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={avatar}
+                                alt={dispName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
+                                {dispName.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex flex-col">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-on-surface text-sm truncate">
+                                {dispName}
+                              </span>
+                              <span className="text-[11px] font-bold text-primary">
+                                @{handle}
+                              </span>
+                              <span className="text-[10px] text-tertiary font-bold">
+                                🔥 {peerData.current_streak || selectedFriend.streak_days || 1}d
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-secondary truncate">
+                              {peerData.target_exam || selectedFriend.target_exam || "NEET UG"}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <button
@@ -653,7 +783,7 @@ export const SocialView: React.FC = () => {
                     <div className="py-12 flex flex-col items-center justify-center text-center gap-2 text-secondary">
                       <span className="material-symbols-outlined text-[32px] text-primary/40">chat</span>
                       <p className="text-xs font-medium text-on-surface">
-                        {t.noMessagesWith || "No messages yet with"} @{selectedFriend.username}
+                        {t.noMessagesWith || "No messages yet with"} @{cleanHandle(selectedFriend.username, selectedFriend.id)}
                       </p>
                       <p className="text-[11px]">
                         {t.sendGreeting || "Send a greeting or challenge them to practice a quiz!"}
@@ -667,7 +797,8 @@ export const SocialView: React.FC = () => {
                     </div>
                   ) : (
                     messages.map((m) => {
-                      const isMe = m.from_user_id === user?.id || m.from_user_id === "user-current";
+                      const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null) || "user-current";
+                      const isMe = m.from_user_id === currentUid || (currentUid !== "user-current" && m.from_user_id === "user-current");
                       return (
                         <div
                           key={m.id}
@@ -789,18 +920,39 @@ export const SocialView: React.FC = () => {
                   </div>
                 ) : (() => {
                     // Derive full list of conversation partners (friends + any external sender/recipient from allMessages)
-                    const currentUid = user?.id || "user-current";
-                    const conversationPartners: FriendUser[] = [...friends];
+                    const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null) || "user-current";
+                    const currentUsername = user?.username?.toLowerCase();
+                    const acceptedFriends = friends.filter(
+                      (f) =>
+                        (f.status === "friend" || !f.status) &&
+                        f.id !== currentUid &&
+                        (!currentUsername || f.username?.toLowerCase() !== currentUsername)
+                    );
+                    const conversationPartners: FriendUser[] = [...acceptedFriends];
+
                     allMessages.forEach((m) => {
                       const partnerId = m.from_user_id === currentUid ? m.to_user_id : m.from_user_id;
-                      if (partnerId && partnerId !== currentUid && !conversationPartners.some((p) => p.id === partnerId)) {
+                      if (
+                        partnerId &&
+                        partnerId !== currentUid &&
+                        partnerId !== "user-current" &&
+                        !conversationPartners.some((p) => p.id === partnerId)
+                      ) {
+                        const peer = peerProfiles[partnerId];
+                        const handle = cleanHandle(peer?.username, partnerId);
+                        const isSuggestion = m.from_user_id === partnerId && m.text?.includes("💡");
+                        const dispName = isSuggestion
+                          ? "Aspirant Suggestion"
+                          : cleanDisplayName(peer?.display_name, peer?.username, partnerId);
+
                         conversationPartners.push({
                           id: partnerId,
-                          display_name: m.from_user_id === partnerId && m.text?.includes("💡") ? "Aspirant Suggestion" : "Study Partner",
-                          username: partnerId.replace(/^user-/, "aspirant_"),
-                          target_exam: "NEET UG (Medical Entrance)",
+                          display_name: dispName,
+                          username: handle,
+                          avatar_url: peer?.avatar_url,
+                          target_exam: peer?.target_exam || "NEET UG",
                           status: "friend",
-                          streak_days: 1,
+                          streak_days: peer?.current_streak || 1,
                         });
                       }
                     });
@@ -826,84 +978,89 @@ export const SocialView: React.FC = () => {
                     return (
                       <div className="flex flex-col gap-2">
                         {conversationPartners.map((friend) => {
+                          const peerData = peerProfiles[friend.id] || friend;
+                          const dispName = cleanDisplayName(peerData.display_name, peerData.username, friend.id);
+                          const handle = cleanHandle(peerData.username, friend.id);
+                          const avatar = peerData.avatar_url || friend.avatar_url;
+
                           // Find last message with this friend
                           const friendMsgs = allMessages.filter(
                             (m) =>
-                              (m.from_user_id === friend.id && m.to_user_id === (user?.id || "user-current")) ||
-                              (m.from_user_id === (user?.id || "user-current") && m.to_user_id === friend.id)
+                              (m.from_user_id === friend.id && m.to_user_id === currentUid) ||
+                              (m.from_user_id === currentUid && m.to_user_id === friend.id)
                           );
                           const lastMsg = friendMsgs[friendMsgs.length - 1];
 
                           return (
                             <div
                               key={friend.id}
-                              onClick={() => setSelectedFriend(friend)}
+                              onClick={() => setSelectedFriend({ ...friend, display_name: dispName, username: handle, avatar_url: avatar })}
                               className="p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container border border-surface-container-high/40 cursor-pointer transition-all flex items-center justify-between gap-3 shadow-xs active:scale-[0.99]"
                             >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="relative shrink-0">
-                              <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high">
-                                {friend.avatar_url ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={friend.avatar_url}
-                                    alt={friend.display_name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center font-bold text-primary text-sm">
-                                    {friend.display_name.charAt(0)}
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="relative shrink-0">
+                                  <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high">
+                                    {avatar ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={avatar}
+                                        alt={dispName}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center font-bold text-primary text-sm">
+                                        {dispName.charAt(0)}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-surface-container-lowest" />
-                            </div>
+                                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-surface-container-lowest" />
+                                </div>
 
-                            <div className="flex flex-col min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-on-surface text-sm truncate">
-                                  {friend.display_name}
+                                <div className="flex flex-col min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-on-surface text-sm truncate">
+                                      {dispName}
+                                    </span>
+                                    <span className="text-xs text-primary font-bold">
+                                      @{handle}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-secondary truncate mt-0.5">
+                                    {lastMsg ? (
+                                      lastMsg.question_id ? (
+                                        <span className="text-primary font-semibold flex items-center gap-1">
+                                          <span className="material-symbols-outlined text-[13px]">quiz</span>
+                                          {t.sharedQuizChallengeLabel || "Shared Quiz Challenge"}
+                                        </span>
+                                      ) : lastMsg.text?.includes("💡") ? (
+                                        <span className="text-amber-800 dark:text-amber-200 font-bold flex items-center gap-1">
+                                          <span>💡</span>
+                                          <span>{t.suggestCorrection || "Question Suggestion"}</span>
+                                        </span>
+                                      ) : (
+                                        lastMsg.text
+                                      )
+                                    ) : (
+                                      `Target: ${peerData.target_exam || friend.target_exam || "NEET UG"}`
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col items-end shrink-0 gap-1">
+                                <span className="text-[10px] text-tertiary font-bold">
+                                  🔥 {peerData.current_streak || friend.streak_days || 1}d
                                 </span>
-                                <span className="text-xs text-primary font-bold">
-                                  @{friend.username}
+                                <span className="text-[10px] text-secondary">
+                                  {friend.last_active || (t.activeNow || "Active")}
                                 </span>
                               </div>
-                              <p className="text-xs text-secondary truncate mt-0.5">
-                                {lastMsg ? (
-                                  lastMsg.question_id ? (
-                                    <span className="text-primary font-semibold flex items-center gap-1">
-                                      <span className="material-symbols-outlined text-[13px]">quiz</span>
-                                      {t.sharedQuizChallengeLabel || "Shared Quiz Challenge"}
-                                    </span>
-                                  ) : lastMsg.text?.includes("💡") ? (
-                                    <span className="text-amber-800 dark:text-amber-200 font-bold flex items-center gap-1">
-                                      <span>💡</span>
-                                      <span>{t.suggestCorrection || "Question Suggestion"}</span>
-                                    </span>
-                                  ) : (
-                                    lastMsg.text
-                                  )
-                                ) : (
-                                  `Target: ${friend.target_exam}`
-                                )}
-                              </p>
                             </div>
-                          </div>
-
-                          <div className="flex flex-col items-end shrink-0 gap-1">
-                            <span className="text-[10px] text-tertiary font-bold">
-                              🔥 {friend.streak_days}d
-                            </span>
-                            <span className="text-[10px] text-secondary">
-                              {friend.last_active || (t.activeNow || "Active")}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
               </div>
             )}
           </div>
@@ -991,75 +1148,109 @@ export const SocialView: React.FC = () => {
                     {t.noAspirantsFound || `No aspirants found with username "${searchQuery}". Try searching another handle.`}
                   </div>
                 ) : (
-                  searchResults.map((usr) => (
-                    <div
-                      key={usr.id}
-                      className="p-3 rounded-2xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-3 shadow-xs"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high shrink-0">
-                          {usr.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={usr.avatar_url} alt={usr.display_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
-                              {usr.display_name.charAt(0)}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-sm text-on-surface truncate">
-                            {usr.display_name}
-                          </span>
-                          <span className="text-xs text-primary font-bold">
-                            @{usr.username}
-                          </span>
-                          <span className="text-[11px] text-secondary truncate">
-                            Target: {usr.target_exam || "NEET UG"} • 🔥 {usr.current_streak}d
-                          </span>
-                        </div>
-                      </div>
+                  searchResults.map((usr) => {
+                    const dispName = cleanDisplayName(usr.display_name, usr.username, usr.id);
+                    const handle = cleanHandle(usr.username, usr.id);
+                    const isReciprocalFriend = usr.isFriend || usr.friendStatus === "friend";
+                    const isRequestSent = usr.friendStatus === "request_sent";
+                    const isIncoming = usr.friendStatus === "pending_incoming";
 
-                      {usr.isFriend ? (
-                        <button
-                          onClick={() => {
-                            const friendObj = friends.find(
-                              (f) =>
-                                f.id === usr.id ||
-                                f.username?.toLowerCase() === usr.username.toLowerCase()
-                            );
-                            if (friendObj) {
-                              setSelectedFriend(friendObj);
-                            } else {
-                              setSelectedFriend({
-                                id: usr.id,
-                                display_name: usr.display_name,
-                                username: usr.username,
-                                avatar_url: usr.avatar_url,
-                                streak_days: usr.current_streak,
-                                target_exam: usr.target_exam || "NEET UG Aspirant",
-                                status: "friend",
-                              });
-                            }
-                            setActiveTab("chat");
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 shadow-xs shrink-0"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">chat</span>
-                          <span>{t.chatSubTab || "Chat"}</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleSendFriendRequest(usr.username)}
-                          disabled={isAdding}
-                          className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container active:scale-95 transition-all shadow-xs shrink-0 flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">person_add</span>
-                          <span>{t.addFriendBtn || "Add Friend"}</span>
-                        </button>
-                      )}
-                    </div>
-                  ))
+                    return (
+                      <div
+                        key={usr.id}
+                        className="p-3 rounded-2xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-3 shadow-xs"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high shrink-0">
+                            {usr.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={usr.avatar_url} alt={dispName} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
+                                {dispName.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-sm text-on-surface truncate">
+                              {dispName}
+                            </span>
+                            <span className="text-xs text-primary font-bold">
+                              @{handle}
+                            </span>
+                            <span className="text-[11px] text-secondary truncate">
+                              Target: {usr.target_exam || "NEET UG"} • 🔥 {usr.current_streak}d
+                            </span>
+                          </div>
+                        </div>
+
+                        {isReciprocalFriend ? (
+                          <button
+                            onClick={() => {
+                              const friendObj = friends.find(
+                                (f) =>
+                                  f.id === usr.id ||
+                                  f.username?.toLowerCase() === usr.username.toLowerCase()
+                              );
+                              if (friendObj) {
+                                setSelectedFriend(friendObj);
+                              } else {
+                                setSelectedFriend({
+                                  id: usr.id,
+                                  display_name: dispName,
+                                  username: handle,
+                                  avatar_url: usr.avatar_url,
+                                  streak_days: usr.current_streak,
+                                  target_exam: usr.target_exam || "NEET UG Aspirant",
+                                  status: "friend",
+                                });
+                              }
+                              setActiveTab("chat");
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 shadow-xs shrink-0"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">chat</span>
+                            <span>{t.chatSubTab || "Chat"}</span>
+                          </button>
+                        ) : isRequestSent ? (
+                          <button
+                            disabled
+                            className="px-3 py-1.5 rounded-xl bg-surface-container text-secondary font-bold text-xs shadow-xs shrink-0 flex items-center gap-1 cursor-default opacity-85"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">schedule</span>
+                            <span>{lang === "hi" ? "अनुरोध भेजा गया" : "Request Sent"}</span>
+                          </button>
+                        ) : isIncoming ? (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => handleRespondFriendRequest(usr.id, "accept")}
+                              disabled={respondingId === usr.id}
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">check</span>
+                              <span>{lang === "hi" ? "स्वीकार" : "Accept"}</span>
+                            </button>
+                            <button
+                              onClick={() => handleRespondFriendRequest(usr.id, "decline")}
+                              disabled={respondingId === usr.id}
+                              className="px-2 py-1.5 rounded-xl bg-surface-container text-secondary hover:text-error hover:bg-surface-container-high font-semibold text-xs transition-all"
+                            >
+                              <span>{lang === "hi" ? "हटाएं" : "Decline"}</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleSendFriendRequest(usr.username || usr.id)}
+                            disabled={isAdding}
+                            className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container active:scale-95 transition-all shadow-xs shrink-0 flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">person_add</span>
+                            <span>{lang === "hi" ? "अनुरोध भेजें" : "Send Request"}</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             )}
@@ -1076,54 +1267,106 @@ export const SocialView: React.FC = () => {
                       <span>{lang === "hi" ? "आने वाले मित्रता अनुरोध" : "Incoming Friend Requests"} ({incomingRequests.length})</span>
                     </span>
                   </div>
-                  {incomingRequests.map((req) => (
-                    <div
-                      key={req.id}
-                      className="p-3.5 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between gap-3 shadow-xs"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-primary/30 shrink-0">
-                          {req.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={req.avatar_url} alt={req.display_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center font-bold text-primary text-sm">
-                              {req.display_name.charAt(0)}
-                            </div>
-                          )}
+                  {incomingRequests.map((req) => {
+                    const dispName = cleanDisplayName(req.display_name, req.username, req.id);
+                    const handle = cleanHandle(req.username, req.id);
+                    return (
+                      <div
+                        key={req.id}
+                        className="p-3.5 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between gap-3 shadow-xs"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-primary/30 shrink-0">
+                            {req.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={req.avatar_url} alt={dispName} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center font-bold text-primary text-sm">
+                                {dispName.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-sm text-on-surface truncate">{dispName}</span>
+                            <span className="text-xs text-primary font-bold">@{handle}</span>
+                            <span className="text-[11px] text-secondary truncate">{req.target_exam || "NEET UG"}</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-sm text-on-surface truncate">{req.display_name}</span>
-                          <span className="text-xs text-primary font-bold">@{req.username}</span>
-                          <span className="text-[11px] text-secondary truncate">{req.target_exam}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleRespondFriendRequest(req.id, "accept")}
+                            disabled={respondingId === req.id}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">check</span>
+                            <span>{lang === "hi" ? "स्वीकार" : "Accept"}</span>
+                          </button>
+                          <button
+                            onClick={() => handleRespondFriendRequest(req.id, "decline")}
+                            disabled={respondingId === req.id}
+                            className="px-2.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:text-error hover:bg-surface-container-high font-semibold text-xs transition-all"
+                          >
+                            <span>{lang === "hi" ? "हटाएं" : "Decline"}</span>
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => handleRespondFriendRequest(req.id, "accept")}
-                          disabled={respondingId === req.id}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">check</span>
-                          <span>{lang === "hi" ? "स्वीकार" : "Accept"}</span>
-                        </button>
-                        <button
-                          onClick={() => handleRespondFriendRequest(req.id, "decline")}
-                          disabled={respondingId === req.id}
-                          className="px-2.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:text-error hover:bg-surface-container-high font-semibold text-xs transition-all"
-                        >
-                          <span>{lang === "hi" ? "हटाएं" : "Decline"}</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })()}
 
-            {/* My Friends List */}
+            {/* Outgoing Pending Friend Requests */}
             {(() => {
-              const acceptedFriends = friends.filter((f) => f.status !== "pending_incoming" && f.status !== "request_received");
+              const sentRequests = friends.filter((f) => f.status === "request_sent");
+              if (sentRequests.length === 0) return null;
+              return (
+                <div className="flex flex-col gap-2 mb-3 animate-in fade-in">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="font-label-sm text-label-sm text-secondary uppercase font-bold tracking-wider flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]">schedule</span>
+                      <span>{lang === "hi" ? "भेजे गए अनुरोध (लंबित)" : "Sent Requests (Pending)"} ({sentRequests.length})</span>
+                    </span>
+                  </div>
+                  {sentRequests.map((req) => {
+                    const dispName = cleanDisplayName(req.display_name, req.username, req.id);
+                    const handle = cleanHandle(req.username, req.id);
+                    return (
+                      <div
+                        key={req.id}
+                        className="p-3 rounded-2xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-3 shadow-xs opacity-90"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high shrink-0">
+                            {req.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={req.avatar_url} alt={dispName} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
+                                {dispName.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-sm text-on-surface truncate">{dispName}</span>
+                            <span className="text-xs text-primary font-bold">@{handle}</span>
+                            <span className="text-[11px] text-secondary truncate">{req.target_exam || "NEET UG"}</span>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-lg bg-surface-container text-secondary text-[11px] font-semibold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[13px]">schedule</span>
+                          <span>{lang === "hi" ? "लंबित" : "Pending"}</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* My Friends List (Accepted Friends Only) */}
+            {(() => {
+              const acceptedFriends = friends.filter((f) => f.status === "friend" || (!f.status && f.status !== "request_sent" && f.status !== "pending_incoming"));
               return (
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between px-1">
@@ -1138,55 +1381,62 @@ export const SocialView: React.FC = () => {
                       {t.noFriendsConnectedYet || "You have not connected with any friends yet. Use the username search above!"}
                     </div>
                   ) : (
-                    acceptedFriends.map((friend) => (
-                      <div
-                        key={friend.id}
-                        className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-3 shadow-xs hover:bg-surface-container transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high shrink-0">
-                            {friend.avatar_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={friend.avatar_url} alt={friend.display_name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center font-bold text-primary text-sm">
-                                {friend.display_name.charAt(0)}
+                    acceptedFriends.map((friend) => {
+                      const peerData = peerProfiles[friend.id] || friend;
+                      const dispName = cleanDisplayName(peerData.display_name, peerData.username, friend.id);
+                      const handle = cleanHandle(peerData.username, friend.id);
+                      const avatar = peerData.avatar_url || friend.avatar_url;
+
+                      return (
+                        <div
+                          key={friend.id}
+                          className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high/40 flex items-center justify-between gap-3 shadow-xs hover:bg-surface-container transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-11 h-11 rounded-full overflow-hidden bg-primary-fixed border border-surface-container-high shrink-0">
+                              {avatar ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={avatar} alt={dispName} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center font-bold text-primary text-sm">
+                                  {dispName.charAt(0)}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-sm text-on-surface truncate">
+                                  {dispName}
+                                </span>
+                                <span className="text-[10px] text-tertiary font-bold">
+                                  🔥 {peerData.current_streak || friend.streak_days || 1}d
+                                </span>
                               </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-sm text-on-surface truncate">
-                                {friend.display_name}
+                              <span className="text-xs text-primary font-bold">
+                                @{handle}
                               </span>
-                              <span className="text-[10px] text-tertiary font-bold">
-                                🔥 {friend.streak_days}d
+                              <span className="text-[11px] text-secondary truncate mt-0.5">
+                                {peerData.target_exam || friend.target_exam || "NEET UG"}
                               </span>
                             </div>
-                            <span className="text-xs text-primary font-bold">
-                              @{friend.username}
-                            </span>
-                            <span className="text-[11px] text-secondary truncate mt-0.5">
-                              {friend.target_exam}
-                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => {
+                                setSelectedFriend({ ...friend, display_name: dispName, username: handle, avatar_url: avatar });
+                                setActiveTab("chat");
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container active:scale-95 transition-all shadow-xs flex items-center gap-1"
+                              title={t.chatSubTab || "Chat"}
+                            >
+                              <span className="material-symbols-outlined text-[15px]">chat</span>
+                              <span>{t.chatSubTab || "Chat"}</span>
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={() => {
-                              setSelectedFriend(friend);
-                              setActiveTab("chat");
-                            }}
-                            className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container active:scale-95 transition-all shadow-xs flex items-center gap-1"
-                            title={t.chatSubTab || "Chat"}
-                          >
-                            <span className="material-symbols-outlined text-[15px]">chat</span>
-                            <span>{t.chatSubTab || "Chat"}</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               );

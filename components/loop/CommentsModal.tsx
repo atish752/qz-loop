@@ -20,7 +20,10 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      fetch(`/api/comments?questionId=${question.id}`)
+      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      fetch(`/api/comments?questionId=${encodeURIComponent(question.id)}`, {
+        headers: currentUid ? { "x-user-id": currentUid } : {},
+      })
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.comments) {
@@ -56,7 +59,10 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
     try {
       const res = await fetch("/api/comments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": currentUid,
+        },
         body: JSON.stringify({
           questionId: question.id,
           text: newCommentText.trim(),

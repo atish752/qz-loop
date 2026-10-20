@@ -1135,7 +1135,7 @@ async function runTests() {
   const s57ReelFile = fs.readFileSync(path.join(__dirname, "../components/loop/QuestionReelCard.tsx"), "utf8");
   assert(!s57ReelFile.includes("Question by <strong"), "QuestionReelCard removed 'Question by' row above question text");
   assert(!s57ReelFile.includes("I know this (hide)"), "QuestionReelCard removed bottom 'I know this (hide)' bar");
-  assert(s57ReelFile.includes("SWIPE"), "QuestionReelCard renders vertical SWIPE control button");
+  assert(!s57ReelFile.includes("Next Question (Swipe)"), "QuestionReelCard removed swipe button above profile tab");
   assert(s57ReelFile.includes("authorEmoji"), "QuestionReelCard renders authorEmoji avatar");
 
   const s57LoopContainerFile = fs.readFileSync(path.join(__dirname, "../components/loop/QuizLoopContainer.tsx"), "utf8");
@@ -1269,13 +1269,12 @@ async function runTests() {
   const feedAfterSatisfied = db.getFeedQuestions({ userId: dueUser.id, examId: "exam-ssc-cgl", limit: 5 });
   assert(!feedAfterSatisfied.some(q => q.id === dueQ.id), "Satisfied question does not loop immediately on next reel");
 
-  // 4. Horizontal SWIPE pill & Bottom Community Metrics
+  // 4. Stretched Bottom Community Metrics Bar & Removed SWIPE Button
   const s58ReelFile = fs.readFileSync(path.join(__dirname, "../components/loop/QuestionReelCard.tsx"), "utf8");
-  assert(s58ReelFile.includes("flex flex-row items-center justify-between"), "QuestionReelCard renders horizontal SWIPE pill");
-  assert(s58ReelFile.includes("h-13 min-w-[104px]"), "QuestionReelCard SWIPE pill matches h-13 Answer & Learn button height");
-  assert(s58ReelFile.includes("keyboard_arrow_up") && s58ReelFile.includes("keyboard_arrow_down"), "QuestionReelCard SWIPE pill has up arrow on left and down arrow on right");
+  assert(!s58ReelFile.includes("title=\"Next Question (Swipe)\""), "QuestionReelCard removed SWIPE button above profile tab on bottom-right");
+  assert(s58ReelFile.includes("grid grid-cols-4"), "QuestionReelCard stretches bottom metrics bar across full available width with 4 columns");
+  assert(s58ReelFile.includes("safe-area-inset-bottom"), "QuestionReelCard uses safe-area-inset-bottom to eliminate scroll jumping/glitching");
   assert(s58ReelFile.includes("Repeat Question"), "QuestionReelCard renders Repeat Question badge for resurfaced questions");
-  assert(s58ReelFile.includes("SWIPE</span>") && s58ReelFile.includes("title=\"Next Question (Swipe)\""), "QuestionReelCard provides swipe trigger below save button");
 
   // 5. Digital Timer
   assert(!s58ReelFile.includes("<span className=\"material-symbols-outlined text-[15px]\">timer</span>"), "QuestionReelCard removed clunky stopwatch icon");
@@ -1354,8 +1353,139 @@ async function runTests() {
   assert(sqlMigrationContent.includes("idx_profiles_username_trgm"), "Migration creates trigram GIN index on username");
   assert(sqlMigrationContent.includes("auth.uid()::text = user_id OR auth.uid()::text = friend_id"), "Migration provides reciprocal friendship RLS insertion");
 
+  // Scenario 60: Social Search Lifecycle, Peer Attribution, Full-Width Metrics Bar, Persistent Comments & Fire Likes Cross-Device Sync
+  console.log("\n[Scenario 60] Social Search Lifecycle, Peer Attribution, Full-Width Metrics Bar, Persistent Comments & Fire Likes Cross-Device Sync");
+
+  // 1. Social Lifecycle & Strict Self Exclusion
+  const uUserA = db.signUpUser({ display_name: "Aman Sharma", username: `aman_${Date.now()}` });
+  const uUserB = db.signUpUser({ display_name: "Bhavna Patel", username: `bhavna_${Date.now()}` });
+  const uUserC = db.signUpUser({ display_name: "Chirag Verma", username: `chirag_${Date.now()}` });
+
+  // Self exclusion in user search
+  const searchAman = db.searchUsers(uUserA.username, uUserA.id);
+  assert(!searchAman.some(u => u.id === uUserA.id), "User A searching their own username strictly excludes themselves");
+  const searchAmanByName = db.searchUsers("Aman", uUserA.id);
+  assert(!searchAmanByName.some(u => u.id === uUserA.id), "User A searching by display name strictly excludes themselves");
+
+  // Initial friends list is empty and does not contain self
+  const friendsA = db.getFriends(uUserA.id);
+  assert(!friendsA.some(f => f.id === uUserA.id), "User A friends list strictly excludes self");
+
+  // User A sends friend request to User B
+  const reqResult = db.sendFriendRequest(uUserA.id, uUserB.username);
+  assert(reqResult.success === true, "User A successfully sends friend request to User B");
+  assert(reqResult.status === "request_sent", "User A status is request_sent");
+
+  // User A views friends/requests: has request_sent
+  const friendsAAfterReq = db.getFriends(uUserA.id);
+  const sentToB = friendsAAfterReq.find(f => f.id === uUserB.id);
+  assert(sentToB?.status === "request_sent", "User A sees outgoing friend request to User B with status request_sent");
+
+  // User B views incoming requests: has pending_incoming
+  const friendsBAfterReq = db.getFriends(uUserB.id);
+  const incomingFromA = friendsBAfterReq.find(f => f.id === uUserA.id);
+  assert(incomingFromA?.status === "pending_incoming", "User B sees incoming friend request from User A with status pending_incoming");
+
+  // User B accepts request
+  const acceptRes = db.respondFriendRequest(uUserB.id, uUserA.id, "accept");
+  assert(acceptRes.success === true, "User B accepts User A's friend request");
+
+  // Both are now reciprocal friends
+  const friendsAAfterAccept = db.getFriends(uUserA.id);
+  const friendBInA = friendsAAfterAccept.find(f => f.id === uUserB.id);
+  assert(friendBInA?.status === "friend", "User A sees User B as mutual friend");
+
+  const friendsBAfterAccept = db.getFriends(uUserB.id);
+  const friendAInB = friendsBAfterAccept.find(f => f.id === uUserA.id);
+  assert(friendAInB?.status === "friend", "User B sees User A as mutual friend");
+
+  // User A sends request to User C, but User C declines
+  db.sendFriendRequest(uUserA.id, uUserC.username);
+  const declineRes = db.respondFriendRequest(uUserC.id, uUserA.id, "decline");
+  assert(declineRes.success === true, "User C declines User A's friend request");
+  const friendsAAfterDecline = db.getFriends(uUserA.id);
+  assert(!friendsAAfterDecline.some(f => f.id === uUserC.id), "Declined request is completely removed from User A's friends");
+  const friendsCAfterDecline = db.getFriends(uUserC.id);
+  assert(!friendsCAfterDecline.some(f => f.id === uUserA.id), "Declined request is completely removed from User C's friends");
+
+  // 2. Chat UI & Peer Profile Hydration (No Raw UUID Handles)
+  const socialViewSrc = fs.readFileSync(path.join(__dirname, "../components/social/SocialView.tsx"), "utf8");
+  assert(socialViewSrc.includes("Send Request"), "SocialView renders 'Send Request' instead of 'Add Friend'");
+  assert(!socialViewSrc.includes("t.addFriendBtn || \"Add Friend\""), "SocialView removed old 'Add Friend' button label");
+  assert(socialViewSrc.includes("cleanHandle"), "SocialView implements cleanHandle sanitization helper");
+  assert(socialViewSrc.includes("cleanDisplayName"), "SocialView implements cleanDisplayName sanitization helper");
+  assert(socialViewSrc.includes("pollInterval = setInterval"), "SocialView has rapid active chat polling");
+  assert(socialViewSrc.includes("1200"), "SocialView implements 1.2-second rapid active chat polling");
+  assert(socialViewSrc.includes("handleRespondFriendRequest(usr.id, \"decline\")"), "SocialView renders Decline button alongside Accept for incoming requests in search");
+  assert(socialViewSrc.includes("temp-"), "SocialView implements instant optimistic message sending");
+
+  const studyChatModalSrc = fs.readFileSync(path.join(__dirname, "../components/loop/StudyChatModal.tsx"), "utf8");
+  assert(studyChatModalSrc.includes("cleanHandle"), "StudyChatModal implements cleanHandle helper");
+  assert(studyChatModalSrc.includes("chatBottomRef"), "StudyChatModal implements chatBottomRef auto-scroll anchor");
+  assert(studyChatModalSrc.includes("setInterval"), "StudyChatModal implements rapid chat polling");
+  assert(studyChatModalSrc.includes("1200"), "StudyChatModal implements 1.2-second rapid chat polling");
+  assert(studyChatModalSrc.includes("data.peers"), "StudyChatModal hydrates peer profile from API data.peers");
+
+  // Messages API route peer hydration
+  const messagesRouteSrc = fs.readFileSync(path.join(__dirname, "../app/api/messages/route.ts"), "utf8");
+  assert(messagesRouteSrc.includes("idsToHydrate"), "Messages API route hydrates peer profiles from Supabase even when messages array is empty");
+
+  // 3. Quiz Loop UI Overhaul: Removed Swipe Button & Stretched Bottom Metrics Bar
+  const reelCardSrc = fs.readFileSync(path.join(__dirname, "../components/loop/QuestionReelCard.tsx"), "utf8");
+  assert(!reelCardSrc.includes("title=\"Next Question (Swipe)\""), "QuestionReelCard removed swipe button above profile tab");
+  assert(reelCardSrc.includes("absolute bottom-0 left-0 right-0"), "QuestionReelCard pins bottom answering bar to absolute bottom");
+  assert(reelCardSrc.includes("pb-[max(0.75rem,env(safe-area-inset-bottom))]"), "QuestionReelCard anchors bottom bar with safe-area-inset-bottom");
+  assert(reelCardSrc.includes("overflow-hidden"), "QuestionReelCard locks root container with overflow-hidden to eliminate vertical scroll jumping");
+  assert(reelCardSrc.includes("grid grid-cols-4"), "QuestionReelCard stretches metrics bar into full-width 4-column responsive grid");
+  assert(reelCardSrc.includes("attempts") && reelCardSrc.includes("avg speed") && reelCardSrc.includes("accuracy"), "QuestionReelCard displays all 4 metrics clearly without truncation");
+  assert(reelCardSrc.includes("data.totalLikes"), "QuestionReelCard syncs authoritative total fire likes from API response");
+
+  // 4. Question Comments Persistence Across Accounts
+  const testQuestion = db.getFeedQuestions({ examId: "exam-neet-ug" })[0];
+  const initialComments = db.getComments(testQuestion.id);
+  const newComment = db.addComment({
+    questionId: testQuestion.id,
+    userId: uUserA.id,
+    text: "Mendelian genetics PYQ shortcut: Remember 9:3:3:1 phenotypic ratio for dihybrid cross!",
+  });
+  assert(Boolean(newComment.id), "New comment successfully created with unique ID");
+  const commentsAfterAdd = db.getComments(testQuestion.id);
+  assert(commentsAfterAdd.length === initialComments.length + 1, "Comments count increased by 1 across accounts");
+  assert(commentsAfterAdd.some(c => c.id === newComment.id), "Created comment retrievable cross-account");
+
+  // 5. Fire (Likes) Cross-Device Persistence
+  const initialLikeStatus = db.getQuestionLikeStatus(testQuestion.id, uUserA.id);
+  const toggleRes = db.toggleQuestionLike(testQuestion.id, uUserA.id);
+  assert(toggleRes.liked === !initialLikeStatus.liked, "User A toggle flips like status");
+  const updatedStatusForA = db.getQuestionLikeStatus(testQuestion.id, uUserA.id);
+  assert(updatedStatusForA.liked === toggleRes.liked, "User A sees updated like state");
+
+  // Cross-device user B sees updated total likes count
+  const statusForUserB = db.getQuestionLikeStatus(testQuestion.id, uUserB.id);
+  assert(statusForUserB.totalLikes === updatedStatusForA.totalLikes, "User B on different device sees identical total likes count");
+
+  // Unauthenticated / guest visitors receive total likes accurately
+  const statusForGuest = db.getQuestionLikeStatus(testQuestion.id, undefined);
+  assert(statusForGuest.totalLikes === updatedStatusForA.totalLikes, "Guest visitor receives accurate total likes count");
+  assert(statusForGuest.liked === false, "Guest visitor liked flag defaults to false");
+
+  // 6. Instagram Reels-Style Share Sheet Modal
+  const shareModalSrc = fs.readFileSync(path.join(__dirname, "../components/loop/ShareFriendModal.tsx"), "utf8");
+  assert(shareModalSrc.includes("f.status === \"friend\""), "ShareFriendModal strictly filters accepted mutual friends only");
+  assert(shareModalSrc.includes("searchQuery"), "ShareFriendModal includes quick search input for filtering friends");
+  assert(shareModalSrc.includes("cleanHandle"), "ShareFriendModal implements cleanHandle helper for peer handles");
+  assert(shareModalSrc.includes("data.friend.status === \"friend\""), "ShareFriendModal prevents unaccepted pending friend requests from appearing in accepted friends list");
+  assert(shareModalSrc.includes("Sent ✓") || shareModalSrc.includes("Send"), "ShareFriendModal renders 1-tap Send pill with confirmation");
+  assert(shareModalSrc.includes("rounded-t-3xl"), "ShareFriendModal renders Instagram reels-style bottom sheet layout");
+
+  // 7. Supabase SQL Migration includes question_likes & question_comments
+  assert(sqlMigrationContent.includes("CREATE TABLE IF NOT EXISTS question_likes"), "SQL migration creates question_likes table");
+  assert(sqlMigrationContent.includes("CREATE TABLE IF NOT EXISTS question_comments"), "SQL migration creates question_comments table");
+  assert(sqlMigrationContent.includes("idx_question_likes_qid"), "SQL migration creates question_likes index");
+  assert(sqlMigrationContent.includes("idx_question_comments_qid"), "SQL migration creates question_comments index");
+
   console.log("\n=================================================");
-  console.log("   ALL 59 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 60 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 
