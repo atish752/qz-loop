@@ -51,17 +51,17 @@ export default function SharedQuestionPage({ params }: SharedQuestionPageProps) 
 
   return (
     <div className="flex flex-col min-h-screen pb-24">
-      <TopHeader currentTab="home" streakDays={14} activeExamName="SSC CGL" />
+      <TopHeader currentTab="loop" streakDays={14} activeExamName="NEET UG (Medical Entrance)" />
 
       <main className="flex-1 flex flex-col w-full max-w-[480px] mx-auto px-4 pt-4">
         {/* Breadcrumb & Navigation */}
         <div className="flex items-center justify-between mb-3">
           <Link
-            href="/"
+            href="/loop"
             className="flex items-center gap-1 text-primary font-label-md text-label-md font-semibold hover:underline"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            <span>Back to Reel Feed</span>
+            <span>Back to Qz Loop</span>
           </Link>
           <span className="px-2 py-0.5 rounded-full bg-surface-container font-label-sm text-label-sm text-secondary font-semibold">
             Shared Question
@@ -83,10 +83,10 @@ export default function SharedQuestionPage({ params }: SharedQuestionPageProps) 
             <p className="font-headline-sm text-headline-sm font-bold text-on-surface">Question Unavailable</p>
             <p className="font-body-sm text-body-sm text-secondary">{error}</p>
             <Link
-              href="/"
+              href="/loop"
               className="mt-2 px-5 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold shadow-sm"
             >
-              Go to Daily Practice Feed
+              Go to Qz Loop Practice Feed
             </Link>
           </div>
         )}
@@ -112,14 +112,14 @@ export default function SharedQuestionPage({ params }: SharedQuestionPageProps) 
                   Ready for more questions?
                 </span>
                 <span className="font-body-sm text-body-sm text-secondary truncate">
-                  Practice with infinite Reels scroll for SSC CGL
+                  Practice with infinite Reels scroll for NEET UG
                 </span>
               </div>
               <Link
-                href="/"
+                href="/loop"
                 className="px-4 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-bold shrink-0 shadow-xs hover:bg-primary-container active:scale-95 transition-all flex items-center gap-1"
               >
-                <span>Enter Feed</span>
+                <span>Enter Qz Loop</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </Link>
             </div>

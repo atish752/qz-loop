@@ -61,13 +61,22 @@ export const ExamSwitchModal: React.FC<ExamSwitchModalProps> = ({
           Dynamic reels, syllabus topics, and negative marking formulas calibrate automatically.
         </p>
 
+        <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-xs text-primary font-medium flex items-center gap-2 my-1.5">
+          <span className="material-symbols-outlined text-[18px]">verified</span>
+          <span>NEET UG Testing Mode Active · Platform is currently configured for NEET UG</span>
+        </div>
+
         <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2.5 pr-0.5">
-          {exams.map((exam) => {
-            const isSelected = exam.id === currentExamId;
-            const scoringRule = EXAM_SCORING_RULES[exam.id];
-            const scoringPill = scoringRule
-              ? `+${scoringRule.marksPerCorrect} / -${scoringRule.penaltyPerWrong}`
-              : "+2.0 / -0.50";
+          {(() => {
+            // During NEET testing phase: hide other exams from view without deleting from database
+            const visibleExams = exams.filter((e) => e.id === "exam-neet-ug");
+            const displayExams = visibleExams.length > 0 ? visibleExams : exams.slice(0, 1);
+            return displayExams.map((exam) => {
+              const isSelected = exam.id === currentExamId || exam.id === "exam-neet-ug";
+              const scoringRule = EXAM_SCORING_RULES[exam.id];
+              const scoringPill = scoringRule
+                ? `+${scoringRule.marksPerCorrect} / -${scoringRule.penaltyPerWrong}`
+                : "+4.0 / -1.0";
 
             return (
               <button
@@ -123,7 +132,8 @@ export const ExamSwitchModal: React.FC<ExamSwitchModalProps> = ({
                 </div>
               </button>
             );
-          })}
+          });
+        })()}
         </div>
       </div>
     </div>

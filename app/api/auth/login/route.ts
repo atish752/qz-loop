@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
       const newUser = db.signUpUser({
         display_name: name,
         username: targetUsername,
-        target_exam: "Railways (RRB NTPC & Group D)",
-        preferred_examination_id: "exam-railway-ntpc",
+        target_exam: "NEET UG (Medical Entrance)",
+        preferred_examination_id: "exam-neet-ug",
         avatar_url: googleAvatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
         email: googleEmail,
       });

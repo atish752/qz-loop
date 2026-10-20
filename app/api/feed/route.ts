@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const requestedUserId =
       searchParams.get("userId") || request.headers.get("x-user-id") || cookieUserId;
     const user = requestedUserId ? db.getProfileById(requestedUserId) || db.getCurrentUser() : db.getCurrentUser();
-    const examId = searchParams.get("examId") || user?.preferred_examination_id || "exam-ssc-cgl";
+    const examId = searchParams.get("examId") || user?.preferred_examination_id || "exam-neet-ug";
     const excludedParam = searchParams.get("excludedIds");
     const sessionExcludedIds = excludedParam ? excludedParam.split(",") : [];
     const langParam = (searchParams.get("lang") || searchParams.get("language") || "all") as "en" | "hi" | "all";

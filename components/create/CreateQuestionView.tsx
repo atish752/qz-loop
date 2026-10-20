@@ -161,9 +161,9 @@ export const CreateQuestionView: React.FC = () => {
     (typeof window !== "undefined"
       ? localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam")
       : null) || null;
-  const effectiveExamId = user?.preferred_examination_id || persistentExamId || selectedExamId || "exam-neet-ug";
-  const currentExamObj = EXAMS_LIST.find((e) => e.id === effectiveExamId) || EXAMS_LIST[2] || EXAMS_LIST[0];
-  const currentExamSubjects = EXAM_SUBJECTS_MAP[effectiveExamId] || EXAM_SUBJECTS_MAP["exam-neet-ug"];
+  const effectiveExamId = "exam-neet-ug";
+  const currentExamObj = EXAMS_LIST.find((e) => e.id === "exam-neet-ug") || EXAMS_LIST[2] || EXAMS_LIST[0];
+  const currentExamSubjects = EXAM_SUBJECTS_MAP["exam-neet-ug"];
   const currentSubjectObj = currentExamSubjects.find((s) => s.id === selectedSubjectId) || currentExamSubjects[0];
   const dynamicTopics = getTopicsForSubject(currentSubjectObj?.slug, currentSubjectObj?.name);
   const effectiveDynamicTopics = React.useMemo(() => {
@@ -413,14 +413,9 @@ export const CreateQuestionView: React.FC = () => {
   // Sync exam & subjects from user profile or localStorage automatically
   useEffect(() => {
     const syncExam = () => {
-      let activeId = user?.preferred_examination_id;
-      if (!activeId && typeof window !== "undefined") {
-        activeId = localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam") || undefined;
-      }
-      if (!activeId) activeId = "exam-neet-ug";
-
+      const activeId = "exam-neet-ug";
       setSelectedExamId(activeId);
-      const subjs = EXAM_SUBJECTS_MAP[activeId] || EXAM_SUBJECTS_MAP["exam-neet-ug"];
+      const subjs = EXAM_SUBJECTS_MAP["exam-neet-ug"];
       if (subjs && subjs.length > 0) {
         setSelectedSubjectId((prev) => {
           const valid = subjs.some((s) => s.id === prev);
@@ -744,19 +739,19 @@ export const CreateQuestionView: React.FC = () => {
     const challengeText = formatWhatsAppChallenge({
       question: publishedQuestion,
       authorUsername: publishedQuestion.author_name?.toLowerCase().replace(/\s+/g, "_"),
-      targetExam: `${examObj?.shortName || "SSC CGL"} · ${publishedQuestion.subject_name || "General"}`,
+      targetExam: `${examObj?.shortName || "NEET UG"} · ${publishedQuestion.subject_name || "Biology"}`,
       language: publishedQuestion.language,
     });
     openWhatsAppShare(challengeText);
   };
 
   const handleCopyChallenge = () => {
-    if (!publishedQuestion || typeof window === "undefined") return;
+    if (!publishedQuestion || typeof window !== "undefined") return;
     const examObj = EXAMS_LIST.find((e) => e.id === (publishedQuestion.examination_id || selectedExamId));
     const challengeText = formatWhatsAppChallenge({
       question: publishedQuestion,
       authorUsername: publishedQuestion.author_name?.toLowerCase().replace(/\s+/g, "_"),
-      targetExam: `${examObj?.shortName || "SSC CGL"} · ${publishedQuestion.subject_name || "General"}`,
+      targetExam: `${examObj?.shortName || "NEET UG"} · ${publishedQuestion.subject_name || "Biology"}`,
       language: publishedQuestion.language,
     });
     if (navigator.clipboard) {
@@ -772,7 +767,7 @@ export const CreateQuestionView: React.FC = () => {
         <TopHeader
           currentTab="create"
           streakDays={isLoggedIn ? (user?.current_streak ?? 0) : 0}
-          activeExamName={user?.target_exam || "Railways RRB"}
+          activeExamName={user?.target_exam || "NEET UG (Medical Entrance)"}
           user={isLoggedIn ? user : null}
         />
         <div className="flex-1 flex items-center justify-center p-8 text-secondary">
@@ -788,7 +783,7 @@ export const CreateQuestionView: React.FC = () => {
       <TopHeader
         currentTab="create"
         streakDays={isLoggedIn ? (user?.current_streak ?? 0) : 0}
-        activeExamName={user?.target_exam || "Railways RRB"}
+        activeExamName={user?.target_exam || "NEET UG (Medical Entrance)"}
         user={isLoggedIn ? user : null}
       />
 
@@ -1532,7 +1527,7 @@ export const CreateQuestionView: React.FC = () => {
                         type="text"
                         value={pyqInfo}
                         onChange={(e) => setPyqInfo(e.target.value)}
-                        placeholder="e.g. SSC CGL 2023 Tier 1, RRB NTPC 2021"
+                        placeholder="e.g. NEET UG 2024 Biology, NEET 2023 Chemistry"
                         className="w-full px-3 py-1.5 rounded-xl bg-surface-container border border-surface-container-high/50 text-xs text-on-surface font-medium focus:outline-none focus:border-primary"
                       />
                     </div>

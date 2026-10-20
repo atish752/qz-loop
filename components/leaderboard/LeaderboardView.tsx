@@ -36,7 +36,7 @@ export const LeaderboardView: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen pb-24">
-      <TopHeader currentTab="leaderboard" streakDays={14} activeExamName="SSC CGL" />
+      <TopHeader currentTab="leaderboard" streakDays={14} activeExamName="NEET UG (Medical Entrance)" />
 
       <div className="flex flex-col w-full px-4 pt-3 pb-6">
         {/* Title & Live Badge */}
@@ -51,7 +51,7 @@ export const LeaderboardView: React.FC = () => {
             </span>
           </div>
           <p className="font-body-sm text-body-sm text-secondary">
-            SSC CGL Practice Sprint • Minimum 20 solves to qualify • Genuine verified attempts
+            NEET UG Practice Sprint • Minimum 20 solves to qualify • Genuine verified attempts
           </p>
         </div>
 

@@ -46,8 +46,22 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
   if (!isOpen) return null;
 
   const handleSendToFriend = async (friend: FriendUser) => {
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    if (!currentUid) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("open_auth_modal", {
+            detail: {
+              reason: "Sign in required to send questions to study partners",
+              mode: "signup",
+            },
+          })
+        );
+      }
+      return;
+    }
+
     try {
-      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       setSentMap((prev) => ({ ...prev, [friend.id]: true }));
       setShareToast(`Question sent to ${friend.display_name}! 🚀`);
       setTimeout(() => setShareToast(null), 2500);
@@ -56,10 +70,10 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(currentUid ? { "x-user-id": currentUid } : {}),
+          "x-user-id": currentUid,
         },
         body: JSON.stringify({
-          fromUserId: currentUid || undefined,
+          fromUserId: currentUid,
           toUserId: friend.id,
           text: `Check out this ${question.subject_name || "General"} question on Qz Loop: "${question.question_text.substring(0, 60)}..."`,
           questionId: question.id,
@@ -72,19 +86,33 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
 
   const handleSendFriendRequest = async () => {
     if (!addFriendInput.trim()) return;
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    if (!currentUid) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("open_auth_modal", {
+            detail: {
+              reason: "Sign in required to connect with study friends",
+              mode: "signup",
+            },
+          })
+        );
+      }
+      return;
+    }
+
     setIsAdding(true);
     setAddStatusMsg(null);
     try {
-      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       const res = await fetch("/api/friends", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(currentUid ? { "x-user-id": currentUid } : {}),
+          "x-user-id": currentUid,
         },
         body: JSON.stringify({
           target: addFriendInput.trim(),
-          userId: currentUid || undefined,
+          userId: currentUid,
         }),
       });
       const data = await res.json();
@@ -104,20 +132,46 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
     }
   };
 
+  const copyToClipboard = (text: string) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(() => {
+        fallbackCopy(text);
+      });
+      return true;
+    }
+    return fallbackCopy(text);
+  };
+
+  const fallbackCopy = (text: string): boolean => {
+    try {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textArea);
+      return successful;
+    } catch {
+      return false;
+    }
+  };
+
   const handleCopyLink = () => {
     const url = typeof window !== "undefined" ? `${window.location.origin}/q/${question.id}` : "";
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    copyToClipboard(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleWhatsAppShare = () => {
     const challengeText = formatWhatsAppChallenge({
       question,
       authorUsername: question.author_name?.toLowerCase().replace(/\s+/g, "_"),
-      targetExam: question.subject_name || "Competitive Exam",
+      targetExam: question.subject_name || "NEET UG",
       language: question.language,
     });
     openWhatsAppShare(challengeText);
@@ -127,14 +181,12 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
     const challengeText = formatWhatsAppChallenge({
       question,
       authorUsername: question.author_name?.toLowerCase().replace(/\s+/g, "_"),
-      targetExam: question.subject_name || "Competitive Exam",
+      targetExam: question.subject_name || "NEET UG",
       language: question.language,
     });
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(challengeText);
-      setCopiedText(true);
-      setTimeout(() => setCopiedText(false), 2000);
-    }
+    copyToClipboard(challengeText);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 2000);
   };
 
   const filteredFriends = friends.filter(
@@ -333,7 +385,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
           <div className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Enter unique @username (e.g. @amit_ssc)..."
+              placeholder="Enter unique @username (e.g. @priya_neet)..."
               value={addFriendInput}
               onChange={(e) => setAddFriendInput(e.target.value)}
               className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"

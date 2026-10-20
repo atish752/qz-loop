@@ -50,6 +50,9 @@ export const MatrixView: React.FC = () => {
   };
 
   const subjectIcons: Record<string, string> = {
+    biology: "eco",
+    chemistry: "biotech",
+    physics: "bolt",
     maths: "calculate",
     reasoning: "psychology",
     english: "spellcheck",
@@ -58,7 +61,7 @@ export const MatrixView: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen pb-24">
-      <TopHeader currentTab="matrix" streakDays={14} activeExamName="SSC CGL" />
+      <TopHeader currentTab="matrix" streakDays={14} activeExamName="NEET UG (Medical Entrance)" />
 
       <div className="flex flex-col w-full px-4 pt-3 pb-6">
         {/* Header & Context */}
@@ -68,7 +71,7 @@ export const MatrixView: React.FC = () => {
               Personal Matrix
             </h1>
             <p className="font-body-sm text-body-sm text-secondary">
-              SSC CGL Prep • Real Asia/Kolkata Drill Data
+              NEET UG Prep • Real Asia/Kolkata Drill Data
             </p>
           </div>
           <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface font-semibold text-label-sm">

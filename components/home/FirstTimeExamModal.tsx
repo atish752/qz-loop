@@ -104,24 +104,21 @@ export const FirstTimeExamModal: React.FC<FirstTimeExamModalProps> = ({ onExamSe
   const router = useRouter();
   const { lang, t } = useAppLanguage();
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedExamId, setSelectedExamId] = useState<string>("exam-railway-ntpc");
+  const [selectedExamId, setSelectedExamId] = useState<string>("exam-neet-ug");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const hasOnboarded = localStorage.getItem("qz_exam_onboarded");
-      const savedExam = localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam");
-      if (savedExam) {
-        setSelectedExamId(savedExam);
+      // In NEET-only testing mode: automatically set default to NEET UG and suppress modal
+      localStorage.setItem("qz_target_exam", "exam-neet-ug");
+      localStorage.setItem("qz_last_exam", "exam-neet-ug");
+      localStorage.setItem("qz_exam_onboarded", "true");
+      setSelectedExamId("exam-neet-ug");
+      if (onExamSelected) {
+        onExamSelected("exam-neet-ug");
       }
-      if (!hasOnboarded) {
-        // First time visitor: show modal after slight delay for smooth entry
-        const timer = setTimeout(() => {
-          setIsOpen(true);
-        }, 300);
-        return () => clearTimeout(timer);
-      }
+      setIsOpen(false);
     }
-  }, []);
+  }, [onExamSelected]);
 
   if (!isOpen) return null;
 

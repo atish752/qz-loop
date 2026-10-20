@@ -20,7 +20,7 @@ export const AuthorModal: React.FC<AuthorModalProps> = ({
   authorAvatar,
   authorUsername,
   authorId,
-  targetExam = "SSC CGL / RRB NTPC",
+  targetExam = "NEET UG (Medical Entrance)",
   questionsCount,
   isOpen,
   onClose,

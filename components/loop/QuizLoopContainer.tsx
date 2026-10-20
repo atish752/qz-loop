@@ -21,11 +21,10 @@ interface QuizLoopContainerProps {
 }
 
 const AVAILABLE_SUBJECTS = [
-  { slug: "all", labelKey: "subjAll" as const, defaultLabel: "All Subjects", icon: "auto_awesome" },
-  { slug: "maths", labelKey: "subjMaths" as const, defaultLabel: "Maths (Quantitative)", icon: "calculate" },
-  { slug: "reasoning", labelKey: "subjReasoning" as const, defaultLabel: "Reasoning (Logic)", icon: "psychology" },
-  { slug: "english", labelKey: "subjEnglish" as const, defaultLabel: "English Comprehension", icon: "spellcheck" },
-  { slug: "gk", labelKey: "subjGK" as const, defaultLabel: "General Knowledge (GK)", icon: "public" },
+  { slug: "all", defaultLabel: "All Subjects", icon: "auto_awesome" },
+  { slug: "biology", defaultLabel: "Biology (Botany & Zoology)", icon: "eco" },
+  { slug: "chemistry", defaultLabel: "Chemistry", icon: "biotech" },
+  { slug: "physics", defaultLabel: "Physics", icon: "bolt" },
 ];
 
 export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
@@ -101,6 +100,23 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         }
       })
       .catch(() => {});
+
+    const handleSavedChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId: string; isSaved: boolean }>;
+      if (customEvent.detail) {
+        const { questionId, isSaved } = customEvent.detail;
+        setSavedQuestionIds((prev) => {
+          const next = new Set(prev);
+          if (isSaved) next.add(questionId);
+          else next.delete(questionId);
+          return next;
+        });
+      }
+    };
+    window.addEventListener("qz_saved_changed", handleSavedChanged);
+    return () => {
+      window.removeEventListener("qz_saved_changed", handleSavedChanged);
+    };
   }, []);
 
   // Streak & Dopamine combo tracking
@@ -146,10 +162,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   useEffect(() => {
     const checkAuthAndLoad = () => {
       if (typeof window !== "undefined") {
-        const storedExam = localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam");
-        if (storedExam) {
-          setCurrentExamId(storedExam);
-        }
+        localStorage.setItem("qz_target_exam", "exam-neet-ug");
+        localStorage.setItem("qz_last_exam", "exam-neet-ug");
+        setCurrentExamId("exam-neet-ug");
 
         const savedLang = localStorage.getItem("qz_quiz_lang");
         if (savedLang === "hi" || savedLang === "en" || savedLang === "all") {
@@ -166,9 +181,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 if (data.exams?.length > 0) {
                   setExams(data.exams);
                 }
-                if (data.user?.preferred_examination_id) {
-                  setCurrentExamId(data.user.preferred_examination_id);
-                }
+                setCurrentExamId("exam-neet-ug");
                 if (!savedLang && data.user?.language_preference) {
                   setQuizLanguage(data.user.language_preference);
                 }
@@ -630,7 +643,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         <TopHeader
           currentTab="loop"
           streakDays={user?.current_streak ?? 0}
-          activeExamName={activeExam?.name || "Railways RRB"}
+          activeExamName={activeExam?.name || "NEET UG (Medical Entrance)"}
           user={user}
           onSelectExam={() => setShowExamModal(true)}
         />
@@ -673,7 +686,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           {(() => {
             const currentExamSubjects = EXAM_SUBJECTS_MAP[currentExamId] || [];
             const dynamicSubjects = [
-              { slug: "all", label: t.subjAll || "All Subjects", icon: "auto_awesome" },
+              { slug: "all", label: t.allSubjects || "All Subjects", icon: "auto_awesome" },
               ...(currentExamSubjects.length > 0
                 ? currentExamSubjects.map((s) => ({
                     slug: s.slug,
@@ -682,7 +695,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                   }))
                 : AVAILABLE_SUBJECTS.filter((s) => s.slug !== "all").map((s) => ({
                     slug: s.slug,
-                    label: t[s.labelKey] || s.defaultLabel,
+                    label: s.defaultLabel,
                     icon: s.icon,
                   }))),
             ];

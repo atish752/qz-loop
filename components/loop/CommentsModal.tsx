@@ -37,6 +37,21 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
     e.preventDefault();
     if (!newCommentText.trim()) return;
 
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    if (!currentUid) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("open_auth_modal", {
+            detail: {
+              reason: "Sign in to post your shortcut or mnemonic",
+              mode: "signup",
+            },
+          })
+        );
+      }
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await fetch("/api/comments", {
@@ -45,17 +60,65 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
         body: JSON.stringify({
           questionId: question.id,
           text: newCommentText.trim(),
+          userId: currentUid,
         }),
       });
       const data = await res.json();
       if (data.success && data.comment) {
         setComments((prev) => [data.comment, ...prev]);
         setNewCommentText("");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("qz_comment_added", {
+              detail: { questionId: question.id },
+            })
+          );
+        }
       }
     } catch {
       // Handled
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleVoteComment = async (commentId: string) => {
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    if (!currentUid) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("open_auth_modal", {
+            detail: {
+              reason: "Sign in to upvote shortcuts",
+              mode: "signup",
+            },
+          })
+        );
+      }
+      return;
+    }
+
+    try {
+      // Optimistic increment
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, likes_count: (c.likes_count || 0) + 1 } : c))
+      );
+      const res = await fetch("/api/comments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          commentId,
+          userId: currentUid,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.comment) {
+        setComments((prev) =>
+          prev.map((c) => (c.id === commentId ? data.comment : c))
+        );
+      }
+    } catch {
+      // Handled optimistically
     }
   };
 
@@ -101,9 +164,15 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
                 <div className="flex-1 bg-surface-container-low p-2.5 rounded-xl border border-surface-container-high/40">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-bold text-xs text-on-surface">{cmt.user_name}</span>
-                    <span className="text-[10px] text-secondary flex items-center gap-0.5">
-                      <span>👍</span> {cmt.likes_count}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleVoteComment(cmt.id)}
+                      className="text-[10px] text-secondary flex items-center gap-1 hover:text-primary transition-colors bg-surface-container/80 hover:bg-surface-container px-2 py-0.5 rounded-full cursor-pointer active:scale-95"
+                      title="Upvote shortcut / trick"
+                    >
+                      <span>👍</span>
+                      <span className="font-bold">{cmt.likes_count || 0}</span>
+                    </button>
                   </div>
                   <p className="text-xs text-on-surface leading-relaxed">{cmt.comment_text}</p>
                 </div>

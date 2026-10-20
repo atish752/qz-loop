@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       }
     }
     const exams = db.getExaminations();
-    const activeExamId = user?.preferred_examination_id || exams[0]?.id || "exam-railway-ntpc";
+    const activeExamId = user?.preferred_examination_id || "exam-neet-ug";
     const subjects = db.getSubjects(activeExamId);
     const hiddenCount = user ? db.getHiddenQuestions(user.id).length : 0;
 

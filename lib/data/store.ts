@@ -376,10 +376,10 @@ class DataStore {
 
     // Determine target exam name
     let targetExam = data.target_exam;
-    const examId = data.preferred_examination_id || "exam-ssc-cgl";
+    const examId = data.preferred_examination_id || "exam-neet-ug";
     if (!targetExam) {
       const ex = this.examinations.find((e) => e.id === examId);
-      targetExam = ex ? ex.name : "SSC CGL / CHSL / MTS";
+      targetExam = ex ? ex.name : "NEET UG (Medical Entrance)";
     }
 
     const newUserId = `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -469,8 +469,8 @@ class DataStore {
         id: data.id,
         display_name: data.display_name,
         username: data.username,
-        target_exam: data.target_exam || "Railways (RRB NTPC & Group D)",
-        preferred_examination_id: data.preferred_examination_id || "exam-railway-ntpc",
+        target_exam: data.target_exam || "NEET UG (Medical Entrance)",
+        preferred_examination_id: data.preferred_examination_id || "exam-neet-ug",
         avatar_url: data.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
         email: data.email || undefined,
         language_preference: data.language_preference || "en",
@@ -527,7 +527,7 @@ class DataStore {
     const isExplicitUser = Boolean(options.userId);
     const userId = options.userId || this.currentUserId;
     const userProfile = this.profiles.find((p) => p.id === userId);
-    const examId = options.examId || userProfile?.preferred_examination_id || this.getCurrentUser()?.preferred_examination_id || "exam-ssc-cgl";
+    const examId = options.examId || userProfile?.preferred_examination_id || this.getCurrentUser()?.preferred_examination_id || "exam-neet-ug";
     const subjectSlug = options.subjectSlug || "all";
     const sessionExcludedIds = new Set(options.sessionExcludedIds || []);
     const limit = options.limit || 10;
@@ -558,8 +558,8 @@ class DataStore {
     // Filter strictly by exam, subject, and language
     let pool = this.questions.filter((q) => {
       if (hasExamQuestions && q.examination_id !== examId) return false;
-      // If exam has no questions in database yet, allow 10 baseline clean GK questions so fresh user feed is never empty
-      if (!hasExamQuestions && q.examination_id !== "exam-ssc-cgl") return false;
+      // If exam has no questions in database yet, allow authentic baseline clean NEET questions so fresh user feed is never empty
+      if (!hasExamQuestions && q.examination_id !== "exam-neet-ug") return false;
       if (q.publication_status !== "published" || q.moderation_status !== "active") return false;
       if (userHiddenIds.has(q.id)) return false;
       if (sessionExcludedIds.has(q.id)) return false;
@@ -593,7 +593,7 @@ class DataStore {
         );
       } else {
         pool = this.questions.filter(
-          (q) => q.examination_id === "exam-ssc-cgl" && q.publication_status === "published" && q.moderation_status === "active" && !userHiddenIds.has(q.id)
+          (q) => q.examination_id === "exam-neet-ug" && q.publication_status === "published" && q.moderation_status === "active" && !userHiddenIds.has(q.id)
         );
       }
     }
@@ -940,7 +940,7 @@ class DataStore {
     authorId?: string;
   }): Question {
     const subj = this.subjects.find((s) => s.id === params.subjectId);
-    const examId = params.examinationId || subj?.examination_id || "exam-ssc-cgl";
+    const examId = params.examinationId || subj?.examination_id || "exam-neet-ug";
     const examObj = this.examinations.find((e) => e.id === examId);
 
     let author = params.authorId ? this.profiles.find((p) => p.id === params.authorId) : null;
@@ -949,7 +949,7 @@ class DataStore {
         id: params.authorId,
         display_name: "Aspirant",
         username: "aspirant_" + params.authorId.slice(0, 6),
-        target_exam: examObj?.name || "SSC CGL (All India)",
+        target_exam: examObj?.name || "NEET UG (Medical Entrance)",
         preferred_examination_id: examId,
         role: "student",
         current_streak: 0,
@@ -1166,10 +1166,10 @@ class DataStore {
 
     // Subject breakdown (Target exam subject matrix)
     const user = this.profiles.find((p) => p.id === userId) || this.getCurrentUser();
-    const targetExamId = user?.preferred_examination_id || "exam-ssc-cgl";
+    const targetExamId = user?.preferred_examination_id || "exam-neet-ug";
     let relevantSubjects = this.subjects.filter((s) => s.examination_id === targetExamId);
     if (relevantSubjects.length === 0) {
-      relevantSubjects = this.subjects.filter((s) => s.examination_id === "exam-ssc-cgl");
+      relevantSubjects = this.subjects.filter((s) => s.examination_id === "exam-neet-ug");
     }
 
     const subjectMap = new Map<string, { attempts: number; correct: number; totalTimeMs: number }>();
@@ -1886,6 +1886,13 @@ class DataStore {
     };
     this.comments.unshift(newCmt);
     return newCmt;
+  }
+
+  public toggleLikeComment(commentId: string, userId?: string): { comment: QuestionComment | null; isLiked: boolean } {
+    const cmt = this.comments.find((c) => c.id === commentId);
+    if (!cmt) return { comment: null, isLiked: false };
+    cmt.likes_count = (cmt.likes_count || 0) + 1;
+    return { comment: cmt, isLiked: true };
   }
 
   // --- Habit Formation, Goals & Boosts ---

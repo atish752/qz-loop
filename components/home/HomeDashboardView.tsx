@@ -30,8 +30,12 @@ export const HomeDashboardView: React.FC = () => {
     const checkAuth = () => {
       if (typeof window !== "undefined") {
         const storedExam = localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam");
-        if (storedExam) {
+        if (storedExam === "exam-neet-ug") {
           setTargetExamId(storedExam);
+        } else {
+          localStorage.setItem("qz_target_exam", "exam-neet-ug");
+          localStorage.setItem("qz_last_exam", "exam-neet-ug");
+          setTargetExamId("exam-neet-ug");
         }
 
         const uid = localStorage.getItem("qz_user_id");
@@ -43,9 +47,7 @@ export const HomeDashboardView: React.FC = () => {
           .then((data) => {
             if (data.success && data.user) {
               setUser(data.user);
-              if (data.user?.preferred_examination_id) {
-                setTargetExamId(data.user.preferred_examination_id);
-              }
+              setTargetExamId("exam-neet-ug");
               if (data.user?.daily_goal) {
                 setNewGoalInput(data.user.daily_goal);
               }
@@ -202,6 +204,9 @@ export const HomeDashboardView: React.FC = () => {
   };
 
   const subjectIcons: Record<string, string> = {
+    biology: "eco",
+    chemistry: "biotech",
+    physics: "bolt",
     maths: "calculate",
     reasoning: "psychology",
     english: "spellcheck",
@@ -212,7 +217,7 @@ export const HomeDashboardView: React.FC = () => {
   const solvedToday = isLoggedIn ? (habit?.solved_today || stats?.total_solved || 0) : 0;
   const currentStreak = isLoggedIn ? (user?.current_streak || 0) : 0;
   const goalProgress = Math.min(100, Math.round((solvedToday / dailyGoal) * 100));
-  const activeExamId = user?.preferred_examination_id || targetExamId || user?.target_exam || "exam-ssc-cgl";
+  const activeExamId = "exam-neet-ug";
   const examCountdown = getExamCountdown(activeExamId);
 
   return (
@@ -274,15 +279,13 @@ export const HomeDashboardView: React.FC = () => {
                 <span>🔥</span>
                 <span>{t.infiniteHabitLoop}</span>
               </span>
-              <button
-                type="button"
-                onClick={() => setShowExamModal(true)}
-                className="px-2.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-xs font-bold text-white/95 transition-all flex items-center gap-1 cursor-pointer"
-                title="Click to switch target exam"
+              <span
+                className="px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold text-white/95 flex items-center gap-1.5"
+                title="Target: NEET UG 2027"
               >
+                <span className="material-symbols-outlined text-[14px]">school</span>
                 <span>Target: {examCountdown.examShortName}</span>
-                <span className="material-symbols-outlined text-[13px]">expand_more</span>
-              </button>
+              </span>
             </div>
 
             {/* Large powerful exam target & unlimited practice headline */}

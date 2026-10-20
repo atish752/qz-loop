@@ -185,7 +185,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
   const handleShareQuestion = async () => {
     const url = typeof window !== "undefined" ? `${window.location.origin}/q/${question.id}` : "";
-    const shareText = `Solve this SSC CGL question on Qz Loop: "${question.question_text}"`;
+    const shareText = `Solve this NEET UG question on Qz Loop: "${question.question_text}"`;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -236,7 +236,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   };
 
   const handleDirectWhatsAppShare = () => {
-    const scoring = getExamScoringRule(question.examination_id || "exam-ssc-cgl");
+    const scoring = getExamScoringRule(question.examination_id || "exam-neet-ug");
     const challengeText = formatWhatsAppChallenge({
       question,
       authorUsername: question.author_name?.toLowerCase().replace(/\s+/g, "_"),
@@ -264,7 +264,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     return displayLang === "hi" && opt.hindi_text ? opt.hindi_text : opt.text;
   };
 
-  const scoringRule = getExamScoringRule(question.examination_id || "exam-ssc-cgl");
+  const scoringRule = getExamScoringRule(question.examination_id || "exam-neet-ug");
 
   const accuracyPercentage =
     metrics.attempts > 0 ? Math.round((metrics.correctAttempts / metrics.attempts) * 100) : 0;

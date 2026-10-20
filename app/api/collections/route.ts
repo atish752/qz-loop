@@ -50,9 +50,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Question ID is required" }, { status: 400 });
     }
 
-    if (action === "remove") {
+    if (action === "remove" || action === "remove_question") {
       const removed = db.removeQuestionFromCollection(targetUserId, questionId, collectionName);
-      return NextResponse.json({ success: true, removed });
+      const collections = db.getUserCollections(targetUserId);
+      return NextResponse.json({ success: true, removed, collections });
     }
 
     const result = db.saveQuestionToCollection(targetUserId, questionId, collectionName);

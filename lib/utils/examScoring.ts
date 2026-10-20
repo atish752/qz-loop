@@ -109,7 +109,7 @@ export function getExamScoringRule(examId?: string): ExamScoringRule {
   if (examId && EXAM_SCORING_RULES[examId]) {
     return EXAM_SCORING_RULES[examId];
   }
-  return EXAM_SCORING_RULES["exam-railway-ntpc"] || EXAM_SCORING_RULES["exam-ssc-cgl"];
+  return EXAM_SCORING_RULES["exam-neet-ug"] || EXAM_SCORING_RULES["exam-railway-ntpc"];
 }
 
 export function calculateNetScore(

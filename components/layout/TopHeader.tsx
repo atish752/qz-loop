@@ -18,7 +18,7 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({
   currentTab = "home",
   streakDays = 0,
-  activeExamName = "Railways (RRB NTPC & Group D)",
+  activeExamName = "NEET UG (Medical Entrance)",
   user,
   onSelectExam,
   onOpenAuth,

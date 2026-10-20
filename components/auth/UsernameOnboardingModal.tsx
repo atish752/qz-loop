@@ -13,7 +13,7 @@ export const UsernameOnboardingModal: React.FC = () => {
   const [exams, setExams] = useState<Examination[]>([]);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
-  const [examId, setExamId] = useState("exam-railway-ntpc");
+  const [examId, setExamId] = useState("exam-neet-ug");
   const [email, setEmail] = useState("");
   const [languagePref, setLanguagePref] = useState<"en" | "hi">("en");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
@@ -53,7 +53,7 @@ export const UsernameOnboardingModal: React.FC = () => {
             setUser(data.user);
             setExams(data.exams || []);
             setName(data.user.display_name || "");
-            setExamId(data.user.preferred_examination_id || "exam-railway-ntpc");
+            setExamId(data.user.preferred_examination_id || "exam-neet-ug");
             if (data.user.language_preference) {
               setLanguagePref(data.user.language_preference);
             }
@@ -345,14 +345,16 @@ export const UsernameOnboardingModal: React.FC = () => {
               onChange={(e) => setExamId(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs font-semibold text-on-surface focus:outline-none focus:border-primary"
             >
-              {exams.length > 0 ? (
-                exams.map((ex) => (
-                  <option key={ex.id} value={ex.id}>
-                    {ex.name}
-                  </option>
-                ))
+              {exams.filter((ex) => ex.id === "exam-neet-ug").length > 0 ? (
+                exams
+                  .filter((ex) => ex.id === "exam-neet-ug")
+                  .map((ex) => (
+                    <option key={ex.id} value={ex.id}>
+                      {ex.name}
+                    </option>
+                  ))
               ) : (
-                <option value="exam-railway-ntpc">Railways (RRB NTPC & Group D)</option>
+                <option value="exam-neet-ug">NEET UG (Medical Entrance)</option>
               )}
             </select>
           </div>

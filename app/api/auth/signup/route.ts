@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
 
     const name = (display_name || displayName || "").trim();
     const uname = (username || "").trim().toLowerCase();
-    const exam = target_exam || targetExam || "Railways (RRB NTPC & Group D)";
-    const examId = preferred_examination_id || preferredExaminationId || "exam-railway-ntpc";
+    const exam = target_exam || targetExam || "NEET UG (Medical Entrance)";
+    const examId = preferred_examination_id || preferredExaminationId || "exam-neet-ug";
     const avatar = avatar_url || avatarUrl || "";
     const lang = (language_preference || languagePreference || "en") === "hi" ? "hi" : "en";
 

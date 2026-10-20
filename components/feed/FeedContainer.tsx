@@ -14,10 +14,9 @@ interface FeedContainerProps {
 
 const SUBJECT_FILTERS = [
   { slug: "all", label: "All" },
-  { slug: "maths", label: "Maths" },
-  { slug: "reasoning", label: "Reasoning" },
-  { slug: "english", label: "English" },
-  { slug: "gk", label: "GK" },
+  { slug: "biology", label: "Biology" },
+  { slug: "chemistry", label: "Chemistry" },
+  { slug: "physics", label: "Physics" },
 ];
 
 export const FeedContainer: React.FC<FeedContainerProps> = ({
@@ -25,7 +24,7 @@ export const FeedContainer: React.FC<FeedContainerProps> = ({
 }) => {
   // State
   const [selectedSubject, setSelectedSubject] = useState<string>("all");
-  const [currentExamId, setCurrentExamId] = useState<string>("exam-ssc-cgl");
+  const [currentExamId, setCurrentExamId] = useState<string>("exam-neet-ug");
   const [exams, setExams] = useState<Examination[]>(initialExams);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -246,7 +245,7 @@ export const FeedContainer: React.FC<FeedContainerProps> = ({
       <TopHeader
         currentTab="home"
         streakDays={user?.current_streak || 14}
-        activeExamName={activeExam?.name || "SSC CGL"}
+        activeExamName={activeExam?.name || "NEET UG (Medical Entrance)"}
         user={user}
         onSelectExam={() => setShowExamModal(true)}
       />

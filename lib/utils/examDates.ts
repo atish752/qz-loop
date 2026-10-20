@@ -107,7 +107,7 @@ const EXAM_SCHEDULES: Record<string, ExamScheduleRule> = {
 
 export function getExamCountdown(examIdOrName?: string, fromDate = new Date()): ExamCountdownInfo {
   // Normalize exam key
-  let ruleKey = "exam-ssc-cgl";
+  let ruleKey = "exam-neet-ug";
 
   if (examIdOrName) {
     const clean = examIdOrName.toLowerCase();
@@ -124,7 +124,7 @@ export function getExamCountdown(examIdOrName?: string, fromDate = new Date()): 
     else if (EXAM_SCHEDULES[examIdOrName]) ruleKey = examIdOrName;
   }
 
-  const rule = EXAM_SCHEDULES[ruleKey] || EXAM_SCHEDULES["exam-ssc-cgl"];
+  const rule = EXAM_SCHEDULES[ruleKey] || EXAM_SCHEDULES["exam-neet-ug"];
 
   // Normalize fromDate to midnight UTC / local
   const currentYear = fromDate.getFullYear();

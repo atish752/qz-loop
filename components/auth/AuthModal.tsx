@@ -29,7 +29,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Form Fields
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
-  const [examId, setExamId] = useState("exam-railway-ntpc");
+  const [examId, setExamId] = useState("exam-neet-ug");
   const [exams, setExams] = useState<Examination[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string>("");
@@ -543,11 +543,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 onChange={(e) => setExamId(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs font-semibold text-on-surface focus:outline-none focus:border-primary"
               >
-                {exams.map((ex, idx) => (
-                  <option key={ex.id} value={ex.id}>
-                    {idx + 1}. {ex.name}
-                  </option>
-                ))}
+                {exams.filter((ex) => ex.id === "exam-neet-ug").length > 0 ? (
+                  exams
+                    .filter((ex) => ex.id === "exam-neet-ug")
+                    .map((ex) => (
+                      <option key={ex.id} value={ex.id}>
+                        {ex.name}
+                      </option>
+                    ))
+                ) : (
+                  <option value="exam-neet-ug">NEET UG (Medical Entrance)</option>
+                )}
               </select>
 
               {/* Major Subjects Preview Chips */}

@@ -77,7 +77,7 @@ export const ProfileView: React.FC = () => {
               setAllProfiles(data.allProfiles || []);
               setEditName(data.user.display_name || "");
               setEditUsername(data.user.username || "");
-              setEditExamId(data.user.preferred_examination_id || "exam-ssc-cgl");
+              setEditExamId(data.user.preferred_examination_id || "exam-neet-ug");
               setEditEmail(data.user.email || "");
 
               // Onboarding prompt if username has not been chosen yet and user is logged in
@@ -174,7 +174,7 @@ export const ProfileView: React.FC = () => {
     if (user) {
       setEditName(user.display_name);
       setEditUsername(user.username || "");
-      setEditExamId(user.preferred_examination_id || "exam-railway-ntpc");
+      setEditExamId(user.preferred_examination_id || "exam-neet-ug");
       setEditEmail(user.email || "");
       setEditAvatarUrl(user.avatar_url || "");
       setEditAvatarSizeKb(null);
@@ -271,8 +271,8 @@ export const ProfileView: React.FC = () => {
           userId: uid || undefined,
           display_name: editName.trim(),
           username: editUsername.trim().toLowerCase(),
-          preferred_examination_id: editExamId,
-          target_exam: selectedExam?.name || "Railways (RRB NTPC & Group D)",
+          preferred_examination_id: editExamId || "exam-neet-ug",
+          target_exam: selectedExam?.name || "NEET UG (Medical Entrance)",
           avatar_url: editAvatarUrl || undefined,
           email: editEmail.trim() || undefined,
           language_preference: editLanguagePref,
@@ -374,7 +374,7 @@ export const ProfileView: React.FC = () => {
   };
 
   const handleShareApp = async () => {
-    const shareText = "Practice SSC CGL competitive questions with an infinite-scroll feed on Qz Loop! Scroll. Solve. Improve. Repeat.";
+    const shareText = "Practice NEET UG medical entrance questions with an infinite-scroll feed on Qz Loop! Scroll. Solve. Improve. Repeat.";
     if (navigator.share) {
       try {
         await navigator.share({
@@ -393,7 +393,7 @@ export const ProfileView: React.FC = () => {
   };
 
   const handleWhatsAppProfileShare = () => {
-    const examName = activeExam?.name || "SSC CGL";
+    const examName = activeExam?.name || "NEET UG (Medical Entrance)";
     const streak = isLoggedIn ? (user?.current_streak ?? 0) : 0;
     const text =
       `🎯 *${user?.display_name || "Aspirant"} on Qz Loop*\n` +
@@ -494,7 +494,7 @@ export const ProfileView: React.FC = () => {
       <TopHeader
         currentTab="profile"
         streakDays={isLoggedIn ? (user?.current_streak || 0) : 0}
-        activeExamName={user?.target_exam || activeExam?.name || "Railways RRB"}
+        activeExamName={user?.target_exam || activeExam?.name || "NEET UG"}
         user={isLoggedIn ? user : null}
         onSelectExam={() => setShowExamModal(true)}
       />
@@ -546,7 +546,7 @@ export const ProfileView: React.FC = () => {
                     {lang === "hi" ? "लक्ष्य परीक्षा (Target Exam)" : "Target Examination"}
                   </span>
                   <span className="text-xs font-bold text-on-surface truncate">
-                    {user?.target_exam || activeExam?.name || "Railways (RRB NTPC & Group D)"}
+                    {user?.target_exam || activeExam?.name || "NEET UG (Medical Entrance)"}
                   </span>
                 </div>
               </div>
@@ -615,7 +615,7 @@ export const ProfileView: React.FC = () => {
                   </span>
                   <span className="text-secondary text-xs">•</span>
                   <span className="font-body-sm text-body-sm text-secondary truncate">
-                    {user?.target_exam || activeExam?.name || "SSC CGL"}
+                    {user?.target_exam || activeExam?.name || "NEET UG"}
                   </span>
                   {user?.email && (
                     <>
@@ -930,7 +930,7 @@ export const ProfileView: React.FC = () => {
                   {t.targetExam || "Target Exam"}
                 </span>
                 <span className="font-body-sm text-body-sm text-secondary truncate">
-                  {activeExam?.name || "SSC CGL"}
+                  {activeExam?.name || "NEET UG (Medical Entrance)"}
                 </span>
               </div>
             </div>
@@ -1500,11 +1500,15 @@ export const ProfileView: React.FC = () => {
                   onChange={(e) => setEditExamId(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-sm font-semibold text-on-surface focus:outline-none focus:border-primary"
                 >
-                  {exams.map((ex) => (
-                    <option key={ex.id} value={ex.id}>
-                      {ex.name}
-                    </option>
-                  ))}
+                  {exams.filter((ex) => ex.id === "exam-neet-ug").length > 0 ? (
+                    exams.filter((ex) => ex.id === "exam-neet-ug").map((ex) => (
+                      <option key={ex.id} value={ex.id}>
+                        {ex.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="exam-neet-ug">NEET UG (Medical Entrance)</option>
+                  )}
                 </select>
               </div>
 
@@ -1596,7 +1600,7 @@ export const ProfileView: React.FC = () => {
       {/* Target Exam Switcher Modal */}
       <ExamSwitchModal
         exams={exams}
-        currentExamId={user?.preferred_examination_id || "exam-ssc-cgl"}
+        currentExamId={user?.preferred_examination_id || "exam-neet-ug"}
         isOpen={showExamModal}
         onClose={() => setShowExamModal(false)}
         onSelectExam={(exam) => {

@@ -164,6 +164,27 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
     }
   }, [isSavedExternal]);
 
+  useEffect(() => {
+    const handleSavedSync = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId: string; isSaved: boolean }>;
+      if (customEvent.detail && customEvent.detail.questionId === question.id) {
+        setIsSaved(customEvent.detail.isSaved);
+      }
+    };
+    const handleCommentAdded = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId: string }>;
+      if (customEvent.detail && customEvent.detail.questionId === question.id) {
+        setCommentsCount((prev) => prev + 1);
+      }
+    };
+    window.addEventListener("qz_saved_changed", handleSavedSync);
+    window.addEventListener("qz_comment_added", handleCommentAdded);
+    return () => {
+      window.removeEventListener("qz_saved_changed", handleSavedSync);
+      window.removeEventListener("qz_comment_added", handleCommentAdded);
+    };
+  }, [question.id]);
+
   // Metrics
   const [metrics, setMetrics] = useState({
     attempts: initialAnswerRecord?.metrics?.attempts ?? question.total_attempts,
@@ -493,12 +514,21 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
     setIsSaved(nextSaved);
     setQuickSaveToast(nextSaved ? "Saved to Quick Revision!" : "Removed from Saved");
     setTimeout(() => setQuickSaveToast(null), 2000);
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("qz_saved_changed", {
+          detail: { questionId: question.id, isSaved: nextSaved },
+        })
+      );
+    }
     try {
       await fetch("/api/collections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: nextSaved ? "save_question" : "remove_question",
+          userId: currentUid || undefined,
+          action: nextSaved ? "save" : "remove",
           questionId: question.id,
           collectionName: "Saved Questions",
         }),
@@ -1000,17 +1030,6 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           {/* Comments / Discussion Button */}
           <button
             onClick={() => {
-              if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
-                window.dispatchEvent(
-                  new CustomEvent("open_auth_modal", {
-                    detail: {
-                      reason: "Sign in required to view proof shortcuts & discuss with aspirants",
-                      mode: "signup",
-                    },
-                  })
-                );
-                return;
-              }
               if (onOpenCommentsModal) {
                 onOpenCommentsModal(question);
               } else {
@@ -1029,17 +1048,6 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           {/* Share / Friends Button */}
           <button
             onClick={() => {
-              if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
-                window.dispatchEvent(
-                  new CustomEvent("open_auth_modal", {
-                    detail: {
-                      reason: "Sign in required to challenge and share with study partners",
-                      mode: "signup",
-                    },
-                  })
-                );
-                return;
-              }
               if (onOpenShareModal) {
                 onOpenShareModal(question);
               } else {

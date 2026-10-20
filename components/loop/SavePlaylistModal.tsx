@@ -86,6 +86,13 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
       if (onSavedChange) {
         onSavedChange(action === "save" ? ["Saved Questions"] : []);
       }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("qz_saved_changed", {
+            detail: { questionId: question.id, isSaved: action === "save" },
+          })
+        );
+      }
 
       const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
       const res = await fetch("/api/collections", {
@@ -131,6 +138,13 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
         .filter((c) => c.question_ids.includes(question.id))
         .map((c) => c.name);
       if (onSavedChange) onSavedChange(activeNames);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("qz_saved_changed", {
+            detail: { questionId: question.id, isSaved: activeNames.length > 0 },
+          })
+        );
+      }
 
       setToastMsg(
         isCurrentlySaved
@@ -179,6 +193,13 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
           .filter((c: QuestionCollection) => c.question_ids.includes(question.id))
           .map((c: QuestionCollection) => c.name);
         if (onSavedChange) onSavedChange(activeNames);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("qz_saved_changed", {
+              detail: { questionId: question.id, isSaved: true },
+            })
+          );
+        }
         setToastMsg(`Created and saved to '${newCollectionName.trim()}'! ✨`);
         setTimeout(() => setToastMsg(null), 2000);
         setNewCollectionName("");
@@ -335,7 +356,7 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
           <div className="flex items-center gap-2">
             <input
               type="text"
-              placeholder={t.newCollectionPlaceholder || "e.g. Maths Formulas, Hard PYQs..."}
+              placeholder={t.newCollectionPlaceholder || "e.g. Biology Mnemonics, Organic Chemistry, Physics PYQs..."}
               value={newCollectionName}
               onChange={(e) => setNewCollectionName(e.target.value)}
               className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/60 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"

@@ -439,7 +439,7 @@ export const SocialView: React.FC = () => {
       <TopHeader
         currentTab="social"
         streakDays={isLoggedIn ? (user?.current_streak || 0) : 0}
-        activeExamName={user?.target_exam || activeExam?.name || "Railways RRB"}
+        activeExamName={user?.target_exam || activeExam?.name || "NEET UG"}
         user={isLoggedIn ? user : null}
         onSelectExam={() => setShowExamModal(true)}
       />
@@ -759,7 +759,7 @@ export const SocialView: React.FC = () => {
                           id: partnerId,
                           display_name: m.from_user_id === partnerId && m.text?.includes("💡") ? "Aspirant Suggestion" : "Study Partner",
                           username: partnerId.replace(/^user-/, "aspirant_"),
-                          target_exam: "Indian Competitive Exams",
+                          target_exam: "NEET UG (Medical Entrance)",
                           status: "friend",
                           streak_days: 1,
                         });
@@ -976,7 +976,7 @@ export const SocialView: React.FC = () => {
                             @{usr.username}
                           </span>
                           <span className="text-[11px] text-secondary truncate">
-                            Target: {usr.target_exam || "SSC CGL"} • 🔥 {usr.current_streak}d
+                            Target: {usr.target_exam || "NEET UG"} • 🔥 {usr.current_streak}d
                           </span>
                         </div>
                       </div>
@@ -998,7 +998,7 @@ export const SocialView: React.FC = () => {
                                 username: usr.username,
                                 avatar_url: usr.avatar_url,
                                 streak_days: usr.current_streak,
-                                target_exam: usr.target_exam || "SSC CGL Aspirant",
+                                target_exam: usr.target_exam || "NEET UG Aspirant",
                                 status: "friend",
                               });
                             }
@@ -1431,7 +1431,7 @@ export const SocialView: React.FC = () => {
       {/* Target Exam Switcher Modal */}
       <ExamSwitchModal
         exams={exams}
-        currentExamId={user?.preferred_examination_id || "exam-ssc-cgl"}
+        currentExamId={user?.preferred_examination_id || "exam-neet-ug"}
         isOpen={showExamModal}
         onClose={() => setShowExamModal(false)}
         onSelectExam={(exam) => {
