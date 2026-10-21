@@ -187,10 +187,10 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in overflow-y-auto">
-      <div className="w-full max-w-md bg-surface-container-lowest rounded-3xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 my-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in overflow-hidden">
+      <div className="w-full max-w-md bg-surface-container-lowest rounded-3xl p-4 sm:p-5 shadow-2xl border border-surface-container-high/60 flex flex-col h-[75vh] max-h-[550px] animate-in zoom-in-95 duration-200 my-auto">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
+        <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40 shrink-0">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[24px]">chat</span>
             <div>
@@ -207,7 +207,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
         </div>
 
         {/* Comments Feed */}
-        <div className="flex-1 overflow-y-auto no-scrollbar py-3 flex flex-col gap-3 min-h-[200px] max-h-[340px]">
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar py-3 flex flex-col gap-3">
           {comments.length > 0 ? (
             comments.map((cmt) => (
               <div key={cmt.id} className="flex gap-2.5 items-start text-left">
@@ -287,7 +287,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
         )}
 
         {/* Input Form */}
-        <form onSubmit={handlePostComment} className="pt-2 border-t border-surface-container-high/40 flex items-center gap-2">
+        <form onSubmit={handlePostComment} className="pt-2 border-t border-surface-container-high/40 flex items-center gap-2 shrink-0 w-full">
           <input
             type="text"
             placeholder="Share shortcut, tip, or formula..."
