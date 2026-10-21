@@ -55,7 +55,7 @@ export const LeaderboardView: React.FC = () => {
             </span>
           </div>
           <p className="font-body-sm text-body-sm text-secondary">
-            NEET UG Practice Sprint • Minimum 20 solves to qualify • Genuine verified attempts
+            NEET UG Practice Sprint • Verified Aspirant Solves • Real-time Rank
           </p>
         </div>
 
@@ -93,7 +93,7 @@ export const LeaderboardView: React.FC = () => {
               <span className="font-semibold text-on-surface">Deterministic Scoring Formula</span>
               <span className="text-xs mt-0.5">{scoringRule.formula}</span>
               <span className="text-[11px] text-secondary mt-0.5">
-                Participation Threshold: 20 submitted answers in period required for ranked AIR qualification.
+                Participation Threshold: 1 verified submitted answer in period required for ranked AIR qualification.
               </span>
             </div>
           </div>

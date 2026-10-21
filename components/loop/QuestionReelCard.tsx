@@ -177,11 +177,35 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         setCommentsCount((prev) => prev + 1);
       }
     };
+    const handleOpenOptions = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId: string }>;
+      if (customEvent.detail && customEvent.detail.questionId === question.id) {
+        setShowOptions(true);
+      }
+    };
+    const handleHideOptions = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId: string }>;
+      if (customEvent.detail && customEvent.detail.questionId === question.id) {
+        setShowOptions(false);
+      }
+    };
+    const handleOpenSolution = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId: string }>;
+      if (customEvent.detail && customEvent.detail.questionId === question.id) {
+        setShowPostAnswerModal(true);
+      }
+    };
     window.addEventListener("qz_saved_changed", handleSavedSync);
     window.addEventListener("qz_comment_added", handleCommentAdded);
+    window.addEventListener("qz_open_answer_options", handleOpenOptions);
+    window.addEventListener("qz_hide_answer_options", handleHideOptions);
+    window.addEventListener("qz_open_solution_modal", handleOpenSolution);
     return () => {
       window.removeEventListener("qz_saved_changed", handleSavedSync);
       window.removeEventListener("qz_comment_added", handleCommentAdded);
+      window.removeEventListener("qz_open_answer_options", handleOpenOptions);
+      window.removeEventListener("qz_hide_answer_options", handleHideOptions);
+      window.removeEventListener("qz_open_solution_modal", handleOpenSolution);
     };
   }, [question.id]);
 
@@ -1065,7 +1089,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       </div>
 
       {/* 5. Fixed / Pinned Bottom Answering & 4-Metric Bar (Safe-Area Anchored, Zero Glitch) */}
-      <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 z-20 flex flex-col gap-2">
+      <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 z-20 flex flex-col gap-2 opacity-0 pointer-events-none">
         {!showOptions && !isAnswered && (
           <div className="w-full">
             <button

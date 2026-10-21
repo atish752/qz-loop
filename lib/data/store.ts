@@ -667,7 +667,17 @@ class DataStore {
 
       const last = lastAttemptByQ.get(q.id);
       if (!last) {
-        neverAnswered.push(q);
+        if (repeatPref) {
+          if (repeatPref.next_review_at) {
+            const nextReviewTime = new Date(repeatPref.next_review_at).getTime();
+            if (now >= nextReviewTime) {
+              eligibleForRevision.push({ ...q, is_repeat: true, repeat_at: repeatPref.next_review_at });
+            }
+          }
+          // Scheduled for future review: do not include in neverAnswered!
+        } else {
+          neverAnswered.push(q);
+        }
       } else {
         const timeSinceAttempt = now - new Date(last.created_at).getTime();
 
@@ -750,7 +760,10 @@ class DataStore {
       const remaining = pool.filter((q) => {
         if (selected.some((s) => s.id === q.id)) return false;
         const pref = this.repeatPreferences.get(`${userId}:${q.id}`);
-        if (pref?.interval === "never") return false;
+        if (pref) {
+          if (pref.interval === "never") return false;
+          if (pref.next_review_at && now < new Date(pref.next_review_at).getTime()) return false;
+        }
         // If an explicit logged-in user has answered this question, DO NOT resurface unless eligible for revision
         if (isExplicitUser && lastAttemptByQ.has(q.id)) {
           if (!pref) return false;
@@ -780,6 +793,7 @@ class DataStore {
     responseTimeMs: number;
   }): {
     isCorrect: boolean;
+    attemptId?: string;
     correctOptionId: string;
     explanation?: string;
     updatedMetrics: {
@@ -888,6 +902,7 @@ class DataStore {
 
     return {
       isCorrect,
+      attemptId: newAttempt.id,
       correctOptionId: q.correct_option_id || "A",
       explanation: q.explanation,
       updatedMetrics: {
@@ -1622,6 +1637,11 @@ class DataStore {
   public getQuestionRepeatInterval(userId: string, questionId: string): RepeatInterval | undefined {
     const key = `${userId}:${questionId}`;
     return this.repeatPreferences.get(key)?.interval;
+  }
+
+  public getQuestionRepeatPreference(userId: string, questionId: string): QuestionRepeatPreference | undefined {
+    const key = `${userId}:${questionId}`;
+    return this.repeatPreferences.get(key);
   }
 
   // --- Likes & Interactions ---

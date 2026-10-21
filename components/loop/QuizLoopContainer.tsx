@@ -64,6 +64,16 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     submitCurrentOption: () => {},
   });
 
+  const [activeAnswerStatus, setActiveAnswerStatus] = useState<{
+    isAnswerMode: boolean;
+    isAnswered: boolean;
+    hasSelectedPendingOption: boolean;
+  }>({
+    isAnswerMode: false,
+    isAnswered: false,
+    hasSelectedPendingOption: false,
+  });
+
   const startParamHandledRef = useRef<boolean>(false);
 
   // Intercept Swipe Confirmation Modal ("Answer or Skip?")
@@ -117,6 +127,24 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     return () => {
       window.removeEventListener("qz_saved_changed", handleSavedChanged);
     };
+  }, []);
+
+  // Prefetch accepted friends on mount for 0ms share modal rendering
+  useEffect(() => {
+    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    if (currentUid && currentUid !== "guest") {
+      fetch(`/api/friends?userId=${encodeURIComponent(currentUid)}`, {
+        headers: { "x-user-id": currentUid },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.friends)) {
+            const accepted = data.friends.filter((f: FriendUser) => f.status === "friend");
+            localStorage.setItem("qz_cached_friends", JSON.stringify(accepted));
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   // Streak & Dopamine combo tracking
@@ -356,7 +384,18 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               }
 
               if (playlistQuestions.length > 0) {
-                if (shuffleParam) {
+                // Deduplicate questions by ID
+                const seen = new Set<string>();
+                const uniqueQuestions: Question[] = [];
+                for (const q of playlistQuestions) {
+                  if (!seen.has(q.id)) {
+                    seen.add(q.id);
+                    uniqueQuestions.push(q);
+                  }
+                }
+                playlistQuestions = uniqueQuestions;
+
+                if (shuffleParam || Boolean(storedIdsRaw)) {
                   for (let i = playlistQuestions.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [playlistQuestions[i], playlistQuestions[j]] = [playlistQuestions[j], playlistQuestions[i]];
@@ -365,6 +404,8 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 setQuestions(playlistQuestions);
                 setCurrentIndex(0);
                 setIsStarted(true);
+              } else {
+                loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, true);
               }
             }
           })
@@ -426,6 +467,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         hasSelectedPendingOption: false,
         submitCurrentOption: () => {},
       };
+      setActiveAnswerStatus({
+        isAnswerMode: false,
+        isAnswered: false,
+        hasSelectedPendingOption: false,
+      });
       // Reset any open hoisted modals
       setActiveSaveQuestion(null);
       setActiveShareQuestion(null);
@@ -462,6 +508,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
       hasSelectedPendingOption: false,
       submitCurrentOption: () => {},
     };
+    setActiveAnswerStatus({
+      isAnswerMode: false,
+      isAnswered: false,
+      hasSelectedPendingOption: false,
+    });
     // Reset any open hoisted modals
     setActiveSaveQuestion(null);
     setActiveShareQuestion(null);
@@ -624,6 +675,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     setAnsweredRecords((prev) => ({
       ...prev,
       [result.questionId]: result.record,
+    }));
+    setActiveAnswerStatus((prev) => ({
+      ...prev,
+      isAnswered: true,
+      isAnswerMode: false,
     }));
 
     // Update Dopamine Combo Streak
@@ -1088,6 +1144,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                   onRegisterAnsweringStatus={(status) => {
                     if (idx === currentIndex) {
                       activeStatusRef.current = status;
+                      setActiveAnswerStatus({
+                        isAnswerMode: status.isAnswerMode,
+                        isAnswered: status.isAnswered,
+                        hasSelectedPendingOption: status.hasSelectedPendingOption,
+                      });
                     }
                   }}
                   onOpenChatWithFriend={(friend) => setActiveChatFriend(friend)}
@@ -1102,6 +1163,119 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 />
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pinned Bottom Answering Bar & 4 Community Metrics Bar (Rigidly Fixed, Zero Glitch) */}
+        {activeQuestion && (
+          <div className="absolute bottom-0 left-0 right-0 z-30 px-4 sm:px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 pointer-events-auto flex flex-col gap-2">
+            {!activeAnswerStatus.isAnswerMode && !activeAnswerStatus.isAnswered && !answeredRecords[activeQuestion.id] && (
+              <div className="w-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== "undefined" && !localStorage.getItem("qz_user_id")) {
+                      window.dispatchEvent(
+                        new CustomEvent("open_auth_modal", {
+                          detail: {
+                            reason: "Sign in required to answer questions, test your accuracy & track rank",
+                            mode: "signup",
+                          },
+                        })
+                      );
+                      return;
+                    }
+                    window.dispatchEvent(
+                      new CustomEvent("qz_open_answer_options", { detail: { questionId: activeQuestion.id } })
+                    );
+                    setActiveAnswerStatus((prev) => ({ ...prev, isAnswerMode: true }));
+                  }}
+                  className="w-full h-11 bg-primary text-on-primary rounded-xl font-label-md text-xs sm:text-sm font-bold shadow-sm hover:bg-primary-container active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 group cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">
+                    touch_app
+                  </span>
+                  <span>{t.answerQuestion || "Answer & Learn"}</span>
+                </button>
+              </div>
+            )}
+
+            {activeAnswerStatus.isAnswerMode && !activeAnswerStatus.isAnswered && !answeredRecords[activeQuestion.id] && (
+              <div className="w-full">
+                <div className="w-full h-11 px-3 rounded-xl bg-surface-container-high/80 text-secondary border border-surface-container-high flex items-center justify-between text-xs font-semibold">
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px] text-primary">touch_app</span>
+                    <span>{(t.answerQuestion || "Answer & Learn") + " · Select Option"}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent("qz_hide_answer_options", { detail: { questionId: activeQuestion.id } })
+                      );
+                      setActiveAnswerStatus((prev) => ({ ...prev, isAnswerMode: false }));
+                    }}
+                    className="text-[11px] text-primary hover:underline font-bold cursor-pointer"
+                  >
+                    Hide
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(activeAnswerStatus.isAnswered || Boolean(answeredRecords[activeQuestion.id])) && (
+              <div className="w-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("qz_open_solution_modal", { detail: { questionId: activeQuestion.id } })
+                    );
+                  }}
+                  className="w-full h-11 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-2xs group cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">bolt</span>
+                  <span>{lang === "hi" ? "समाधान व दोहराव (Quick Proof)" : "Quick Proof & Solution"}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Community Performance Metrics Bar - Full Available Bottom Width */}
+            {(() => {
+              const currentRecord = answeredRecords[activeQuestion.id];
+              const bAttempts = currentRecord?.metrics?.attempts ?? activeQuestion.total_attempts ?? 0;
+              const bCorrect = currentRecord?.metrics?.correctAttempts ?? activeQuestion.correct_attempts ?? 0;
+              const bAvgSpeed = currentRecord?.metrics?.avgTimeSec ?? (activeQuestion.total_attempts > 0 ? Math.round(activeQuestion.total_time_ms / activeQuestion.total_attempts / 1000) : 0);
+              const bFastest = currentRecord?.metrics?.fastestSec ?? (activeQuestion.fastest_correct_ms ? Number((activeQuestion.fastest_correct_ms / 1000).toFixed(1)) : null);
+              const bAccuracy = bAttempts > 0 ? Math.round((bCorrect / bAttempts) * 100) : 0;
+
+              return (
+                <div className="w-full">
+                  <div className="w-full bg-surface-container-low px-1.5 sm:px-3 py-1.5 rounded-xl border border-surface-container-high/40 grid grid-cols-4 gap-0.5 sm:gap-2 text-[10px] sm:text-xs shadow-2xs">
+                    {/* Metric 1: Attempts */}
+                    <span className="flex items-center justify-center gap-0.5 sm:gap-1 font-medium text-on-surface whitespace-nowrap min-w-0" title={`${bAttempts} Attempts`}>
+                      <span className="material-symbols-outlined text-[13px] sm:text-[14px] text-primary shrink-0">groups</span>
+                      <span className="truncate">{bAttempts.toLocaleString()} <span className="opacity-75">{t.attempts || "attempts"}</span></span>
+                    </span>
+                    {/* Metric 2: Accuracy */}
+                    <span className="flex items-center justify-center gap-0.5 sm:gap-1 font-bold text-tertiary whitespace-nowrap min-w-0" title={`${bAccuracy}% Accuracy`}>
+                      <span className="material-symbols-outlined text-[13px] sm:text-[14px] shrink-0">target</span>
+                      <span className="truncate">{bAccuracy}% <span className="opacity-75">{t.accuracy || "acc"}</span></span>
+                    </span>
+                    {/* Metric 3: Avg Speed */}
+                    <span className="flex items-center justify-center gap-0.5 sm:gap-1 text-secondary whitespace-nowrap min-w-0" title={`${bAvgSpeed}s Average Speed`}>
+                      <span className="material-symbols-outlined text-[13px] sm:text-[14px] shrink-0">speed</span>
+                      <span className="truncate">{bAvgSpeed}s <span className="opacity-75">{t.avgSpeed || "avg speed"}</span></span>
+                    </span>
+                    {/* Metric 4: Fastest Speed */}
+                    <span className="flex items-center justify-center gap-0.5 sm:gap-1 text-primary font-semibold whitespace-nowrap min-w-0" title={`${bFastest || 0}s Fastest Correct`}>
+                      <span className="material-symbols-outlined text-[13px] sm:text-[14px] shrink-0">bolt</span>
+                      <span className="truncate">{bFastest ? `${bFastest}s` : "0s"} <span className="opacity-75">{t.fastest || "fastest"}</span></span>
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

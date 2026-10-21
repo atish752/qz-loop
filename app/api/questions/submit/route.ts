@@ -29,13 +29,28 @@ export async function POST(request: NextRequest) {
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase && resolvedUserId) {
-        await supabase.from("question_attempts").insert({
+        const attemptId = (result as { attemptId?: string }).attemptId || `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const { error: insErr } = await supabase.from("question_attempts").insert({
+          id: attemptId,
           user_id: resolvedUserId,
           question_id: questionId,
           selected_option_id: selectedOptionId,
           is_correct: result.isCorrect,
           response_time_ms: typeof responseTimeMs === "number" ? responseTimeMs : 10000,
         });
+
+        if (insErr) {
+          // If insert failed because of uuid format constraint, retry with fallback UUID
+          const fallbackUuid = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : undefined;
+          await supabase.from("question_attempts").insert({
+            ...(fallbackUuid ? { id: fallbackUuid } : {}),
+            user_id: resolvedUserId,
+            question_id: questionId,
+            selected_option_id: selectedOptionId,
+            is_correct: result.isCorrect,
+            response_time_ms: typeof responseTimeMs === "number" ? responseTimeMs : 10000,
+          });
+        }
 
         const userProf = db.getProfileById(resolvedUserId);
         if (userProf) {
@@ -55,6 +70,18 @@ export async function POST(request: NextRequest) {
               ? Math.round(result.updatedMetrics.fastest_correct_seconds * 1000)
               : null,
           }).eq("id", questionId);
+        }
+
+        // Sync updated repeat preference if modified upon solving
+        const repPref = db.getQuestionRepeatPreference(resolvedUserId, questionId);
+        if (repPref) {
+          await supabase.from("question_repeat_preferences").upsert({
+            user_id: resolvedUserId,
+            question_id: questionId,
+            interval: repPref.interval,
+            next_review_at: repPref.next_review_at || null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "user_id,question_id" });
         }
       }
     } catch (sbErr) {

@@ -1488,7 +1488,7 @@ export const CreateQuestionView: React.FC = () => {
                       +25 Rep Points
                     </span>
                   </div>
-                  <div className="grid grid-flow-col auto-cols-fr gap-2 w-full py-0.5">
+                  <div className={`grid ${currentExamSubjects.length === 3 ? "grid-cols-3" : "grid-flow-col auto-cols-fr"} gap-2 w-full py-0.5`}>
                     {currentExamSubjects.map((s) => {
                       const isSelected = selectedSubjectId === s.id;
                       const shortLabel =

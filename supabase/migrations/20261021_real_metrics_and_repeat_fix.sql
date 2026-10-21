@@ -81,3 +81,5 @@ CREATE POLICY "Allow serverless attempt insertion" ON question_attempts
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS total_questions_answered INT DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS overall_accuracy INT DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS today_solved_count INT DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS language_preference TEXT DEFAULT 'en';
+UPDATE profiles SET onboarding_completed = true WHERE onboarding_completed IS NULL;

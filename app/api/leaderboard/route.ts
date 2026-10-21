@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
       scoringRule: {
         description: "Deterministic transparent scoring formula",
         formula: "(Correct answers × 25) + (Accuracy % × 8) + Speed bonus (up to 200 pts)",
-        minAttemptsThreshold: 20,
+        minAttemptsThreshold: 1,
       },
     });
   } catch (error: unknown) {

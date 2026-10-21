@@ -73,19 +73,20 @@ export async function GET(request: NextRequest) {
             .maybeSingle();
 
           if (dbProfile) {
+            const p = dbProfile as Record<string, any>;
             user = db.syncUserFromAuth({
-              id: dbProfile.id,
-              display_name: dbProfile.display_name,
-              username: dbProfile.username,
-              target_exam: dbProfile.target_exam,
-              preferred_examination_id: dbProfile.preferred_examination_id,
-              avatar_url: dbProfile.avatar_url,
-              email: dbProfile.email,
-              language_preference: dbProfile.language_preference,
-              onboarding_completed: dbProfile.onboarding_completed,
+              id: p.id,
+              display_name: p.display_name || undefined,
+              username: p.username || undefined,
+              target_exam: p.target_exam || undefined,
+              preferred_examination_id: p.preferred_examination_id || undefined,
+              avatar_url: p.avatar_url || undefined,
+              email: p.email || undefined,
+              language_preference: p.language_preference || undefined,
+              onboarding_completed: p.onboarding_completed ?? true,
             });
-            if (typeof dbProfile.current_streak === "number") user.current_streak = dbProfile.current_streak;
-            if (typeof dbProfile.daily_goal === "number") user.daily_goal = dbProfile.daily_goal;
+            if (typeof p.current_streak === "number") user.current_streak = p.current_streak;
+            if (typeof p.daily_goal === "number") user.daily_goal = p.daily_goal;
           } else {
             const { data: authData } = await supabase.auth.getUser();
             if (authData?.user && authData.user.id === requestedUserId) {
@@ -199,7 +200,7 @@ export async function PATCH(request: NextRequest) {
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase && updated) {
-        await supabase.from("profiles").upsert({
+        const profilePayload: Record<string, any> = {
           id: requestedUserId,
           display_name: updated.display_name,
           username: updated.username,
@@ -207,9 +208,30 @@ export async function PATCH(request: NextRequest) {
           preferred_examination_id: updated.preferred_examination_id,
           avatar_url: updated.avatar_url,
           email: updated.email,
-          language_preference: updated.language_preference,
-          onboarding_completed: updated.onboarding_completed ?? true,
-        });
+          onboarding_completed: true,
+        };
+        if (updated.language_preference) {
+          profilePayload.language_preference = updated.language_preference;
+        }
+
+        const { error: upsertErr } = await supabase.from("profiles").upsert(profilePayload, { onConflict: "id" });
+        if (upsertErr) {
+          console.error("Supabase profile upsert error:", upsertErr);
+          delete profilePayload.language_preference;
+          const { error: fallbackErr } = await supabase.from("profiles").upsert(profilePayload, { onConflict: "id" });
+          if (fallbackErr) {
+            console.error("Supabase profile fallback upsert error:", fallbackErr);
+            // Also try explicit update by ID
+            await supabase.from("profiles").update({
+              display_name: updated.display_name,
+              username: updated.username,
+              target_exam: updated.target_exam,
+              preferred_examination_id: updated.preferred_examination_id,
+              avatar_url: updated.avatar_url,
+              onboarding_completed: true,
+            }).eq("id", requestedUserId);
+          }
+        }
       }
     } catch (supabaseErr) {
       console.error("Supabase profile sync error:", supabaseErr);

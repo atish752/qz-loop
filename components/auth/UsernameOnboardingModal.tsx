@@ -46,6 +46,16 @@ export const UsernameOnboardingModal: React.FC = () => {
 
       // If user has already completed onboarding for this account, do not show
       if (onboardedUid === uid || userSpecificOnboarded || (onboardingCompleted && detailsSubmitted)) {
+        localStorage.removeItem("qz_needs_username");
+        localStorage.removeItem("qz_just_signed_up");
+        setIsOpen(false);
+        return;
+      }
+
+      // If user is returning or signing in (not a brand new signup session), do not show
+      const justSignedUp = localStorage.getItem("qz_just_signed_up") === "true";
+      const needsUsername = localStorage.getItem("qz_needs_username") === "true";
+      if (!justSignedUp && !needsUsername) {
         setIsOpen(false);
         return;
       }
@@ -56,12 +66,13 @@ export const UsernameOnboardingModal: React.FC = () => {
         try {
           const parsed = JSON.parse(cachedAuthUserRaw);
           cachedUsername = parsed.username || "";
-          if (parsed.onboarding_completed || (cachedUsername && !cachedUsername.startsWith("aspirant_") && cachedUsername.length >= 3)) {
+          if (parsed.onboarding_completed || (cachedUsername && !cachedUsername.startsWith("aspirant_") && cachedUsername.length >= 3) || !justSignedUp) {
             localStorage.setItem("qz_onboarding_completed", "true");
             localStorage.setItem("qz_details_submitted", "true");
             localStorage.setItem(`qz_onboarded_${uid}`, "true");
             localStorage.setItem("qz_onboarded_user_id", uid);
             localStorage.removeItem("qz_needs_username");
+            localStorage.removeItem("qz_just_signed_up");
             setIsOpen(false);
             return;
           }
@@ -96,8 +107,8 @@ export const UsernameOnboardingModal: React.FC = () => {
               !data.user.username.startsWith("aspirant_") &&
               data.user.username.length >= 3;
 
-            // Only mark complete if user has completed onboarding OR has a username OR already onboarded
-            if (data.user.onboarding_completed || hasUsername || localStorage.getItem("qz_onboarded_user_id") === data.user.id) {
+            // Only mark complete if user has completed onboarding OR has a username OR already onboarded OR not a first-time signup
+            if (data.user.onboarding_completed || hasUsername || localStorage.getItem("qz_onboarded_user_id") === data.user.id || !justSignedUp) {
               localStorage.setItem("qz_onboarding_completed", "true");
               localStorage.setItem("qz_details_submitted", "true");
               localStorage.setItem(`qz_onboarded_${data.user.id}`, "true");
@@ -244,11 +255,34 @@ export const UsernameOnboardingModal: React.FC = () => {
     }
   };
 
+  const handleDismiss = () => {
+    const uid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
+    if (uid) {
+      localStorage.setItem("qz_onboarding_completed", "true");
+      localStorage.setItem("qz_details_submitted", "true");
+      localStorage.setItem(`qz_onboarded_${uid}`, "true");
+      localStorage.setItem("qz_onboarded_user_id", uid);
+    }
+    localStorage.removeItem("qz_needs_username");
+    localStorage.removeItem("qz_just_signed_up");
+    setIsOpen(false);
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in overflow-y-auto">
-      <div className="w-full max-w-sm max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto overscroll-contain bg-surface-container-lowest rounded-3xl p-5 sm:p-6 shadow-2xl border border-surface-container-high/60 flex flex-col gap-3.5 sm:gap-4 animate-in zoom-in-95 no-scrollbar my-auto">
+      <div className="relative w-full max-w-sm max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto overscroll-contain bg-surface-container-lowest rounded-3xl p-5 sm:p-6 shadow-2xl border border-surface-container-high/60 flex flex-col gap-3.5 sm:gap-4 animate-in zoom-in-95 no-scrollbar my-auto">
+        {/* Dismiss Button */}
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="absolute top-4 right-4 w-7 h-7 rounded-full flex items-center justify-center text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"
+          title="Dismiss"
+        >
+          <span className="material-symbols-outlined text-[18px]">close</span>
+        </button>
+
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center gap-2">
           <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md border-2 border-primary/20 bg-primary">
@@ -465,6 +499,14 @@ export const UsernameOnboardingModal: React.FC = () => {
             className="w-full mt-1 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-md hover:bg-primary-container active:scale-95 transition-all disabled:opacity-40"
           >
             {isSaving ? "Saving Profile..." : "Claim Username & Start Practice"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="w-full py-1 text-center text-xs text-secondary hover:text-on-surface font-semibold transition-colors"
+          >
+            Skip for now & start practicing
           </button>
         </form>
 
