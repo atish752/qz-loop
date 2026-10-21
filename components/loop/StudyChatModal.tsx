@@ -65,11 +65,29 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
           if (!isMounted) return;
           if (data.success && data.messages) {
             setMessages((prev) => {
-              const pendingOptimistic = prev.filter((m) => m.id.startsWith("temp-"));
-              const stillPending = pendingOptimistic.filter(
-                (om) => !data.messages.some((sm: any) => sm.text === om.text && sm.from_user_id === om.from_user_id)
+              const serverMsgs = data.messages || [];
+              const pendingOptimistic = prev.filter(
+                (m) =>
+                  m.id.startsWith("temp-") &&
+                  !serverMsgs.some((sm: any) => sm.text === m.text && sm.from_user_id === m.from_user_id)
               );
-              return [...data.messages, ...stillPending];
+              const combined = [...serverMsgs, ...pendingOptimistic];
+              const uniqueMap = new Map<string, any>();
+              for (const m of combined) {
+                if (!uniqueMap.has(m.id)) {
+                  uniqueMap.set(m.id, m);
+                }
+              }
+              const next = Array.from(uniqueMap.values()).sort(
+                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              );
+              if (
+                prev.length === next.length &&
+                prev.every((m, idx) => m.id === next[idx]?.id && m.text === next[idx]?.text)
+              ) {
+                return prev;
+              }
+              return next;
             });
             if (data.peers && data.peers[friend.id]) {
               const p = data.peers[friend.id];
@@ -95,17 +113,19 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
     };
   }, [isOpen, friend]);
 
+  const prevMsgCountRef = useRef(0);
   useEffect(() => {
-    if (chatBottomRef.current) {
+    if (chatBottomRef.current && messages.length > prevMsgCountRef.current) {
       chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+    prevMsgCountRef.current = messages.length;
+  }, [messages.length]);
 
   if (!isOpen || !friend) return null;
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isSending) return;
 
     const currentUid = (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null) || "user-current";
     const text = inputText.trim();
@@ -138,7 +158,16 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
       });
       const data = await res.json();
       if (data.success && data.message) {
-        setMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
+        setMessages((prev) => {
+          const map = new Map<string, any>();
+          for (const m of prev) {
+            const finalMsg = m.id === tempId ? data.message : m;
+            map.set(finalMsg.id, finalMsg);
+          }
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        });
       }
     } catch {
       // Handled

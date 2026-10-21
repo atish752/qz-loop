@@ -256,7 +256,24 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
     }
   };
 
-  // Capture Frame from Live Video
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [isCropping, setIsCropping] = useState<boolean>(false);
+  const [cropBox, setCropBox] = useState<{ x: number; y: number; width: number; height: number }>({
+    x: 5,
+    y: 12,
+    width: 90,
+    height: 72,
+  });
+  const [dragHandle, setDragHandle] = useState<string | null>(null);
+  const [dragStart, setDragStart] = useState<{
+    clientX: number;
+    clientY: number;
+    box: { x: number; y: number; width: number; height: number };
+  } | null>(null);
+  const cropContainerRef = useRef<HTMLDivElement | null>(null);
+  const cropImageRef = useRef<HTMLImageElement | null>(null);
+
+  // Capture Frame from Live Video -> Go to interactive crop step
   const handleCaptureFromCamera = () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
@@ -268,32 +285,136 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
     if (!ctx) return;
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    processImageCanvas(canvas);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+    stopCameraStream();
+    setCropImageSrc(dataUrl);
+    setCropBox({ x: 5, y: 12, width: 90, height: 72 });
+    setIsCropping(true);
   };
 
-  // Upload Photo / File Fallback
+  // Upload Photo / File Fallback -> Go to interactive crop step
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        if (!canvasRef.current) return;
-        const canvas = canvasRef.current;
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0);
-        processImageCanvas(canvas);
-      };
-      img.src = event.target?.result as string;
+      const dataUrl = event.target?.result as string;
+      stopCameraStream();
+      setCropImageSrc(dataUrl);
+      setCropBox({ x: 5, y: 12, width: 90, height: 72 });
+      setIsCropping(true);
     };
     reader.readAsDataURL(file);
     // Reset file input
     e.target.value = "";
+  };
+
+  // Pointer drag events for interactive cropping
+  const handlePointerDown = (handle: string, e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch {}
+    setDragHandle(handle);
+    setDragStart({
+      clientX: e.clientX,
+      clientY: e.clientY,
+      box: { ...cropBox },
+    });
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragHandle || !dragStart || !cropContainerRef.current) return;
+    const rect = cropContainerRef.current.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const deltaX = ((e.clientX - dragStart.clientX) / rect.width) * 100;
+    const deltaY = ((e.clientY - dragStart.clientY) / rect.height) * 100;
+
+    const minSize = 10;
+    let { x, y, width, height } = dragStart.box;
+
+    if (dragHandle === "box") {
+      x = Math.max(0, Math.min(100 - width, x + deltaX));
+      y = Math.max(0, Math.min(100 - height, y + deltaY));
+    } else if (dragHandle === "nw") {
+      const newX = Math.max(0, Math.min(dragStart.box.x + dragStart.box.width - minSize, x + deltaX));
+      const newY = Math.max(0, Math.min(dragStart.box.y + dragStart.box.height - minSize, y + deltaY));
+      width = dragStart.box.x + dragStart.box.width - newX;
+      height = dragStart.box.y + dragStart.box.height - newY;
+      x = newX;
+      y = newY;
+    } else if (dragHandle === "ne") {
+      const newY = Math.max(0, Math.min(dragStart.box.y + dragStart.box.height - minSize, y + deltaY));
+      width = Math.max(minSize, Math.min(100 - x, dragStart.box.width + deltaX));
+      height = dragStart.box.y + dragStart.box.height - newY;
+      y = newY;
+    } else if (dragHandle === "sw") {
+      const newX = Math.max(0, Math.min(dragStart.box.x + dragStart.box.width - minSize, x + deltaX));
+      width = dragStart.box.x + dragStart.box.width - newX;
+      height = Math.max(minSize, Math.min(100 - y, dragStart.box.height + deltaY));
+      x = newX;
+    } else if (dragHandle === "se") {
+      width = Math.max(minSize, Math.min(100 - x, dragStart.box.width + deltaX));
+      height = Math.max(minSize, Math.min(100 - y, dragStart.box.height + deltaY));
+    } else if (dragHandle === "n") {
+      const newY = Math.max(0, Math.min(dragStart.box.y + dragStart.box.height - minSize, y + deltaY));
+      height = dragStart.box.y + dragStart.box.height - newY;
+      y = newY;
+    } else if (dragHandle === "s") {
+      height = Math.max(minSize, Math.min(100 - y, dragStart.box.height + deltaY));
+    } else if (dragHandle === "w") {
+      const newX = Math.max(0, Math.min(dragStart.box.x + dragStart.box.width - minSize, x + deltaX));
+      width = dragStart.box.x + dragStart.box.width - newX;
+      x = newX;
+    } else if (dragHandle === "e") {
+      width = Math.max(minSize, Math.min(100 - x, dragStart.box.width + deltaX));
+    }
+
+    setCropBox({
+      x: Math.round(x * 10) / 10,
+      y: Math.round(y * 10) / 10,
+      width: Math.round(width * 10) / 10,
+      height: Math.round(height * 10) / 10,
+    });
+  };
+
+  const handlePointerUp = () => {
+    setDragHandle(null);
+    setDragStart(null);
+  };
+
+  // Confirm Crop and trigger OCR extraction on cropped area
+  const handleConfirmCrop = () => {
+    if (!cropImageSrc) return;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const cropX = Math.max(0, Math.round((cropBox.x / 100) * img.naturalWidth));
+      const cropY = Math.max(0, Math.round((cropBox.y / 100) * img.naturalHeight));
+      const cropW = Math.max(10, Math.min(img.naturalWidth - cropX, Math.round((cropBox.width / 100) * img.naturalWidth)));
+      const cropH = Math.max(10, Math.min(img.naturalHeight - cropY, Math.round((cropBox.height / 100) * img.naturalHeight)));
+
+      canvas.width = cropW;
+      canvas.height = cropH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+      setIsCropping(false);
+      setCropImageSrc(null);
+      processImageCanvas(canvas);
+    };
+    img.src = cropImageSrc;
+  };
+
+  // Cancel Crop and return to camera viewfinder
+  const handleCancelCrop = () => {
+    setIsCropping(false);
+    setCropImageSrc(null);
+    startCamera("environment");
   };
 
   return (
@@ -339,166 +460,373 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
         </span>
       </div>
 
-      {/* Horizontal Camera Viewfinder Window */}
-      <div className="relative w-full h-44 sm:h-52 bg-black/95 rounded-2xl overflow-hidden border border-surface-container-high/60 flex items-center justify-center shadow-inner">
-        {/* Live Video Element: Always mounted to guarantee videoRef.current is never null */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`w-full h-full object-cover ${isCameraActive ? "block" : "hidden"}`}
-        />
+      {/* Crop Mode Interface vs Camera Viewfinder */}
+      {isCropping && cropImageSrc ? (
+        <div className="flex flex-col gap-3 animate-in fade-in">
+          <div className="flex items-center justify-between pb-1 border-b border-surface-container-high/50">
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-primary text-[20px]">crop</span>
+              <span className="font-bold text-xs sm:text-sm text-on-surface">
+                {lang === "hi" ? "प्रश्न और विकल्पों को क्रॉप करें" : "Crop Question & Options"}
+              </span>
+            </div>
+            <span className="text-[10px] text-primary font-bold bg-primary-fixed/30 px-2 py-0.5 rounded-full">
+              {lang === "hi" ? "सटीक क्रॉप" : "Precise Selection"}
+            </span>
+          </div>
 
-        {isCameraActive ? (
-          <>
-            {/* Horizontal Alignment Reticle & Scanning Laser */}
-            <div className="absolute inset-3 border-2 border-primary/60 rounded-xl pointer-events-none flex flex-col justify-between p-2">
-              <div className="flex justify-between items-start">
-                <span className="w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl" />
-                <span className="w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr" />
+          <p className="text-[11px] text-secondary leading-snug">
+            {lang === "hi"
+              ? "कोनों को खींचकर केवल प्रश्न और 4 विकल्पों को चुनें। ऊपर का स्टेटस बार या अन्य प्रश्न बाहर रखें।"
+              : "Drag corners to select strictly the question text and 4 options. Exclude app headers, browser bars, and other questions."}
+          </p>
+
+          {/* Interactive Crop Container with tight inline-block image wrapper */}
+          <div className="w-full overflow-hidden rounded-2xl border-2 border-primary/40 bg-black/95 flex items-center justify-center min-h-[240px] max-h-[440px] p-2">
+            <div
+              ref={cropContainerRef}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              className="relative inline-block select-none max-w-full max-h-[400px]"
+              style={{ touchAction: "none" }}
+            >
+              {/* Source Image */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                ref={cropImageRef}
+                src={cropImageSrc}
+                alt="To Crop"
+                className="block max-h-[400px] max-w-full w-auto h-auto rounded select-none pointer-events-none"
+              />
+
+            {/* Shaded Mask: Dims areas outside crop box */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: "rgba(0, 0, 0, 0.65)",
+                clipPath: `polygon(
+                  0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+                  ${cropBox.x}% ${cropBox.y}%,
+                  ${cropBox.x}% ${cropBox.y + cropBox.height}%,
+                  ${cropBox.x + cropBox.width}% ${cropBox.y + cropBox.height}%,
+                  ${cropBox.x + cropBox.width}% ${cropBox.y}%,
+                  ${cropBox.x}% ${cropBox.y}%
+                )`,
+              }}
+            />
+
+            {/* Active Crop Box with Grid & Touch Drag Handles */}
+            <div
+              onPointerDown={(e) => handlePointerDown("box", e)}
+              className="absolute border-2 border-primary rounded cursor-move shadow-[0_0_15px_rgba(83,0,183,0.5)] flex flex-col justify-between"
+              style={{
+                left: `${cropBox.x}%`,
+                top: `${cropBox.y}%`,
+                width: `${cropBox.width}%`,
+                height: `${cropBox.height}%`,
+                touchAction: "none",
+              }}
+            >
+              {/* Rule of Thirds Grid */}
+              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
+                <div className="border-r border-b border-white/20" />
+                <div className="border-r border-b border-white/20" />
+                <div className="border-b border-white/20" />
+                <div className="border-r border-b border-white/20" />
+                <div className="border-r border-b border-white/20" />
+                <div className="border-b border-white/20" />
+                <div className="border-r border-b border-white/20" />
+                <div className="border-r border-b border-white/20" />
+                <div />
               </div>
-              <div className="text-center">
-                <span className="px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-mono backdrop-blur-xs tracking-wider uppercase font-semibold">
-                  {lang === "hi" ? "प्रश्न व विकल्पों को फ्रेम में रखें" : "Align Question & Options in Frame"}
+
+              {/* Center Hint Label */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="px-2 py-0.5 rounded-full bg-black/70 text-white text-[9px] font-mono tracking-wider font-semibold backdrop-blur-xs shadow-sm">
+                  {lang === "hi" ? "प्रश्न + 4 विकल्प" : "Question & Options"}
                 </span>
               </div>
-              <div className="flex justify-between items-end">
-                <span className="w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl" />
-                <span className="w-4 h-4 border-b-2 border-r-2 border-primary rounded-br" />
+
+              {/* 4 Corner Touch Drag Handles */}
+              <div
+                onPointerDown={(e) => handlePointerDown("nw", e)}
+                className="absolute -top-3 -left-3 w-7 h-7 rounded-full bg-white border-2 border-primary shadow-md cursor-nwse-resize flex items-center justify-center touch-none z-10 hover:scale-110 active:scale-125 transition-transform"
+                title="Resize top-left"
+              >
+                <span className="w-2 h-2 rounded-full bg-primary" />
               </div>
+              <div
+                onPointerDown={(e) => handlePointerDown("ne", e)}
+                className="absolute -top-3 -right-3 w-7 h-7 rounded-full bg-white border-2 border-primary shadow-md cursor-nesw-resize flex items-center justify-center touch-none z-10 hover:scale-110 active:scale-125 transition-transform"
+                title="Resize top-right"
+              >
+                <span className="w-2 h-2 rounded-full bg-primary" />
+              </div>
+              <div
+                onPointerDown={(e) => handlePointerDown("sw", e)}
+                className="absolute -bottom-3 -left-3 w-7 h-7 rounded-full bg-white border-2 border-primary shadow-md cursor-nesw-resize flex items-center justify-center touch-none z-10 hover:scale-110 active:scale-125 transition-transform"
+                title="Resize bottom-left"
+              >
+                <span className="w-2 h-2 rounded-full bg-primary" />
+              </div>
+              <div
+                onPointerDown={(e) => handlePointerDown("se", e)}
+                className="absolute -bottom-3 -right-3 w-7 h-7 rounded-full bg-white border-2 border-primary shadow-md cursor-nwse-resize flex items-center justify-center touch-none z-10 hover:scale-110 active:scale-125 transition-transform"
+                title="Resize bottom-right"
+              >
+                <span className="w-2 h-2 rounded-full bg-primary" />
+              </div>
+
+              {/* Edge Handles */}
+              <div
+                onPointerDown={(e) => handlePointerDown("n", e)}
+                className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-8 h-2.5 rounded-full bg-white border border-primary shadow cursor-ns-resize touch-none z-10"
+              />
+              <div
+                onPointerDown={(e) => handlePointerDown("s", e)}
+                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-8 h-2.5 rounded-full bg-white border border-primary shadow cursor-ns-resize touch-none z-10"
+              />
+              <div
+                onPointerDown={(e) => handlePointerDown("w", e)}
+                className="absolute top-1/2 -translate-y-1/2 -left-1.5 w-2.5 h-8 rounded-full bg-white border border-primary shadow cursor-ew-resize touch-none z-10"
+              />
+              <div
+                onPointerDown={(e) => handlePointerDown("e", e)}
+                className="absolute top-1/2 -translate-y-1/2 -right-1.5 w-2.5 h-8 rounded-full bg-white border border-primary shadow cursor-ew-resize touch-none z-10"
+              />
             </div>
 
-            {/* Animated Laser Bar */}
-            <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse shadow-[0_0_8px_rgba(83,0,183,0.8)] pointer-events-none" />
+            {/* Processing Spinner Overlay */}
+            {isProcessing && (
+              <div className="absolute inset-0 z-20 bg-black/85 backdrop-blur-xs flex flex-col items-center justify-center gap-2 p-4 text-center">
+                <div className="w-9 h-9 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-xs font-bold text-white tracking-wide">{progressStatus}</p>
+                <p className="text-[10px] text-white/60">
+                  {lang === "hi"
+                    ? "स्मार्ट पार्सर प्रश्न और विकल्पों को अलग कर रहा है..."
+                    : "Extracting cropped question and options..."}
+                </p>
+              </div>
+            )}
+            </div>
+          </div>
 
-            {/* Camera Floating Controls */}
-            <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
+          {/* Quick Crop Presets */}
+          <div className="flex items-center justify-between gap-1 text-[11px] px-0.5">
+            <span className="text-secondary font-medium">{lang === "hi" ? "त्वरित विकल्प:" : "Presets:"}</span>
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={toggleCameraFacing}
-                className="w-8 h-8 rounded-full bg-black/60 text-white hover:bg-black/80 flex items-center justify-center backdrop-blur-xs transition-colors"
-                title="Switch Camera"
+                onClick={() => setCropBox({ x: 2, y: 15, width: 96, height: 75 })}
+                className="px-2 py-0.5 rounded-lg bg-surface-container text-secondary hover:text-on-surface text-[10px] font-semibold"
               >
-                <span className="material-symbols-outlined text-[18px]">flip_camera_ios</span>
+                {lang === "hi" ? "शीर्ष छोड़ें (Skip Header)" : "Skip Header"}
               </button>
               <button
                 type="button"
-                onClick={stopCameraStream}
-                className="w-8 h-8 rounded-full bg-black/60 text-white hover:bg-black/80 flex items-center justify-center backdrop-blur-xs transition-colors"
-                title="Close Camera"
+                onClick={() => setCropBox({ x: 3, y: 8, width: 94, height: 84 })}
+                className="px-2 py-0.5 rounded-lg bg-surface-container text-secondary hover:text-on-surface text-[10px] font-semibold"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                {lang === "hi" ? "रीसेट" : "Default"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCropBox({ x: 0, y: 0, width: 100, height: 100 })}
+                className="px-2 py-0.5 rounded-lg bg-surface-container text-secondary hover:text-on-surface text-[10px] font-semibold"
+              >
+                {lang === "hi" ? "पूरी फोटो" : "Full View"}
               </button>
             </div>
-          </>
-        ) : (
-          /* Idle Viewfinder State */
-          <div className="flex flex-col items-center justify-center p-4 text-center gap-2 text-white/80">
-            {lastScannedPreview ? (
-              <div className="relative w-full h-full flex flex-col items-center justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={lastScannedPreview}
-                  alt="Scanned Preview"
-                  className="w-full h-full object-cover opacity-60 rounded-xl"
-                />
-                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center p-2">
-                  <span className="material-symbols-outlined text-emerald-400 text-[28px] mb-1">
-                    check_circle
-                  </span>
-                  <p className="text-xs font-bold text-white">
-                    {lang === "hi" ? "प्रश्न सफलता से निकाला गया!" : "Textbook Question Extracted!"}
-                  </p>
-                  <p className="text-[10px] text-white/80 max-w-xs mt-0.5">
-                    {lang === "hi"
-                      ? "नीचे फॉर्म में प्रश्न व विकल्प भरे गए हैं। सही विकल्प चुनें और प्रकाशित करें।"
-                      : "Form fields below are populated. Choose the correct option and publish."}
-                  </p>
-                </div>
-              </div>
-            ) : (
+          </div>
+
+          {/* Buttons: Confirm Crop & Extract vs Cancel / Retake */}
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              disabled={isProcessing}
+              onClick={handleConfirmCrop}
+              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-xs shadow-md hover:opacity-95 active:scale-98 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[19px]">crop</span>
+              <span>{lang === "hi" ? "क्रॉप करें और टेक्स्ट निकालें" : "Confirm Crop & Extract"}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isProcessing}
+              onClick={handleCancelCrop}
+              className="py-3 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs active:scale-98 transition-all flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+              <span>{lang === "hi" ? "रद्द / दोबारा लें" : "Cancel / Re-take"}</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Horizontal Camera Viewfinder Window */}
+          <div className="relative w-full h-44 sm:h-52 bg-black/95 rounded-2xl overflow-hidden border border-surface-container-high/60 flex items-center justify-center shadow-inner">
+            {/* Live Video Element: Always mounted to guarantee videoRef.current is never null */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`w-full h-full object-cover ${isCameraActive ? "block" : "hidden"}`}
+            />
+
+            {isCameraActive ? (
               <>
-                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-primary-fixed mb-1">
-                  <span className="material-symbols-outlined text-[28px]">photo_camera</span>
+                {/* Horizontal Alignment Reticle & Scanning Laser */}
+                <div className="absolute inset-3 border-2 border-primary/60 rounded-xl pointer-events-none flex flex-col justify-between p-2">
+                  <div className="flex justify-between items-start">
+                    <span className="w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl" />
+                    <span className="w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr" />
+                  </div>
+                  <div className="text-center">
+                    <span className="px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-mono backdrop-blur-xs tracking-wider uppercase font-semibold">
+                      {lang === "hi" ? "प्रश्न व विकल्पों को फ्रेम में रखें" : "Align Question & Options in Frame"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-end">
+                    <span className="w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl" />
+                    <span className="w-4 h-4 border-b-2 border-r-2 border-primary rounded-br" />
+                  </div>
                 </div>
-                <p className="text-xs font-semibold text-white/90">
-                  {lang === "hi"
-                    ? "किताब या नोट्स से प्रश्न स्कैन करने के लिए कैमरा खोलें"
-                    : "Open horizontal camera to scan printed MCQs from textbook"}
-                </p>
-                <p className="text-[10px] text-white/60 max-w-xs leading-relaxed">
-                  {lang === "hi"
-                    ? "OCR प्रश्न और 4 विकल्पों (A, B, C, D) को पहचान कर अपने आप फॉर्म में भर देगा"
-                    : "Smart OCR splits the prompt and 4 options (A, B, C, D) automatically"}
-                </p>
+
+                {/* Animated Laser Bar */}
+                <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse shadow-[0_0_8px_rgba(83,0,183,0.8)] pointer-events-none" />
+
+                {/* Camera Floating Controls */}
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
+                  <button
+                    type="button"
+                    onClick={toggleCameraFacing}
+                    className="w-8 h-8 rounded-full bg-black/60 text-white hover:bg-black/80 flex items-center justify-center backdrop-blur-xs transition-colors"
+                    title="Switch Camera"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">flip_camera_ios</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stopCameraStream}
+                    className="w-8 h-8 rounded-full bg-black/60 text-white hover:bg-black/80 flex items-center justify-center backdrop-blur-xs transition-colors"
+                    title="Close Camera"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
               </>
+            ) : (
+              /* Idle Viewfinder State */
+              <div className="flex flex-col items-center justify-center p-4 text-center gap-2 text-white/80">
+                {lastScannedPreview ? (
+                  <div className="relative w-full h-full flex flex-col items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={lastScannedPreview}
+                      alt="Scanned Preview"
+                      className="w-full h-full object-cover opacity-60 rounded-xl"
+                    />
+                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center p-2">
+                      <span className="material-symbols-outlined text-emerald-400 text-[28px] mb-1">
+                        check_circle
+                      </span>
+                      <p className="text-xs font-bold text-white">
+                        {lang === "hi" ? "प्रश्न सफलता से निकाला गया!" : "Textbook Question Extracted!"}
+                      </p>
+                      <p className="text-[10px] text-white/80 max-w-xs mt-0.5">
+                        {lang === "hi"
+                          ? "नीचे फॉर्म में प्रश्न व विकल्प भरे गए हैं। सही विकल्प चुनें और प्रकाशित करें।"
+                          : "Form fields below are populated. Choose the correct option and publish."}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-primary-fixed mb-1">
+                      <span className="material-symbols-outlined text-[28px]">photo_camera</span>
+                    </div>
+                    <p className="text-xs font-semibold text-white/90">
+                      {lang === "hi"
+                        ? "किताब या नोट्स से प्रश्न स्कैन करने के लिए कैमरा खोलें"
+                        : "Open horizontal camera to scan printed MCQs from textbook"}
+                    </p>
+                    <p className="text-[10px] text-white/60 max-w-xs leading-relaxed">
+                      {lang === "hi"
+                        ? "OCR प्रश्न और 4 विकल्पों (A, B, C, D) को पहचान कर अपने आप फॉर्म में भर देगा"
+                        : "Smart OCR splits the prompt and 4 options (A, B, C, D) automatically"}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Processing Spinner Overlay */}
+            {isProcessing && (
+              <div className="absolute inset-0 z-20 bg-black/85 backdrop-blur-xs flex flex-col items-center justify-center gap-2 p-4 text-center">
+                <div className="w-9 h-9 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-xs font-bold text-white tracking-wide">{progressStatus}</p>
+                <p className="text-[10px] text-white/60">
+                  {lang === "hi"
+                    ? "स्मार्ट पार्सर प्रश्न और विकल्पों को अलग कर रहा है..."
+                    : "Smart heuristic parser is splitting question and options..."}
+                </p>
+              </div>
             )}
           </div>
-        )}
 
-        {/* Processing Spinner Overlay */}
-        {isProcessing && (
-          <div className="absolute inset-0 z-20 bg-black/85 backdrop-blur-xs flex flex-col items-center justify-center gap-2 p-4 text-center">
-            <div className="w-9 h-9 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs font-bold text-white tracking-wide">{progressStatus}</p>
-            <p className="text-[10px] text-white/60">
-              {lang === "hi"
-                ? "स्मार्ट पार्सर प्रश्न और विकल्पों को अलग कर रहा है..."
-                : "Smart heuristic parser is splitting question and options..."}
-            </p>
+          {/* Action Buttons Row */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {isCameraActive ? (
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={handleCaptureFromCamera}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-xs shadow-md hover:opacity-95 active:scale-98 transition-all flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[20px]">center_focus_strong</span>
+                <span>{lang === "hi" ? "कैप्चर और स्कैन करें" : "Capture & Extract Text"}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={() => startCamera("environment")}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-sm hover:bg-primary-container active:scale-98 transition-all flex items-center justify-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[18px]">photo_camera</span>
+                <span>{lang === "hi" ? "कैमरा खोलें" : "Open Camera"}</span>
+              </button>
+            )}
+
+            {/* 100% Reliable Native Mobile Shutter Button */}
+            <button
+              type="button"
+              disabled={isProcessing}
+              onClick={() => nativeCameraInputRef.current?.click()}
+              className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1.5 shrink-0"
+              title="Direct native device camera shutter"
+            >
+              <span className="material-symbols-outlined text-[18px]">photo_camera_back</span>
+              <span>{lang === "hi" ? "कैमरा ऐप (Shutter)" : "Camera App (Native)"}</span>
+            </button>
+
+            {/* File / Gallery Upload Fallback */}
+            <button
+              type="button"
+              disabled={isProcessing}
+              onClick={() => fileInputRef.current?.click()}
+              className="py-2.5 px-3 rounded-xl bg-surface-container font-semibold text-xs text-on-surface hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1.5 shrink-0"
+              title="Pick image from gallery"
+            >
+              <span className="material-symbols-outlined text-[18px] text-secondary">image</span>
+              <span>{lang === "hi" ? "फ़ोटो चुनें" : "Pick Photo"}</span>
+            </button>
           </div>
-        )}
-      </div>
-
-      {/* Action Buttons Row */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-        {isCameraActive ? (
-          <button
-            type="button"
-            disabled={isProcessing}
-            onClick={handleCaptureFromCamera}
-            className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-xs shadow-md hover:opacity-95 active:scale-98 transition-all flex items-center justify-center gap-2"
-          >
-            <span className="material-symbols-outlined text-[20px]">center_focus_strong</span>
-            <span>{lang === "hi" ? "कैप्चर और स्कैन करें" : "Capture & Extract Text"}</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={isProcessing}
-            onClick={() => startCamera("environment")}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-sm hover:bg-primary-container active:scale-98 transition-all flex items-center justify-center gap-1.5"
-          >
-            <span className="material-symbols-outlined text-[18px]">photo_camera</span>
-            <span>{lang === "hi" ? "कैमरा खोलें" : "Open Camera"}</span>
-          </button>
-        )}
-
-        {/* 100% Reliable Native Mobile Shutter Button */}
-        <button
-          type="button"
-          disabled={isProcessing}
-          onClick={() => nativeCameraInputRef.current?.click()}
-          className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1.5 shrink-0"
-          title="Direct native device camera shutter"
-        >
-          <span className="material-symbols-outlined text-[18px]">photo_camera_back</span>
-          <span>{lang === "hi" ? "कैमरा ऐप (Shutter)" : "Camera App (Native)"}</span>
-        </button>
-
-        {/* File / Gallery Upload Fallback */}
-        <button
-          type="button"
-          disabled={isProcessing}
-          onClick={() => fileInputRef.current?.click()}
-          className="py-2.5 px-3 rounded-xl bg-surface-container font-semibold text-xs text-on-surface hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1.5 shrink-0"
-          title="Pick image from gallery"
-        >
-          <span className="material-symbols-outlined text-[18px] text-secondary">image</span>
-          <span>{lang === "hi" ? "फ़ोटो चुनें" : "Pick Photo"}</span>
-        </button>
-      </div>
+        </>
+      )}
 
       {/* Error Notice */}
       {errorMessage && (

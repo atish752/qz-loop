@@ -51,9 +51,30 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
     return `Aspirant ${handle.replace(/^aspirant_/, "").slice(0, 4).toUpperCase() || "Study"}`;
   };
 
+  const getEffectiveUid = (): string | null => {
+    if (typeof window === "undefined") return null;
+    let uid = localStorage.getItem("qz_user_id");
+    if (!uid || uid === "guest") {
+      const match = document.cookie.match(/(?:^|;\s*)qz_user_id=([^;]+)/);
+      if (match && match[1] && match[1] !== "guest") {
+        uid = decodeURIComponent(match[1]);
+      }
+    }
+    if (!uid || uid === "guest") {
+      try {
+        const cached = localStorage.getItem("qz_auth_user");
+        if (cached) {
+          const u = JSON.parse(cached);
+          if (u?.id && u.id !== "guest") uid = u.id;
+        }
+      } catch {}
+    }
+    return uid && uid !== "guest" ? uid : null;
+  };
+
   useEffect(() => {
     if (isOpen) {
-      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      const currentUid = getEffectiveUid();
       let myUsername = "";
       if (typeof window !== "undefined") {
         try {
@@ -84,7 +105,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
   if (!isOpen) return null;
 
   const handleSendToFriend = async (friend: FriendUser) => {
-    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const currentUid = getEffectiveUid();
     if (!currentUid) {
       if (typeof window !== "undefined") {
         window.dispatchEvent(
@@ -125,7 +146,7 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
 
   const handleSendFriendRequest = async () => {
     if (!addFriendInput.trim()) return;
-    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const currentUid = getEffectiveUid();
     if (!currentUid) {
       if (typeof window !== "undefined") {
         window.dispatchEvent(

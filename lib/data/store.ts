@@ -1944,32 +1944,56 @@ class DataStore {
 
   // --- Direct Study Chat Messages ---
   public getMessages(userId: string, friendId: string): DirectMessage[] {
-    return this.messages.filter(
+    const list = this.messages.filter(
       (m) =>
         (m.from_user_id === userId && m.to_user_id === friendId) ||
         (m.from_user_id === friendId && m.to_user_id === userId)
     );
+    const seen = new Set<string>();
+    const deduped: DirectMessage[] = [];
+    for (const m of list) {
+      if (!seen.has(m.id)) {
+        seen.add(m.id);
+        deduped.push(m);
+      }
+    }
+    return deduped;
   }
 
   public getAllMessagesForUser(userId: string): DirectMessage[] {
-    return this.messages.filter(
+    const list = this.messages.filter(
       (m) => m.from_user_id === userId || m.to_user_id === userId
     );
+    const seen = new Set<string>();
+    const deduped: DirectMessage[] = [];
+    for (const m of list) {
+      if (!seen.has(m.id)) {
+        seen.add(m.id);
+        deduped.push(m);
+      }
+    }
+    return deduped;
   }
 
   public sendMessage(params: {
+    id?: string;
     fromUserId: string;
     toUserId: string;
     text?: string;
     questionId?: string;
+    created_at?: string;
   }): DirectMessage {
+    if (params.id) {
+      const existing = this.messages.find((m) => m.id === params.id);
+      if (existing) return existing;
+    }
     const newMsg: DirectMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: params.id || `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       from_user_id: params.fromUserId,
       to_user_id: params.toUserId,
       text: params.text,
       question_id: params.questionId,
-      created_at: new Date().toISOString(),
+      created_at: params.created_at || new Date().toISOString(),
     };
     this.messages.push(newMsg);
     return newMsg;
@@ -1996,13 +2020,14 @@ class DataStore {
     text: string;
     id?: string;
   }): QuestionComment {
-    const user = (params.userId ? this.profiles.find((p) => p.id === params.userId) : null) || this.getCurrentUser();
+    const user = params.userId ? this.profiles.find((p) => p.id === params.userId) : null;
+    const authorUser = user || this.getCurrentUser();
     const newCmt: QuestionComment = {
       id: params.id || `cmt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       question_id: params.questionId,
-      user_id: user.id,
-      user_name: user.display_name,
-      user_avatar: user.avatar_url,
+      user_id: params.userId || authorUser.id,
+      user_name: user ? user.display_name : authorUser.display_name || "Aspirant",
+      user_avatar: user ? user.avatar_url : authorUser.avatar_url,
       comment_text: params.text.trim(),
       likes_count: 0,
       created_at: new Date().toISOString(),

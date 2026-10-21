@@ -17,12 +17,52 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
   const [comments, setComments] = useState<QuestionComment[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentUid, setCurrentUid] = useState<string | null>(null);
+
+  const getEffectiveUid = (): string | null => {
+    if (typeof window === "undefined") return null;
+    let uid = localStorage.getItem("qz_user_id");
+    if (!uid || uid === "guest") {
+      const match = document.cookie.match(/(?:^|;\s*)qz_user_id=([^;]+)/);
+      if (match && match[1] && match[1] !== "guest") {
+        uid = decodeURIComponent(match[1]);
+      }
+    }
+    if (!uid || uid === "guest") {
+      try {
+        const cached = localStorage.getItem("qz_auth_user");
+        if (cached) {
+          const u = JSON.parse(cached);
+          if (u?.id && u.id !== "guest") uid = u.id;
+        }
+      } catch {}
+    }
+    return uid && uid !== "guest" ? uid : null;
+  };
+
+  useEffect(() => {
+    const syncAuth = () => {
+      const effUid = getEffectiveUid();
+      setCurrentUid(effUid);
+      if (effUid && typeof window !== "undefined") {
+        const pending = sessionStorage.getItem(`qz_pending_comment_${question.id}`);
+        if (pending && !newCommentText) {
+          setNewCommentText(pending);
+        }
+      }
+    };
+    syncAuth();
+    window.addEventListener("qz_auth_changed", syncAuth);
+    return () => window.removeEventListener("qz_auth_changed", syncAuth);
+  }, [question.id, newCommentText]);
 
   useEffect(() => {
     if (isOpen) {
-      const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+      setErrorMessage(null);
+      const uid = getEffectiveUid();
       fetch(`/api/comments?questionId=${encodeURIComponent(question.id)}`, {
-        headers: currentUid ? { "x-user-id": currentUid } : {},
+        headers: uid ? { "x-user-id": uid } : {},
       })
         .then((res) => res.json())
         .then((data) => {
@@ -39,10 +79,12 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
   const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCommentText.trim()) return;
+    setErrorMessage(null);
 
-    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
-    if (!currentUid) {
+    const uid = getEffectiveUid();
+    if (!uid) {
       if (typeof window !== "undefined") {
+        sessionStorage.setItem(`qz_pending_comment_${question.id}`, newCommentText.trim());
         window.dispatchEvent(
           new CustomEvent("open_auth_modal", {
             detail: {
@@ -61,12 +103,12 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": currentUid,
+          "x-user-id": uid,
         },
         body: JSON.stringify({
           questionId: question.id,
           text: newCommentText.trim(),
-          userId: currentUid,
+          userId: uid,
         }),
       });
       const data = await res.json();
@@ -74,23 +116,39 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
         setComments((prev) => [data.comment, ...prev]);
         setNewCommentText("");
         if (typeof window !== "undefined") {
+          sessionStorage.removeItem(`qz_pending_comment_${question.id}`);
           window.dispatchEvent(
             new CustomEvent("qz_comment_added", {
               detail: { questionId: question.id },
             })
           );
         }
+      } else {
+        if (res.status === 401 || data.error?.toLowerCase().includes("sign in") || data.error?.toLowerCase().includes("unauthorized")) {
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem(`qz_pending_comment_${question.id}`, newCommentText.trim());
+            window.dispatchEvent(
+              new CustomEvent("open_auth_modal", {
+                detail: {
+                  reason: "Sign in to post your shortcut or mnemonic",
+                  mode: "signup",
+                },
+              })
+            );
+          }
+        }
+        setErrorMessage(data.error || "Failed to post comment. Please try again.");
       }
     } catch {
-      // Handled
+      setErrorMessage("Network error. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleVoteComment = async (commentId: string) => {
-    const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
-    if (!currentUid) {
+    const uid = getEffectiveUid();
+    if (!uid) {
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("open_auth_modal", {
@@ -192,8 +250,44 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
           )}
         </div>
 
+        {/* Error Feedback */}
+        {errorMessage && (
+          <div className="mb-2 p-2 rounded-xl bg-error-container/30 border border-error/30 text-error text-[11px] font-semibold flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[15px]">error</span>
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {/* Guest Sign-In Notice */}
+        {!currentUid && (
+          <div className="mb-2 p-2.5 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="material-symbols-outlined text-primary text-[18px]">lock</span>
+              <p className="text-[11px] text-on-surface truncate font-medium">Sign in to post tips & mnemonics</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(
+                    new CustomEvent("open_auth_modal", {
+                      detail: {
+                        reason: "Sign in to post your shortcut or mnemonic",
+                        mode: "signup",
+                      },
+                    })
+                  );
+                }
+              }}
+              className="px-2.5 py-1 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-primary-container shrink-0 shadow-xs active:scale-95 transition-all"
+            >
+              Sign In
+            </button>
+          </div>
+        )}
+
         {/* Input Form */}
-        <form onSubmit={handlePostComment} className="pt-3 border-t border-surface-container-high/40 flex items-center gap-2">
+        <form onSubmit={handlePostComment} className="pt-2 border-t border-surface-container-high/40 flex items-center gap-2">
           <input
             type="text"
             placeholder="Share shortcut, tip, or formula..."

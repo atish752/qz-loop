@@ -70,9 +70,10 @@ export async function POST(request: NextRequest) {
     if (!questionId || !text?.trim()) {
       return NextResponse.json({ success: false, error: "Question ID and comment text required" }, { status: 400 });
     }
-    const currentUid = userId || request.headers.get("x-user-id");
+    const cookieUserId = request.cookies.get("qz_user_id")?.value;
+    const currentUid = userId || request.headers.get("x-user-id") || cookieUserId;
     if (!currentUid || currentUid === "guest") {
-      return NextResponse.json({ success: false, error: "Unauthorized: User ID required" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Unauthorized: Please sign in to post comments" }, { status: 401 });
     }
 
     // Recover user profile from Supabase if not yet in memory

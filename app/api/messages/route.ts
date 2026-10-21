@@ -69,10 +69,12 @@ export async function GET(request: NextRequest) {
             const existingMsgs = db.getAllMessagesForUser(requestedUserId);
             if (!existingMsgs.some((m) => m.id === cm.id)) {
               db.sendMessage({
+                id: cm.id,
                 fromUserId: cm.from_user_id,
                 toUserId: cm.to_user_id,
                 text: cm.text,
                 questionId: cm.question_id || undefined,
+                created_at: cm.created_at,
               });
             }
           }

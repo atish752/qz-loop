@@ -131,6 +131,17 @@ export const SocialView: React.FC = () => {
     return () => window.removeEventListener("qz_auth_changed", checkAuth);
   }, []);
 
+  // Live polling for friends and messages synchronization
+  useEffect(() => {
+    const refresh = () => loadFriendsAndMessages();
+    const interval = setInterval(refresh, 3500);
+    window.addEventListener("qz_friends_changed", refresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("qz_friends_changed", refresh);
+    };
+  }, [user?.username]);
+
   // Load Friends List & All Messages
   const loadFriendsAndMessages = (uid?: string | null) => {
     const currentUid = uid !== undefined ? uid : (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null);
@@ -193,11 +204,29 @@ export const SocialView: React.FC = () => {
           if (!isMounted) return;
           if (data.success && data.messages) {
             setMessages((prev) => {
-              const pendingOptimistic = prev.filter((m) => m.id.startsWith("temp-"));
-              const stillPending = pendingOptimistic.filter(
-                (om) => !data.messages.some((sm: any) => sm.text === om.text && sm.from_user_id === om.from_user_id)
+              const serverMsgs = data.messages || [];
+              const pendingOptimistic = prev.filter(
+                (m) =>
+                  m.id.startsWith("temp-") &&
+                  !serverMsgs.some((sm: any) => sm.text === m.text && sm.from_user_id === m.from_user_id)
               );
-              return [...data.messages, ...stillPending];
+              const combined = [...serverMsgs, ...pendingOptimistic];
+              const uniqueMap = new Map<string, any>();
+              for (const m of combined) {
+                if (!uniqueMap.has(m.id)) {
+                  uniqueMap.set(m.id, m);
+                }
+              }
+              const next = Array.from(uniqueMap.values()).sort(
+                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+              );
+              if (
+                prev.length === next.length &&
+                prev.every((m, idx) => m.id === next[idx]?.id && m.text === next[idx]?.text)
+              ) {
+                return prev;
+              }
+              return next;
             });
             if (data.peers) {
               setPeerProfiles((prev) => ({ ...prev, ...data.peers }));
@@ -218,12 +247,14 @@ export const SocialView: React.FC = () => {
     };
   }, [selectedFriend, user?.id]);
 
-  // Scroll to bottom of chat on new message
+  // Scroll to bottom of chat only when new messages are added
+  const prevChatCountRef = useRef(0);
   useEffect(() => {
-    if (selectedFriend && chatBottomRef.current) {
+    if (selectedFriend && chatBottomRef.current && messages.length > prevChatCountRef.current) {
       chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, selectedFriend]);
+    prevChatCountRef.current = messages.length;
+  }, [messages.length, selectedFriend]);
 
   const [respondingId, setRespondingId] = useState<string | null>(null);
 
@@ -317,6 +348,9 @@ export const SocialView: React.FC = () => {
         setAddStatus({ type: "success", message: data.message || "Friend request sent!" });
         setAddInput("");
         loadFriendsAndMessages();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("qz_friends_changed"));
+        }
         const cleanTarget = targetUsernameOrName.trim().toLowerCase().replace(/^@/, "");
         // Update search results to reflect request_sent status (pending acceptance)
         setSearchResults((prev) =>
@@ -371,6 +405,9 @@ export const SocialView: React.FC = () => {
           })
         );
         loadFriendsAndMessages();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("qz_friends_changed"));
+        }
       }
     } catch {
       // ignore
@@ -383,7 +420,7 @@ export const SocialView: React.FC = () => {
   // Send Direct Chat Message with instant optimistic UI update
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInputText.trim() || !selectedFriend) return;
+    if (!chatInputText.trim() || !selectedFriend || isSendingMessage) return;
 
     const text = chatInputText.trim();
     const currentUid = user?.id || (typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null) || "user-current";
@@ -417,7 +454,16 @@ export const SocialView: React.FC = () => {
       });
       const data = await res.json();
       if (data.success && data.message) {
-        setMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
+        setMessages((prev) => {
+          const map = new Map<string, any>();
+          for (const m of prev) {
+            const finalMsg = m.id === tempId ? data.message : m;
+            map.set(finalMsg.id, finalMsg);
+          }
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        });
         setAllMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
       }
     } catch {
@@ -661,6 +707,81 @@ export const SocialView: React.FC = () => {
           </span>
         </div>
 
+        {/* Top-Level Incoming Friend Requests Alert Card */}
+        {(() => {
+          const incoming = friends.filter(
+            (f) => f.status === "pending_incoming" || f.status === "request_received"
+          );
+          if (incoming.length === 0) return null;
+          return (
+            <div className="mb-4 p-3 rounded-2xl bg-primary/10 border-2 border-primary/40 shadow-xs flex flex-col gap-2 animate-in slide-in-from-top duration-200">
+              <div className="flex items-center justify-between px-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[11px] font-black shadow-xs animate-pulse">
+                    {incoming.length}
+                  </span>
+                  <span className="font-bold text-xs text-on-surface">
+                    {lang === "hi"
+                      ? `आने वाले मित्रता अनुरोध (${incoming.length})`
+                      : `Incoming Friend Request (${incoming.length})`}
+                  </span>
+                </div>
+                <span className="text-[10px] text-primary font-bold">
+                  {lang === "hi" ? "स्वीकार करें" : "Accept to connect"}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                {incoming.map((req) => {
+                  const dispName = cleanDisplayName(req.display_name, req.username, req.id);
+                  const handle = cleanHandle(req.username, req.id);
+                  return (
+                    <div
+                      key={req.id}
+                      className="p-2.5 rounded-xl bg-surface-container-lowest border border-surface-container-high/60 flex items-center justify-between gap-2 shadow-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-full overflow-hidden bg-primary-fixed border border-primary/30 shrink-0">
+                          {req.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={req.avatar_url} alt={dispName} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center font-bold text-primary text-xs">
+                              {dispName.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold text-xs text-on-surface truncate">{dispName}</span>
+                          <span className="text-[11px] text-primary font-bold">@{handle}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleRespondFriendRequest(req.id, "accept")}
+                          disabled={respondingId === req.id}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">check</span>
+                          <span>{lang === "hi" ? "स्वीकार" : "Accept"}</span>
+                        </button>
+                        <button
+                          onClick={() => handleRespondFriendRequest(req.id, "decline")}
+                          disabled={respondingId === req.id}
+                          className="px-2.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:text-error hover:bg-surface-container-high font-semibold text-xs transition-all"
+                        >
+                          <span>{lang === "hi" ? "हटाएं" : "Decline"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 2 Primary Sub-Tabs: Chat (Default) and Friends */}
         <div className="flex items-center p-1 bg-surface-container-high rounded-xl gap-1 mb-4">
           <button
@@ -688,7 +809,7 @@ export const SocialView: React.FC = () => {
               setActiveTab("friends");
               setAddStatus(null);
             }}
-            className={`flex-1 py-2 rounded-lg font-label-md text-label-md text-center transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2 rounded-lg font-label-md text-label-md text-center transition-all flex items-center justify-center gap-1.5 relative ${
               activeTab === "friends"
                 ? "bg-primary-container text-on-primary shadow-sm font-bold"
                 : "text-secondary hover:text-on-surface font-medium"
@@ -696,9 +817,23 @@ export const SocialView: React.FC = () => {
           >
             <span className="material-symbols-outlined text-[18px]">group</span>
             <span>{t.friendsSubTab || "Friends"}</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === "friends" ? "bg-white/20 text-white" : "bg-surface-container text-secondary"}`}>
-              {friends.length}
-            </span>
+            {(() => {
+              const incomingCount = friends.filter(
+                (f) => f.status === "pending_incoming" || f.status === "request_received"
+              ).length;
+              if (incomingCount > 0) {
+                return (
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-red-600 text-white animate-pulse">
+                    {incomingCount}
+                  </span>
+                );
+              }
+              return (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === "friends" ? "bg-white/20 text-white" : "bg-surface-container text-secondary"}`}>
+                  {friends.length}
+                </span>
+              );
+            })()}
           </button>
         </div>
 

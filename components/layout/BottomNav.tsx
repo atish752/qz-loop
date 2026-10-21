@@ -11,6 +11,8 @@ export const BottomNav: React.FC = () => {
   const { t } = useAppLanguage();
   const [user, setUser] = useState<UserProfile | null>(null);
 
+  const [incomingRequestsCount, setIncomingRequestsCount] = useState<number>(0);
+
   useEffect(() => {
     const checkUser = () => {
       if (typeof window !== "undefined") {
@@ -38,6 +40,56 @@ export const BottomNav: React.FC = () => {
     checkUser();
     window.addEventListener("qz_auth_changed", checkUser);
     return () => window.removeEventListener("qz_auth_changed", checkUser);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchIncomingRequests = () => {
+      if (typeof window === "undefined") return;
+      let uid = localStorage.getItem("qz_user_id");
+      if (!uid || uid === "guest") {
+        const match = document.cookie.match(/(?:^|;\s*)qz_user_id=([^;]+)/);
+        if (match && match[1] && match[1] !== "guest") {
+          uid = decodeURIComponent(match[1]);
+        }
+      }
+      if (!uid || uid === "guest") {
+        try {
+          const cached = localStorage.getItem("qz_auth_user");
+          if (cached) {
+            const u = JSON.parse(cached);
+            if (u?.id && u.id !== "guest") uid = u.id;
+          }
+        } catch {}
+      }
+      if (!uid || uid === "guest") {
+        if (isMounted) setIncomingRequestsCount(0);
+        return;
+      }
+      fetch(`/api/friends?userId=${encodeURIComponent(uid)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (!isMounted) return;
+          if (d.success && Array.isArray(d.friends)) {
+            const count = d.friends.filter(
+              (f: any) => f.status === "pending_incoming" || f.status === "request_received"
+            ).length;
+            setIncomingRequestsCount(count);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchIncomingRequests();
+    const interval = setInterval(fetchIncomingRequests, 4000);
+    window.addEventListener("qz_friends_changed", fetchIncomingRequests);
+    window.addEventListener("qz_auth_changed", fetchIncomingRequests);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener("qz_friends_changed", fetchIncomingRequests);
+      window.removeEventListener("qz_auth_changed", fetchIncomingRequests);
+    };
   }, []);
 
   const isHome = pathname === "/" || pathname === "/home";
@@ -116,16 +168,23 @@ export const BottomNav: React.FC = () => {
           {/* 4. Social (Chat & Friends) - Replaced Ranks */}
           <Link
             href="/social"
-            className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 ${
+            className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 relative ${
               isSocial ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
             }`}
           >
-            <span
-              className="material-symbols-outlined text-[24px]"
-              style={isSocial ? { fontVariationSettings: "'FILL' 1" } : {}}
-            >
-              forum
-            </span>
+            <div className="relative flex items-center justify-center">
+              <span
+                className="material-symbols-outlined text-[24px]"
+                style={isSocial ? { fontVariationSettings: "'FILL' 1" } : {}}
+              >
+                forum
+              </span>
+              {incomingRequestsCount > 0 && (
+                <span className="absolute -top-1 -right-2.5 min-w-[17px] h-[17px] px-1 bg-red-600 text-white text-[10px] font-black rounded-full flex items-center justify-center ring-2 ring-surface shadow-xs animate-pulse">
+                  {incomingRequestsCount > 9 ? "9+" : incomingRequestsCount}
+                </span>
+              )}
+            </div>
             <span className="font-label-sm text-label-sm">{t.navSocial}</span>
           </Link>
 

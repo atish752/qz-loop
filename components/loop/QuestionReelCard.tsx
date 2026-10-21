@@ -1354,6 +1354,13 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           onSavedChange={(savedList) => setIsSaved(savedList.length > 0)}
         />
       )}
+      {!onOpenShareModal && (
+        <ShareFriendModal
+          question={question}
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
       {!onOpenCommentsModal && (
         <CommentsModal
           question={question}

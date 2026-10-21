@@ -105,16 +105,20 @@ export async function GET(request: NextRequest) {
             let effectiveStatus: "friend" | "request_sent" | "pending_incoming" = "friend";
             if (cf.status === "friend") {
               effectiveStatus = "friend";
-            } else if (cf.user_id === requestedUserId) {
-              effectiveStatus = "request_sent";
+            } else if (cf.status === "pending_incoming" || cf.status === "request_received") {
+              effectiveStatus = cf.user_id === requestedUserId ? "pending_incoming" : "request_sent";
+            } else if (cf.status === "request_sent") {
+              effectiveStatus = cf.user_id === requestedUserId ? "request_sent" : "pending_incoming";
             } else {
-              effectiveStatus = "pending_incoming";
+              effectiveStatus = cf.user_id === requestedUserId ? "request_sent" : "pending_incoming";
             }
 
             const friendProfile = db.getProfileById(peerId);
             const exists = localFriends.find((f) => f.id === peerId);
             if (exists) {
-              exists.status = effectiveStatus;
+              if (exists.status !== "friend") {
+                exists.status = effectiveStatus;
+              }
               if (friendProfile) {
                 exists.display_name = friendProfile.display_name;
                 exists.username = friendProfile.username;
@@ -122,18 +126,16 @@ export async function GET(request: NextRequest) {
                 exists.target_exam = friendProfile.target_exam || exists.target_exam;
               }
             } else {
-              if (friendProfile) {
-                localFriends.push({
-                  id: friendProfile.id,
-                  display_name: friendProfile.display_name,
-                  username: friendProfile.username,
-                  avatar_url: friendProfile.avatar_url,
-                  streak_days: friendProfile.current_streak,
-                  target_exam: friendProfile.target_exam || "NEET UG",
-                  status: effectiveStatus,
-                  last_active: "Active recently",
-                });
-              }
+              localFriends.push({
+                id: peerId,
+                display_name: friendProfile?.display_name || `Aspirant ${peerId.replace(/[^0-9a-zA-Z]/g, "").slice(0, 4).toUpperCase() || "Study"}`,
+                username: friendProfile?.username || `aspirant_${peerId.replace(/[^0-9a-zA-Z]/g, "").slice(0, 6)}`,
+                avatar_url: friendProfile?.avatar_url,
+                streak_days: friendProfile?.current_streak || 1,
+                target_exam: friendProfile?.target_exam || "NEET UG",
+                status: effectiveStatus,
+                last_active: "Active recently",
+              });
             }
           }
         }
@@ -218,7 +220,7 @@ export async function POST(request: NextRequest) {
       if (supabase && result.friend) {
         const myStatus = result.friend.status || "request_sent";
         const peerStatus = myStatus === "friend" ? "friend" : "pending_incoming";
-        await supabase.from("friendships").upsert(
+        const { error: upsertErr1 } = await supabase.from("friendships").upsert(
           {
             user_id: currentUserId,
             friend_id: result.friend.id,
@@ -226,8 +228,14 @@ export async function POST(request: NextRequest) {
           },
           { onConflict: "user_id,friend_id" }
         );
+        if (upsertErr1) {
+          try {
+            await supabase.from("friendships").delete().match({ user_id: currentUserId, friend_id: result.friend.id });
+            await supabase.from("friendships").insert({ user_id: currentUserId, friend_id: result.friend.id, status: myStatus });
+          } catch {}
+        }
         try {
-          await supabase.from("friendships").upsert(
+          const { error: upsertErr2 } = await supabase.from("friendships").upsert(
             {
               user_id: result.friend.id,
               friend_id: currentUserId,
@@ -235,6 +243,10 @@ export async function POST(request: NextRequest) {
             },
             { onConflict: "user_id,friend_id" }
           );
+          if (upsertErr2) {
+            await supabase.from("friendships").delete().match({ user_id: result.friend.id, friend_id: currentUserId });
+            await supabase.from("friendships").insert({ user_id: result.friend.id, friend_id: currentUserId, status: peerStatus });
+          }
         } catch {}
       }
     } catch (err) {
@@ -270,13 +282,25 @@ export async function PATCH(request: NextRequest) {
       const supabase = await createServerSupabaseClient();
       if (supabase) {
         if (action === "accept") {
-          await supabase.from("friendships").upsert(
+          const { error: patchErr } = await supabase.from("friendships").upsert(
             [
               { user_id: currentUserId, friend_id: friendId, status: "friend" },
               { user_id: friendId, friend_id: currentUserId, status: "friend" },
             ],
             { onConflict: "user_id,friend_id" }
           );
+          if (patchErr) {
+            try {
+              await supabase
+                .from("friendships")
+                .delete()
+                .or(`and(user_id.eq.${currentUserId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUserId})`);
+              await supabase.from("friendships").insert([
+                { user_id: currentUserId, friend_id: friendId, status: "friend" },
+                { user_id: friendId, friend_id: currentUserId, status: "friend" },
+              ]);
+            } catch {}
+          }
         } else {
           await supabase
             .from("friendships")
