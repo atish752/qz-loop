@@ -139,17 +139,9 @@ export async function GET(request: Request) {
           console.error("Supabase profiles table query/insert notice:", dbErr);
         }
 
-        // Determine if unique username onboarding is required
+        // Determine if unique username onboarding is required (strictly brand new signups without a username)
         const currentUname = username || existingProfile?.username || ("aspirant_" + user.id.slice(0, 6));
-        const isCustomHandle =
-          Boolean(currentUname) &&
-          !currentUname.startsWith("aspirant_") &&
-          currentUname.length >= 3;
-        const needsUsernameSetup =
-          isNewUser ||
-          !existingProfile ||
-          !existingProfile.onboarding_completed ||
-          !isCustomHandle;
+        const needsUsernameSetup = Boolean(isNewUser && (!existingProfile || !existingProfile.username));
 
         // Sync into application store
         const syncedUser = db.syncUserFromAuth({
@@ -219,7 +211,8 @@ export async function GET(request: Request) {
           : `localStorage.setItem("qz_onboarding_completed", "true");
       localStorage.setItem("qz_details_submitted", "true");
       localStorage.setItem("qz_onboarded_user_id", uid);
-      localStorage.removeItem("qz_needs_username");`
+      localStorage.removeItem("qz_needs_username");
+      localStorage.removeItem("qz_just_signed_up");`
       }
       document.cookie = "qz_user_id=" + uid + "; path=/; max-age=2592000; SameSite=Lax";
       window.dispatchEvent(new CustomEvent("qz_auth_changed", { detail: { user: profileData } }));

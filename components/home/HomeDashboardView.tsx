@@ -95,7 +95,7 @@ export const HomeDashboardView: React.FC = () => {
         if (data.success) setHabit(data.settings);
       })
       .catch(() => {});
-  }, [isLoggedIn]);
+  }, [isLoggedIn, refreshCount]);
 
   useEffect(() => {
     setIsLoading(true);

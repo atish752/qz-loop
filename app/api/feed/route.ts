@@ -79,11 +79,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Recover user's spaced repetition preferences from Supabase
+  // Recover user's spaced repetition preferences and attempts from Supabase
   if (requestedUserId && requestedUserId !== "guest") {
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase) {
+        // 1. Spaced Repetition Preferences
         const { data: cloudRepeatPrefs } = await supabase
           .from("question_repeat_preferences")
           .select("*")
@@ -96,6 +97,25 @@ export async function GET(request: NextRequest) {
               interval: p.interval,
               next_review_at: p.next_review_at,
               updated_at: p.updated_at,
+            });
+          }
+        }
+
+        // 2. Question Attempts (Required for lastAttemptByQ in getFeedQuestions)
+        const { data: cloudAttempts } = await supabase
+          .from("question_attempts")
+          .select("id, user_id, question_id, selected_option_id, is_correct, response_time_ms, created_at")
+          .eq("user_id", requestedUserId);
+        if (cloudAttempts && cloudAttempts.length > 0) {
+          for (const att of cloudAttempts) {
+            db.syncCloudAttempt({
+              id: att.id,
+              user_id: att.user_id,
+              question_id: att.question_id,
+              selected_option_id: att.selected_option_id,
+              is_correct: att.is_correct,
+              response_time_ms: att.response_time_ms,
+              created_at: att.created_at,
             });
           }
         }

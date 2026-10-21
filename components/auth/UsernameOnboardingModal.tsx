@@ -90,28 +90,30 @@ export const UsernameOnboardingModal: React.FC = () => {
               setEmail(data.user.email);
             }
 
+            const hasUsername = Boolean(data.user.username) && data.user.username.trim().length > 0;
             const hasCustomUname =
-              Boolean(data.user.username) &&
+              hasUsername &&
               !data.user.username.startsWith("aspirant_") &&
               data.user.username.length >= 3;
 
-            // Only mark complete if user has completed onboarding OR has chosen a custom unique username OR already onboarded
-            if (data.user.onboarding_completed || hasCustomUname || localStorage.getItem("qz_onboarded_user_id") === data.user.id) {
+            // Only mark complete if user has completed onboarding OR has a username OR already onboarded
+            if (data.user.onboarding_completed || hasUsername || localStorage.getItem("qz_onboarded_user_id") === data.user.id) {
               localStorage.setItem("qz_onboarding_completed", "true");
               localStorage.setItem("qz_details_submitted", "true");
               localStorage.setItem(`qz_onboarded_${data.user.id}`, "true");
               localStorage.setItem("qz_onboarded_user_id", data.user.id);
               localStorage.removeItem("qz_needs_username");
+              localStorage.removeItem("qz_just_signed_up");
               setIsOpen(false);
               return;
             }
 
-            // Only trigger for first-time signups explicitly needing a handle
+            // Only trigger for brand new signups explicitly needing a handle
             const isFirstTimeSignup =
               localStorage.getItem("qz_just_signed_up") === "true" ||
               localStorage.getItem("qz_needs_username") === "true";
 
-            if (isFirstTimeSignup && !hasCustomUname) {
+            if (isFirstTimeSignup && !hasUsername) {
               localStorage.setItem("qz_needs_username", "true");
               setIsOpen(true);
             } else {
@@ -222,6 +224,7 @@ export const UsernameOnboardingModal: React.FC = () => {
         localStorage.setItem("qz_auth_user", JSON.stringify(data.user));
         localStorage.setItem("qz_quiz_lang", languagePref);
         localStorage.removeItem("qz_needs_username");
+        localStorage.removeItem("qz_just_signed_up");
         localStorage.setItem("qz_onboarding_completed", "true");
         localStorage.setItem("qz_details_submitted", "true");
         localStorage.setItem(`qz_onboarded_${data.user.id}`, "true");

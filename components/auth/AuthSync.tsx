@@ -41,6 +41,7 @@ export const AuthSync: React.FC = () => {
                 localStorage.setItem(`qz_onboarded_${d.user.id}`, "true");
                 localStorage.setItem("qz_onboarded_user_id", d.user.id);
                 localStorage.removeItem("qz_needs_username");
+                localStorage.removeItem("qz_just_signed_up");
               } else if (localStorage.getItem("qz_just_signed_up") === "true") {
                 localStorage.setItem("qz_needs_username", "true");
               }
@@ -130,6 +131,7 @@ export const AuthSync: React.FC = () => {
                 localStorage.setItem(`qz_onboarded_${d.user.id}`, "true");
                 localStorage.setItem("qz_onboarded_user_id", d.user.id);
                 localStorage.removeItem("qz_needs_username");
+                localStorage.removeItem("qz_just_signed_up");
               } else if (localStorage.getItem("qz_just_signed_up") === "true") {
                 localStorage.setItem("qz_needs_username", "true");
               }

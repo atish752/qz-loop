@@ -60,11 +60,12 @@ export async function GET(request: NextRequest) {
 
     let user = db.getProfileById(requestedUserId) || null;
 
-    // Cloud recovery: if user is not in in-memory store, recover from Supabase
-    if (!user) {
-      try {
-        const supabase = await createServerSupabaseClient();
-        if (supabase) {
+    // Cloud recovery: if user is not in in-memory store or to sync attempts from Supabase
+    try {
+      const supabase = await createServerSupabaseClient();
+      if (supabase && requestedUserId) {
+        // 1. Recover profile if missing
+        if (!user) {
           const { data: dbProfile } = await supabase
             .from("profiles")
             .select("*")
@@ -83,6 +84,8 @@ export async function GET(request: NextRequest) {
               language_preference: dbProfile.language_preference,
               onboarding_completed: dbProfile.onboarding_completed,
             });
+            if (typeof dbProfile.current_streak === "number") user.current_streak = dbProfile.current_streak;
+            if (typeof dbProfile.daily_goal === "number") user.daily_goal = dbProfile.daily_goal;
           } else {
             const { data: authData } = await supabase.auth.getUser();
             if (authData?.user && authData.user.id === requestedUserId) {
@@ -98,9 +101,37 @@ export async function GET(request: NextRequest) {
             }
           }
         }
-      } catch (recoveryErr) {
-        console.error("Supabase profile recovery notice:", recoveryErr);
+
+        // 2. Hydrate user attempts to guarantee live metrics in serverless runtime
+        const { data: cloudAttempts } = await supabase
+          .from("question_attempts")
+          .select("id, user_id, question_id, selected_option_id, is_correct, response_time_ms, created_at")
+          .eq("user_id", requestedUserId);
+
+        if (cloudAttempts && cloudAttempts.length > 0) {
+          for (const att of cloudAttempts) {
+            db.syncCloudAttempt({
+              id: att.id,
+              user_id: att.user_id,
+              question_id: att.question_id,
+              selected_option_id: att.selected_option_id,
+              is_correct: att.is_correct,
+              response_time_ms: att.response_time_ms,
+              created_at: att.created_at,
+            });
+          }
+        }
       }
+    } catch (recoveryErr) {
+      console.error("Supabase profile recovery notice:", recoveryErr);
+    }
+
+    if (user) {
+      const lifetime = db.getUserLifetimeSummary(user.id);
+      const todayAttempts = db.getAttemptsInPeriod(user.id, "today");
+      user.total_questions_answered = lifetime.totalSolved;
+      user.overall_accuracy = lifetime.overallAccuracy;
+      user.today_solved_count = todayAttempts.length;
     }
 
     const exams = db.getExaminations();

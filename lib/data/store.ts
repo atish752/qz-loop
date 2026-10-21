@@ -678,7 +678,7 @@ class DataStore {
               eligibleForRevision.push({ ...q, is_repeat: true, repeat_at: repeatPref.next_review_at });
             }
           } else if (repeatPref.interval === "day") {
-            if (timeSinceAttempt >= 4 * MS_PER_HOUR) {
+            if (timeSinceAttempt >= 24 * MS_PER_HOUR) {
               eligibleForRevision.push({ ...q, is_repeat: true });
             }
           } else if (repeatPref.interval === "week") {
@@ -877,6 +877,9 @@ class DataStore {
         user.last_active_date = todayStr;
       }
       user.today_solved_count = (user.today_solved_count || 0) + 1;
+      const lifetime = this.getUserLifetimeSummary(user.id);
+      user.total_questions_answered = lifetime.totalSolved;
+      user.overall_accuracy = lifetime.overallAccuracy;
     }
 
     const accuracy = Math.round((q.correct_attempts / q.total_attempts) * 100);
@@ -965,7 +968,7 @@ class DataStore {
       }
     }
 
-    const isSimilar = highestScore >= 0.42;
+    const isSimilar = highestScore >= 0.50;
 
     return {
       is_exact_duplicate: isExact,
@@ -1174,7 +1177,7 @@ class DataStore {
     return date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // YYYY-MM-DD
   }
 
-  private getAttemptsInPeriod(userId: string, period: "today" | "week" | "month" | "lifetime"): QuestionAttempt[] {
+  public getAttemptsInPeriod(userId: string, period: "today" | "week" | "month" | "lifetime"): QuestionAttempt[] {
     const userAttempts = this.attempts.filter((a) => a.user_id === userId);
     if (period === "lifetime") return userAttempts;
 
@@ -1593,7 +1596,7 @@ class DataStore {
     let nextReviewMs = now.getTime();
     const isTest = typeof process !== "undefined" && (process.env.NODE_ENV === "test" || process.env.npm_lifecycle_event === "test");
     if (interval === "day") {
-      nextReviewMs += 4 * 3600 * 1000; // 4 hours / same day
+      nextReviewMs += 24 * 3600 * 1000; // 24 hours / next day
     } else if (interval === "week") {
       // Bring question within a week (randomized between 2 and 6 days)
       const randomDays = isTest ? 3 : 2 + Math.floor(Math.random() * 5);

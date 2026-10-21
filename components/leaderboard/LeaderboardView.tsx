@@ -131,7 +131,7 @@ export const LeaderboardView: React.FC = () => {
             <span className="material-symbols-outlined text-[40px] text-tertiary">military_tech</span>
             <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface">No Qualified Aspirants Yet</h3>
             <p className="font-body-md text-body-md text-secondary max-w-xs">
-              Complete at least 20 practice questions during this {period === "weekly" ? "week" : "month"} to earn your AIR Rank #1!
+              Complete practice questions during this {period === "weekly" ? "week" : "month"} to earn your AIR Rank #1!
             </p>
           </div>
         ) : (

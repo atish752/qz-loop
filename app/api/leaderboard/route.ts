@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
               stat.totalTimeMs += a.response_time_ms || 0;
             }
 
-            const QUALIFICATION_THRESHOLD = 20;
+            const QUALIFICATION_THRESHOLD = 1;
             const entries: LeaderboardEntry[] = [];
 
             userStats.forEach((stat, uId) => {
@@ -135,23 +135,29 @@ export async function GET(request: NextRequest) {
         (s) => !DUMMY_USER_IDS.has(s.user_id) && !DUMMY_USERNAMES.has(s.username || "")
       );
 
-      const qualified = filtered.filter((s) => s.is_qualified !== false);
-      qualified.forEach((s, idx) => {
+      // Rank any real non-dummy user with at least 1 verified attempt
+      const activeUsers = filtered.filter((s) => s.total_attempts >= 1);
+      activeUsers.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.accuracy_percentage !== a.accuracy_percentage) return b.accuracy_percentage - a.accuracy_percentage;
+        return a.avg_time_seconds - b.avg_time_seconds;
+      });
+      activeUsers.forEach((s, idx) => {
         s.rank = idx + 1;
+        s.is_qualified = true;
         if (resolvedUserId) {
           s.is_current_user = s.user_id === resolvedUserId;
         }
       });
-
-      const unqualified = filtered.filter((s) => s.is_qualified === false);
-      unqualified.forEach((s) => {
+      const zeroAttemptUsers = filtered.filter((s) => s.total_attempts === 0);
+      zeroAttemptUsers.forEach((s) => {
         s.rank = 0;
+        s.is_qualified = false;
         if (resolvedUserId) {
           s.is_current_user = s.user_id === resolvedUserId;
         }
       });
-
-      standings = [...qualified, ...unqualified];
+      standings = [...activeUsers, ...zeroAttemptUsers];
     }
 
     return NextResponse.json({
