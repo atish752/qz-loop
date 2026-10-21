@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/data/store";
 import { LeaderboardEntry } from "@/types/database";
 
-const DUMMY_USER_IDS = new Set(["user-amit", "user-priya", "user-vikram", "user-ananya"]);
-const DUMMY_USERNAMES = new Set(["amit_ssc", "priya_quant", "vikram_p", "ananya_r"]);
+const DUMMY_USER_IDS = new Set(["user-current", "user-amit", "user-priya", "user-vikram", "user-ananya"]);
+const DUMMY_USERNAMES = new Set(["rahul_cgl", "amit_ssc", "priya_quant", "vikram_p", "ananya_r"]);
 
 export async function GET(request: NextRequest) {
   try {

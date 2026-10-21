@@ -52,10 +52,11 @@ export const UsernameOnboardingModal: React.FC = () => {
         return;
       }
 
-      // If user is returning or signing in (not a brand new signup session), do not show
+      // Strictly only trigger for new users during a fresh signup session (only 1 time)
       const justSignedUp = localStorage.getItem("qz_just_signed_up") === "true";
       const needsUsername = localStorage.getItem("qz_needs_username") === "true";
-      if (!justSignedUp && !needsUsername) {
+      if (!justSignedUp) {
+        localStorage.removeItem("qz_needs_username");
         setIsOpen(false);
         return;
       }
@@ -66,7 +67,7 @@ export const UsernameOnboardingModal: React.FC = () => {
         try {
           const parsed = JSON.parse(cachedAuthUserRaw);
           cachedUsername = parsed.username || "";
-          if (parsed.onboarding_completed || (cachedUsername && !cachedUsername.startsWith("aspirant_") && cachedUsername.length >= 3) || !justSignedUp) {
+          if (parsed.onboarding_completed || (cachedUsername && !cachedUsername.startsWith("aspirant_") && cachedUsername.length >= 3)) {
             localStorage.setItem("qz_onboarding_completed", "true");
             localStorage.setItem("qz_details_submitted", "true");
             localStorage.setItem(`qz_onboarded_${uid}`, "true");
@@ -89,7 +90,8 @@ export const UsernameOnboardingModal: React.FC = () => {
             setUser(data.user);
             setExams(data.exams || []);
             setName(data.user.display_name || "");
-            setUsername(data.user.username || "");
+            const resolvedUsername = data.user.username || cachedUsername || "";
+            setUsername(resolvedUsername.startsWith("aspirant_") ? "" : resolvedUsername);
             setExamId(data.user.preferred_examination_id || "exam-neet-ug");
             if (data.user.language_preference) {
               setLanguagePref(data.user.language_preference);
@@ -107,8 +109,8 @@ export const UsernameOnboardingModal: React.FC = () => {
               !data.user.username.startsWith("aspirant_") &&
               data.user.username.length >= 3;
 
-            // Only mark complete if user has completed onboarding OR has a username OR already onboarded OR not a first-time signup
-            if (data.user.onboarding_completed || hasUsername || localStorage.getItem("qz_onboarded_user_id") === data.user.id || !justSignedUp) {
+            // Only mark complete if user has completed onboarding OR has a custom username OR already onboarded OR not a first-time signup
+            if (data.user.onboarding_completed || hasCustomUname || localStorage.getItem("qz_onboarded_user_id") === data.user.id || !justSignedUp) {
               localStorage.setItem("qz_onboarding_completed", "true");
               localStorage.setItem("qz_details_submitted", "true");
               localStorage.setItem(`qz_onboarded_${data.user.id}`, "true");
@@ -124,10 +126,12 @@ export const UsernameOnboardingModal: React.FC = () => {
               localStorage.getItem("qz_just_signed_up") === "true" ||
               localStorage.getItem("qz_needs_username") === "true";
 
-            if (isFirstTimeSignup && !hasUsername) {
+            if (isFirstTimeSignup && !hasCustomUname) {
               localStorage.setItem("qz_needs_username", "true");
               setIsOpen(true);
             } else {
+              localStorage.removeItem("qz_needs_username");
+              localStorage.removeItem("qz_just_signed_up");
               setIsOpen(false);
             }
           }

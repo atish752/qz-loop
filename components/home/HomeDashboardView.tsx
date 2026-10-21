@@ -78,11 +78,17 @@ export const HomeDashboardView: React.FC = () => {
         setTargetExamId(customEvent.detail.examId);
       }
     };
+    const handleAttemptSubmitted = () => {
+      setRefreshCount((prev) => prev + 1);
+    };
+
     window.addEventListener("qz_exam_changed", handleExamChanged);
     window.addEventListener("qz_auth_changed", checkAuth);
+    window.addEventListener("qz_attempt_submitted", handleAttemptSubmitted);
     return () => {
       window.removeEventListener("qz_exam_changed", handleExamChanged);
       window.removeEventListener("qz_auth_changed", checkAuth);
+      window.removeEventListener("qz_attempt_submitted", handleAttemptSubmitted);
     };
   }, [refreshCount]);
 
@@ -106,8 +112,54 @@ export const HomeDashboardView: React.FC = () => {
     fetch(url)
       .then((res) => res.json())
       .then((data) => {
-        if (data.success) {
-          setStats(data.stats);
+        if (data.success && data.stats) {
+          let finalStats = data.stats;
+          // Hydrate from client attempt cache if server stats returned 0 attempts
+          if (uid && typeof window !== "undefined") {
+            try {
+              const cachedRaw = localStorage.getItem(`qz_user_attempts_${uid}`);
+              if (cachedRaw) {
+                const localAttempts: Array<{
+                  id: string;
+                  user_id: string;
+                  question_id: string;
+                  is_correct: boolean;
+                  response_time_ms: number;
+                  created_at: string;
+                }> = JSON.parse(cachedRaw);
+
+                if (Array.isArray(localAttempts) && localAttempts.length > 0) {
+                  const now = Date.now();
+                  const filtered = localAttempts.filter((a) => {
+                    const diffMs = now - new Date(a.created_at).getTime();
+                    if (period === "today") return diffMs <= 86400000;
+                    if (period === "week") return diffMs <= 7 * 86400000;
+                    if (period === "month") return diffMs <= 30 * 86400000;
+                    return true;
+                  });
+
+                  if (filtered.length > (finalStats.total_solved || 0)) {
+                    const totalSolved = filtered.length;
+                    const correctCount = filtered.filter((a) => a.is_correct).length;
+                    const incorrectCount = totalSolved - correctCount;
+                    const accuracy = Math.round((correctCount / totalSolved) * 100);
+                    const totalTime = filtered.reduce((acc, a) => acc + (a.response_time_ms || 10000), 0);
+                    const avgTimeSec = Math.round(totalTime / totalSolved / 1000);
+
+                    finalStats = {
+                      ...finalStats,
+                      total_solved: totalSolved,
+                      correct_count: correctCount,
+                      incorrect_count: incorrectCount,
+                      accuracy_percentage: accuracy,
+                      avg_time_seconds: avgTimeSec,
+                    };
+                  }
+                }
+              }
+            } catch {}
+          }
+          setStats(finalStats);
         }
       })
       .catch(() => {})

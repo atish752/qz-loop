@@ -29,27 +29,43 @@ export async function POST(request: NextRequest) {
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase && resolvedUserId) {
-        const attemptId = (result as { attemptId?: string }).attemptId || `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-        const { error: insErr } = await supabase.from("question_attempts").insert({
-          id: attemptId,
+        // Ensure question stub exists in Supabase so foreign key constraints never fail
+        const qObj = db.getQuestionById(questionId);
+        if (qObj) {
+          try {
+            await supabase.from("questions").upsert({
+              id: qObj.id,
+              examination_id: qObj.examination_id || "exam-neet-ug",
+              subject_id: qObj.subject_id || "subj-neet-bio",
+              subject_name: qObj.subject_name || "Biology",
+              subject_slug: qObj.subject_slug || "biology",
+              question_text: qObj.question_text || "Practice Question",
+              correct_option_id: qObj.correct_option_id || "A",
+              options: qObj.options || [],
+              publication_status: "published",
+              moderation_status: "active",
+              normalized_fingerprint: qObj.normalized_fingerprint || qObj.id,
+            }, { onConflict: "id", ignoreDuplicates: true });
+          } catch {}
+        }
+
+        const validUuid = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : undefined;
+        const attemptPayload: Record<string, any> = {
           user_id: resolvedUserId,
           question_id: questionId,
           selected_option_id: selectedOptionId,
           is_correct: result.isCorrect,
           response_time_ms: typeof responseTimeMs === "number" ? responseTimeMs : 10000,
-        });
+        };
+        if (validUuid) {
+          attemptPayload.id = validUuid;
+        }
 
+        const { error: insErr } = await supabase.from("question_attempts").insert(attemptPayload);
         if (insErr) {
-          // If insert failed because of uuid format constraint, retry with fallback UUID
-          const fallbackUuid = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : undefined;
-          await supabase.from("question_attempts").insert({
-            ...(fallbackUuid ? { id: fallbackUuid } : {}),
-            user_id: resolvedUserId,
-            question_id: questionId,
-            selected_option_id: selectedOptionId,
-            is_correct: result.isCorrect,
-            response_time_ms: typeof responseTimeMs === "number" ? responseTimeMs : 10000,
-          });
+          // Fallback: omit explicit id and let Postgres default gen_random_uuid() populate it
+          delete attemptPayload.id;
+          await supabase.from("question_attempts").insert(attemptPayload);
         }
 
         const userProf = db.getProfileById(resolvedUserId);

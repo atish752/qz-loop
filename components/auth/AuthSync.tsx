@@ -12,6 +12,11 @@ export const AuthSync: React.FC = () => {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Purge any stale needs_username flag for returning / existing users
+    if (localStorage.getItem("qz_just_signed_up") !== "true") {
+      localStorage.removeItem("qz_needs_username");
+    }
+
     // 1. Cookie-to-LocalStorage Recovery
     const syncFromCookie = () => {
       const match = document.cookie.match(/(?:^|;\s*)qz_user_id=([^;]+)/);

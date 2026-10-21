@@ -307,6 +307,42 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
     };
   }, [isActive, isAnswered]);
 
+  // Listen for pinned bottom bar events from parent container
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleOpenAnswer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId?: string }>;
+      if (!customEvent.detail?.questionId || customEvent.detail.questionId === question.id) {
+        setShowOptions(true);
+      }
+    };
+
+    const handleHideAnswer = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId?: string }>;
+      if (!customEvent.detail?.questionId || customEvent.detail.questionId === question.id) {
+        setShowOptions(false);
+      }
+    };
+
+    const handleOpenSolution = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId?: string }>;
+      if (!customEvent.detail?.questionId || customEvent.detail.questionId === question.id) {
+        setShowPostAnswerModal(true);
+      }
+    };
+
+    window.addEventListener("qz_open_answer_options", handleOpenAnswer);
+    window.addEventListener("qz_hide_answer_options", handleHideAnswer);
+    window.addEventListener("qz_open_solution_modal", handleOpenSolution);
+
+    return () => {
+      window.removeEventListener("qz_open_answer_options", handleOpenAnswer);
+      window.removeEventListener("qz_hide_answer_options", handleHideAnswer);
+      window.removeEventListener("qz_open_solution_modal", handleOpenSolution);
+    };
+  }, [isActive, question.id]);
+
   // Register answering status with parent so swipe interception can check!
   useEffect(() => {
     if (onRegisterAnsweringStatus && isActive) {
@@ -416,6 +452,23 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         }
 
         if (typeof window !== "undefined") {
+          if (currentUid) {
+            try {
+              const storageKey = `qz_user_attempts_${currentUid}`;
+              const existingRaw = localStorage.getItem(storageKey);
+              const list = existingRaw ? JSON.parse(existingRaw) : [];
+              list.push({
+                id: data.attemptId || `att-${Date.now()}`,
+                user_id: currentUid,
+                question_id: question.id,
+                selected_option_id: optionId,
+                is_correct: data.isCorrect,
+                response_time_ms: finalElapsedMs,
+                created_at: new Date().toISOString(),
+              });
+              localStorage.setItem(storageKey, JSON.stringify(list));
+            } catch {}
+          }
           window.dispatchEvent(
             new CustomEvent("qz_attempt_submitted", {
               detail: {

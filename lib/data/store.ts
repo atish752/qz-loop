@@ -692,11 +692,11 @@ class DataStore {
               eligibleForRevision.push({ ...q, is_repeat: true });
             }
           } else if (repeatPref.interval === "week") {
-            if (timeSinceAttempt >= 2 * MS_PER_DAY) {
+            if (timeSinceAttempt >= 7 * MS_PER_DAY) {
               eligibleForRevision.push({ ...q, is_repeat: true });
             }
           } else if (repeatPref.interval === "month") {
-            if (timeSinceAttempt >= 14 * MS_PER_DAY) {
+            if (timeSinceAttempt >= 30 * MS_PER_DAY) {
               eligibleForRevision.push({ ...q, is_repeat: true });
             }
           }
@@ -983,7 +983,8 @@ class DataStore {
       }
     }
 
-    const isSimilar = highestScore >= 0.50;
+    const threshold = correctAnswerText ? 0.55 : 0.50;
+    const isSimilar = highestScore >= threshold;
 
     return {
       is_exact_duplicate: isExact,
@@ -1134,6 +1135,14 @@ class DataStore {
     );
     if (!exists) {
       this.attempts.push(att);
+      const user = this.profiles.find((p) => p.id === att.user_id);
+      if (user) {
+        const lifetime = this.getUserLifetimeSummary(user.id);
+        const todayAttempts = this.getAttemptsInPeriod(user.id, "today");
+        user.total_questions_answered = lifetime.totalSolved;
+        user.overall_accuracy = lifetime.overallAccuracy;
+        user.today_solved_count = todayAttempts.length;
+      }
     }
   }
 

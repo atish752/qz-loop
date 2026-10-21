@@ -187,8 +187,8 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in overflow-hidden">
-      <div className="w-full max-w-md bg-surface-container-lowest rounded-3xl p-4 sm:p-5 shadow-2xl border border-surface-container-high/60 flex flex-col h-[82dvh] max-h-[580px] animate-in zoom-in-95 duration-200 my-auto">
+    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in overflow-hidden">
+      <div className="w-full max-w-md bg-surface-container-lowest rounded-t-3xl sm:rounded-3xl p-4 sm:p-5 shadow-2xl border-t sm:border border-surface-container-high/60 flex flex-col h-[82dvh] max-h-[580px] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40 shrink-0">
           <div className="flex items-center gap-2">
@@ -287,7 +287,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
         )}
 
         {/* Input Form */}
-        <form onSubmit={handlePostComment} className="pt-2.5 pb-[max(0.25rem,env(safe-area-inset-bottom))] border-t border-surface-container-high/40 flex items-center gap-2 shrink-0 w-full">
+        <form onSubmit={handlePostComment} className="sticky bottom-0 bg-surface-container-lowest pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-surface-container-high/40 flex items-center gap-2 shrink-0 w-full z-10">
           <input
             type="text"
             placeholder="Share shortcut, tip, or formula..."
@@ -298,7 +298,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
           <button
             type="submit"
             disabled={isSubmitting || !newCommentText.trim()}
-            className="px-4 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs disabled:opacity-40 hover:bg-primary-container active:scale-95 transition-all"
+            className="px-4 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs disabled:opacity-40 hover:bg-primary-container active:scale-95 transition-all shrink-0 cursor-pointer"
           >
             {isSubmitting ? "..." : "Post"}
           </button>
