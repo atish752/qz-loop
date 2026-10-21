@@ -34,37 +34,38 @@ export const UsernameOnboardingModal: React.FC = () => {
 
     const checkOnboardingState = () => {
       const uid = localStorage.getItem("qz_user_id");
-      if (!uid) {
+      if (!uid || uid === "guest") {
         setIsOpen(false);
         return;
       }
 
-      const needsUsername = localStorage.getItem("qz_needs_username") === "true";
+      const onboardedUid = localStorage.getItem("qz_onboarded_user_id");
+      const onboardingCompleted = localStorage.getItem("qz_onboarding_completed") === "true";
+      const userSpecificOnboarded = localStorage.getItem(`qz_onboarded_${uid}`) === "true";
+      const detailsSubmitted = localStorage.getItem("qz_details_submitted") === "true";
+
+      // If user has already completed onboarding for this account, do not show
+      if (onboardedUid === uid || userSpecificOnboarded || (onboardingCompleted && detailsSubmitted)) {
+        setIsOpen(false);
+        return;
+      }
+
       const cachedAuthUserRaw = localStorage.getItem("qz_auth_user");
       let cachedUsername = "";
       if (cachedAuthUserRaw) {
         try {
           const parsed = JSON.parse(cachedAuthUserRaw);
           cachedUsername = parsed.username || "";
+          if (parsed.onboarding_completed || (cachedUsername && !cachedUsername.startsWith("aspirant_") && cachedUsername.length >= 3)) {
+            localStorage.setItem("qz_onboarding_completed", "true");
+            localStorage.setItem("qz_details_submitted", "true");
+            localStorage.setItem(`qz_onboarded_${uid}`, "true");
+            localStorage.setItem("qz_onboarded_user_id", uid);
+            localStorage.removeItem("qz_needs_username");
+            setIsOpen(false);
+            return;
+          }
         } catch {}
-      }
-      const hasCustomCachedUsername =
-        Boolean(cachedUsername) &&
-        !cachedUsername.startsWith("aspirant_") &&
-        cachedUsername.length >= 3;
-
-      // Persistent guard: Stop re-prompting only if details already saved for this specific user AND username is custom
-      const completed =
-        !needsUsername &&
-        hasCustomCachedUsername &&
-        (localStorage.getItem("qz_onboarding_completed") === "true" ||
-          localStorage.getItem("qz_details_submitted") === "true") &&
-        (localStorage.getItem("qz_onboarded_user_id") === uid ||
-          localStorage.getItem(`qz_onboarded_${uid}`) === "true");
-
-      if (completed) {
-        setIsOpen(false);
-        return;
       }
 
       const url = `/api/profile?userId=${encodeURIComponent(uid)}`;
@@ -77,6 +78,7 @@ export const UsernameOnboardingModal: React.FC = () => {
             setUser(data.user);
             setExams(data.exams || []);
             setName(data.user.display_name || "");
+            setUsername(data.user.username || "");
             setExamId(data.user.preferred_examination_id || "exam-neet-ug");
             if (data.user.language_preference) {
               setLanguagePref(data.user.language_preference);
@@ -93,8 +95,8 @@ export const UsernameOnboardingModal: React.FC = () => {
               !data.user.username.startsWith("aspirant_") &&
               data.user.username.length >= 3;
 
-            // Only mark complete if user has completed onboarding AND chosen a custom unique username
-            if (data.user.onboarding_completed && hasCustomUname && !needsUsername) {
+            // Only mark complete if user has completed onboarding OR has chosen a custom unique username OR already onboarded
+            if (data.user.onboarding_completed || hasCustomUname || localStorage.getItem("qz_onboarded_user_id") === data.user.id) {
               localStorage.setItem("qz_onboarding_completed", "true");
               localStorage.setItem("qz_details_submitted", "true");
               localStorage.setItem(`qz_onboarded_${data.user.id}`, "true");
@@ -104,9 +106,17 @@ export const UsernameOnboardingModal: React.FC = () => {
               return;
             }
 
-            // Force unique username setup for first-time signups
-            localStorage.setItem("qz_needs_username", "true");
-            setIsOpen(true);
+            // Only trigger for first-time signups explicitly needing a handle
+            const isFirstTimeSignup =
+              localStorage.getItem("qz_just_signed_up") === "true" ||
+              localStorage.getItem("qz_needs_username") === "true";
+
+            if (isFirstTimeSignup && !hasCustomUname) {
+              localStorage.setItem("qz_needs_username", "true");
+              setIsOpen(true);
+            } else {
+              setIsOpen(false);
+            }
           }
         })
         .catch(() => {});

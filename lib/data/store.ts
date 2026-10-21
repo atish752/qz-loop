@@ -620,11 +620,21 @@ class DataStore {
     if (pool.length === 0) {
       if (hasExamQuestions) {
         pool = this.questions.filter(
-          (q) => q.examination_id === examId && q.publication_status === "published" && q.moderation_status === "active" && !userHiddenIds.has(q.id)
+          (q) =>
+            q.examination_id === examId &&
+            q.publication_status === "published" &&
+            q.moderation_status === "active" &&
+            !userHiddenIds.has(q.id) &&
+            (!userId || this.repeatPreferences.get(`${userId}:${q.id}`)?.interval !== "never")
         );
       } else {
         pool = this.questions.filter(
-          (q) => q.examination_id === "exam-neet-ug" && q.publication_status === "published" && q.moderation_status === "active" && !userHiddenIds.has(q.id)
+          (q) =>
+            q.examination_id === "exam-neet-ug" &&
+            q.publication_status === "published" &&
+            q.moderation_status === "active" &&
+            !userHiddenIds.has(q.id) &&
+            (!userId || this.repeatPreferences.get(`${userId}:${q.id}`)?.interval !== "never")
         );
       }
     }
@@ -888,7 +898,7 @@ class DataStore {
   }
 
   // --- Duplicate Detection (Layers 1, 2 & 3) ---
-  public checkDuplicate(questionText: string, optionsText?: string[]): DuplicateCheckResult {
+  public checkDuplicate(questionText: string, optionsText?: string[], correctAnswerText?: string): DuplicateCheckResult {
     const cleaned = cleanText(questionText);
     const inputFp = normalizeTextFingerprint(cleaned);
 
@@ -896,12 +906,29 @@ class DataStore {
       return { is_exact_duplicate: false, is_similar: false, similarity_score: 0 };
     }
 
+    const cleanInputAns = correctAnswerText ? cleanText(correctAnswerText) : "";
+    const inputAnsFp = cleanInputAns ? normalizeTextFingerprint(cleanInputAns) : "";
+
     let highestScore = 0;
     let matchedQ: Question | undefined;
     let isExact = false;
 
     for (const q of this.questions) {
       if (q.publication_status !== "published") continue;
+
+      // If caller provided non-empty correctAnswerText, require answers to match
+      if (inputAnsFp && inputAnsFp.length > 0) {
+        const qCorrectOpt = q.options?.find((o) => o.id === q.correct_option_id);
+        const qCorrectAns = qCorrectOpt?.text || "";
+        const qAnsFp = normalizeTextFingerprint(cleanText(qCorrectAns));
+        if (qAnsFp && qAnsFp.length > 0) {
+          const ansSim = checkSimilarity(cleanInputAns, qCorrectAns);
+          const answersMatch = inputAnsFp === qAnsFp || ansSim.score >= 0.75;
+          if (!answersMatch) {
+            continue;
+          }
+        }
+      }
 
       // Layer 1: Exact Normalized Fingerprint
       if (q.normalized_fingerprint === inputFp) {
@@ -1026,7 +1053,9 @@ class DataStore {
     }
 
     // Server-side duplicate check
-    const dupCheck = this.checkDuplicate(cleanedText);
+    const correctOpt = sanitizedOptions.find((o) => o.id === params.correctOptionId);
+    const correctAnsText = correctOpt ? correctOpt.text : undefined;
+    const dupCheck = this.checkDuplicate(cleanedText, sanitizedOptions.map((o) => o.text), correctAnsText);
     if (dupCheck.is_exact_duplicate) {
       throw new Error("Exact duplicate question already exists in the system");
     }
@@ -1079,6 +1108,20 @@ class DataStore {
     if (idx === -1) {
       this.questions.unshift(q);
     }
+  }
+
+  public syncCloudAttempt(att: QuestionAttempt): void {
+    const exists = this.attempts.some(
+      (a) => a.id === att.id || (a.user_id === att.user_id && a.question_id === att.question_id && a.created_at === att.created_at)
+    );
+    if (!exists) {
+      this.attempts.push(att);
+    }
+  }
+
+  public syncCloudRepeatPreference(pref: QuestionRepeatPreference): void {
+    const key = `${pref.user_id}:${pref.question_id}`;
+    this.repeatPreferences.set(key, pref);
   }
 
   // --- Hide and Restore Questions ---

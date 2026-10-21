@@ -15,7 +15,11 @@ export const LeaderboardView: React.FC = () => {
 
   useEffect(() => {
     setIsLoading(true);
-    fetch(`/api/leaderboard?period=${period}`)
+    const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+    const url = uid
+      ? `/api/leaderboard?period=${period}&userId=${encodeURIComponent(uid)}`
+      : `/api/leaderboard?period=${period}`;
+    fetch(url)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {

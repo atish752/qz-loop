@@ -212,8 +212,8 @@ export const SavePlaylistModal: React.FC<SavePlaylistModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-md bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in overflow-y-auto">
+      <div className="w-full max-w-md bg-surface-container-lowest rounded-3xl p-5 sm:p-6 shadow-2xl border border-surface-container-high/60 flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-200 my-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
           <div className="flex items-center gap-2">

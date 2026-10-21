@@ -79,6 +79,32 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Recover user's spaced repetition preferences from Supabase
+  if (requestedUserId && requestedUserId !== "guest") {
+    try {
+      const supabase = await createServerSupabaseClient();
+      if (supabase) {
+        const { data: cloudRepeatPrefs } = await supabase
+          .from("question_repeat_preferences")
+          .select("*")
+          .eq("user_id", requestedUserId);
+        if (cloudRepeatPrefs && cloudRepeatPrefs.length > 0) {
+          for (const p of cloudRepeatPrefs) {
+            db.syncCloudRepeatPreference({
+              user_id: p.user_id,
+              question_id: p.question_id,
+              interval: p.interval,
+              next_review_at: p.next_review_at,
+              updated_at: p.updated_at,
+            });
+          }
+        }
+      }
+    } catch {
+      // best-effort
+    }
+  }
+
     const questions = db.getFeedQuestions({
       userId: requestedUserId || undefined,
       examId,

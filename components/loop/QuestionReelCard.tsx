@@ -390,6 +390,19 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             record: answerRecord,
           });
         }
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("qz_attempt_submitted", {
+              detail: {
+                questionId: question.id,
+                isCorrect: data.isCorrect,
+                responseTimeMs: finalElapsedMs,
+                userId: currentUid,
+              },
+            })
+          );
+        }
       } else {
         setSubmitError(data.error || "Submission failed. Please retry.");
       }
@@ -656,7 +669,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       </div>
 
       {/* 2. Main Question Card Body + Floating Action Bar on the Right */}
-      <div className="relative flex-1 flex flex-col justify-center py-2 pr-16 sm:pr-20 min-h-0 overflow-hidden">
+      <div className="relative flex-1 flex flex-col justify-center pt-2 pb-24 pr-16 sm:pr-20 min-h-0 overflow-hidden">
 
         {/* Prominent Repeat Question Badge if resurfaced via Spaced Repetition */}
         {question.is_repeat && (
@@ -991,7 +1004,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             <span className="text-[11px] font-bold text-secondary mt-0.5">{commentsCount}</span>
           </button>
 
-          {/* Share / Friends Button */}
+          {/* Share / Friends Button (Vibrant Green) */}
           <button
             onClick={() => {
               if (onOpenShareModal) {
@@ -1001,24 +1014,12 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               }
             }}
             className="flex flex-col items-center group active:scale-90 transition-transform"
-            title="Share to study friends"
+            title="Share to study friends & WhatsApp"
           >
-            <div className="w-10 h-10 rounded-full bg-surface-container-low text-secondary hover:text-primary hover:bg-surface-container flex items-center justify-center transition-all">
-              <span className="material-symbols-outlined text-[22px]">send</span>
+            <div className="w-10 h-10 rounded-full bg-emerald-500/15 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/25 flex items-center justify-center transition-all shadow-sm">
+              <span className="material-symbols-outlined text-[22px] text-emerald-500">send</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary mt-0.5">Share</span>
-          </button>
-
-          {/* WhatsApp Direct Challenge Share Button */}
-          <button
-            onClick={handleDirectWhatsAppShare}
-            className="flex flex-col items-center group active:scale-90 transition-transform"
-            title="Challenge friends on WhatsApp"
-          >
-            <div className="w-10 h-10 rounded-full bg-[#25D366]/20 text-[#25D366] hover:bg-[#25D366] hover:text-white flex items-center justify-center transition-all shadow-sm">
-              <span className="material-symbols-outlined text-[22px]">share</span>
-            </div>
-            <span className="text-[10px] font-bold text-[#25D366] mt-0.5">WhatsApp</span>
+            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">Share</span>
           </button>
 
           {/* Instagram-Style Bookmark / Collection Button */}
@@ -1092,12 +1093,30 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           </div>
         )}
 
+        {showOptions && !isAnswered && (
+          <div className="w-full">
+            <div className="w-full h-11 px-3 rounded-xl bg-surface-container-high/80 text-secondary border border-surface-container-high flex items-center justify-between text-xs font-semibold">
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[18px] text-primary">touch_app</span>
+                <span>{selectedOptionId ? `Selected Option ${selectedOptionId}` : (t.answerQuestion || "Answer & Learn") + " · Select Option"}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowOptions(false)}
+                className="text-[11px] text-primary hover:underline font-bold"
+              >
+                Hide
+              </button>
+            </div>
+          </div>
+        )}
+
         {isAnswered && (
           <div className="w-full">
             <button
               type="button"
               onClick={() => setShowPostAnswerModal(true)}
-              className="w-full h-10 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-2xs group"
+              className="w-full h-11 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-2xs group"
             >
               <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">bolt</span>
               <span>{lang === "hi" ? "समाधान व दोहराव (Quick Proof)" : "Quick Proof & Solution"}</span>

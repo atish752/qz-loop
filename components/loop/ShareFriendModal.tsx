@@ -17,7 +17,18 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
   onClose,
   onOpenChatWithFriend,
 }) => {
-  const [friends, setFriends] = useState<FriendUser[]>([]);
+  const [friends, setFriends] = useState<FriendUser[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("qz_cached_friends");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
   const [sentMap, setSentMap] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
@@ -74,6 +85,18 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      if (typeof window !== "undefined") {
+        try {
+          const cached = localStorage.getItem("qz_cached_friends");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setFriends(parsed);
+            }
+          }
+        } catch {}
+      }
+
       const currentUid = getEffectiveUid();
       let myUsername = "";
       if (typeof window !== "undefined") {
@@ -96,6 +119,11 @@ export const ShareFriendModal: React.FC<ShareFriendModalProps> = ({
                 (!myUsername || f.username?.toLowerCase() !== myUsername)
             );
             setFriends(accepted);
+            if (typeof window !== "undefined") {
+              try {
+                localStorage.setItem("qz_cached_friends", JSON.stringify(accepted));
+              } catch {}
+            }
           }
         })
         .catch(() => {});

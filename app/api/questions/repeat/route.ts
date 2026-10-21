@@ -24,6 +24,23 @@ export async function POST(request: NextRequest) {
     }
     const pref = db.setQuestionRepeatInterval(requestedUserId, questionId, interval);
 
+    // Persist to Supabase
+    try {
+      const { createServerSupabaseClient } = await import("@/lib/supabase/server");
+      const supabase = await createServerSupabaseClient();
+      if (supabase && requestedUserId) {
+        await supabase.from("question_repeat_preferences").upsert({
+          user_id: requestedUserId,
+          question_id: questionId,
+          interval: pref.interval,
+          next_review_at: pref.next_review_at || null,
+          updated_at: pref.updated_at,
+        }, { onConflict: "user_id,question_id" });
+      }
+    } catch (sbErr) {
+      console.error("Supabase repeat pref persistence notice:", sbErr);
+    }
+
     return NextResponse.json({
       success: true,
       preference: pref,

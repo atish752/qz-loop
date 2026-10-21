@@ -25,6 +25,20 @@ export const HomeDashboardView: React.FC = () => {
   const [targetExamId, setTargetExamId] = useState<string>("exam-neet-ug");
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
 
+  const [refreshCount, setRefreshCount] = useState<number>(0);
+
+  useEffect(() => {
+    const handleAttemptSubmitted = () => {
+      setRefreshCount((c) => c + 1);
+    };
+    window.addEventListener("qz_attempt_submitted", handleAttemptSubmitted);
+    window.addEventListener("focus", handleAttemptSubmitted);
+    return () => {
+      window.removeEventListener("qz_attempt_submitted", handleAttemptSubmitted);
+      window.removeEventListener("focus", handleAttemptSubmitted);
+    };
+  }, []);
+
   // Check auth and load user profile & matrix stats
   useEffect(() => {
     const checkAuth = () => {
@@ -70,7 +84,7 @@ export const HomeDashboardView: React.FC = () => {
       window.removeEventListener("qz_exam_changed", handleExamChanged);
       window.removeEventListener("qz_auth_changed", checkAuth);
     };
-  }, []);
+  }, [refreshCount]);
 
   useEffect(() => {
     const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
@@ -98,7 +112,7 @@ export const HomeDashboardView: React.FC = () => {
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, [period, isLoggedIn]);
+  }, [period, isLoggedIn, refreshCount]);
 
   const handleShare = async () => {
     if (!stats) return;

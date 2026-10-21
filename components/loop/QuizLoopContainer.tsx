@@ -313,6 +313,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
       const startParam = params.get("start");
       const examParam = params.get("examId");
 
+      const playlistParam = params.get("playlist");
+      const shuffleParam = params.get("shuffle") === "true";
+
       if (qParam) {
         fetch(`/api/questions/${qParam}`)
           .then((res) => res.json())
@@ -321,6 +324,48 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               setQuestions([data.question]);
               setCurrentIndex(0);
               setIsStarted(true);
+            }
+          })
+          .catch(() => {});
+      } else if (playlistParam || sessionStorage.getItem("qz_shuffle_playlist_ids")) {
+        const storedIdsRaw = sessionStorage.getItem("qz_shuffle_playlist_ids");
+        sessionStorage.removeItem("qz_shuffle_playlist_ids");
+        const uid = localStorage.getItem("qz_user_id");
+        const colUrl = uid
+          ? `/api/collections?includeQuestions=true&userId=${encodeURIComponent(uid)}`
+          : "/api/collections?includeQuestions=true";
+        fetch(colUrl)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success && data.collections) {
+              let playlistQuestions: Question[] = [];
+              if (storedIdsRaw) {
+                try {
+                  const targetIds = JSON.parse(storedIdsRaw);
+                  const allColQuestions = (data.collections as { questions?: Question[] }[])
+                    .flatMap((c) => c.questions || []);
+                  playlistQuestions = allColQuestions.filter((q) => targetIds.includes(q.id));
+                } catch {}
+              } else if (playlistParam === "all") {
+                playlistQuestions = (data.collections as { questions?: Question[] }[])
+                  .flatMap((c) => c.questions || []);
+              } else {
+                const targetCol = (data.collections as { id: string; questions?: Question[] }[])
+                  .find((c) => c.id === playlistParam);
+                playlistQuestions = targetCol?.questions || [];
+              }
+
+              if (playlistQuestions.length > 0) {
+                if (shuffleParam) {
+                  for (let i = playlistQuestions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [playlistQuestions[i], playlistQuestions[j]] = [playlistQuestions[j], playlistQuestions[i]];
+                  }
+                }
+                setQuestions(playlistQuestions);
+                setCurrentIndex(0);
+                setIsStarted(true);
+              }
             }
           })
           .catch(() => {});

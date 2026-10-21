@@ -529,7 +529,7 @@ export const CreateQuestionView: React.FC = () => {
   };
 
   // 4. Debounced duplicate detection
-  const checkDuplicateQuestion = useCallback(async (text: string) => {
+  const checkDuplicateQuestion = useCallback(async (text: string, currentOptions?: string[], currentCorrectAnswer?: string) => {
     if (!text || text.trim().length < 8 || isEditMode) {
       setDuplicateResult(null);
       return;
@@ -540,7 +540,11 @@ export const CreateQuestionView: React.FC = () => {
       const res = await fetch("/api/questions/check-duplicate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionText: text }),
+        body: JSON.stringify({
+          questionText: text,
+          options: currentOptions,
+          correctAnswerText: currentCorrectAnswer,
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -555,7 +559,9 @@ export const CreateQuestionView: React.FC = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      checkDuplicateQuestion(questionText);
+      const optIdx = ["A", "B", "C", "D"].indexOf(correctOptionId);
+      const correctAns = optIdx >= 0 && options[optIdx] ? options[optIdx] : "";
+      checkDuplicateQuestion(questionText, options, correctAns);
       const textToAnalyze = questionText.trim() || hindiQuestionText.trim();
       if (textToAnalyze.length >= 8 && !isEditMode) {
         const detected = detectTopicAndSyllabus(textToAnalyze);
@@ -583,7 +589,7 @@ export const CreateQuestionView: React.FC = () => {
     }, 450);
 
     return () => clearTimeout(timer);
-  }, [questionText, hindiQuestionText, checkDuplicateQuestion, isEditMode, currentExamSubjects, dynamicTopics]);
+  }, [questionText, hindiQuestionText, options, correctOptionId, checkDuplicateQuestion, isEditMode, currentExamSubjects, dynamicTopics]);
 
   const handleOptionChange = (index: number, val: string) => {
     const updated: [string, string, string, string] = [...options];
@@ -1482,22 +1488,40 @@ export const CreateQuestionView: React.FC = () => {
                       +25 Rep Points
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                  <div className="grid grid-flow-col auto-cols-fr gap-2 w-full py-0.5">
                     {currentExamSubjects.map((s) => {
                       const isSelected = selectedSubjectId === s.id;
+                      const shortLabel =
+                        s.slug === "biology"
+                          ? "Bio"
+                          : s.slug === "chemistry"
+                          ? "Chem"
+                          : s.slug === "physics"
+                          ? "Phy"
+                          : s.slug === "maths"
+                          ? "Maths"
+                          : s.slug === "reasoning"
+                          ? "Reasoning"
+                          : s.slug === "english"
+                          ? "English"
+                          : s.slug === "science"
+                          ? "Science"
+                          : s.slug === "gk"
+                          ? "GK"
+                          : s.name;
                       return (
                         <button
                           key={s.id}
                           type="button"
                           onClick={() => handleSubjectSelect(s.id)}
-                          className={`px-3.5 py-2 rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 shrink-0 ${
+                          className={`py-2 px-2 rounded-xl font-label-md text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 min-w-0 ${
                             isSelected
-                              ? "bg-primary text-on-primary shadow-sm font-bold scale-[1.02]"
+                              ? "bg-primary text-on-primary shadow-sm font-bold scale-[1.01]"
                               : "bg-surface-container text-secondary hover:text-on-surface"
                           }`}
                         >
-                          <span className="material-symbols-outlined text-[16px]">{s.icon}</span>
-                          <span>{s.name}</span>
+                          <span className="material-symbols-outlined text-[16px] shrink-0">{s.icon}</span>
+                          <span className="truncate">{shortLabel}</span>
                         </button>
                       );
                     })}
@@ -1701,6 +1725,10 @@ export const CreateQuestionView: React.FC = () => {
                 <span>{duplicateResult.matched_question.total_attempts} {t.attempts}</span>
                 <span>·</span>
                 <span>{duplicateResult.matched_question.accuracy_percentage}% {t.accuracy}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-primary bg-primary/10 px-2 py-1 rounded-lg">
+                <span className="material-symbols-outlined text-[14px]">verified</span>
+                <span>Verified Match: Question text &amp; correct answer match</span>
               </div>
             </div>
 

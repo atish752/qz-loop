@@ -232,6 +232,39 @@ export const SavedCollectionsModal: React.FC<SavedCollectionsModalProps> = ({
           </button>
         </form>
 
+        {/* Practice Playlist in Shuffle Mode Banner */}
+        {displayedQuestions.length > 0 && (
+          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-primary/10 border border-primary/25 my-1 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-primary text-[20px] shrink-0">shuffle</span>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-on-surface block truncate">
+                  {activeCollectionId === "all"
+                    ? "All Saved Questions"
+                    : collections.find((c) => c.id === activeCollectionId)?.name}
+                </span>
+                <span className="text-[10px] text-secondary">
+                  {displayedQuestions.length} questions · Shuffle Mode Practice
+                </span>
+              </div>
+            </div>
+            <Link
+              href={`/loop?playlist=${encodeURIComponent(activeCollectionId)}&shuffle=true`}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  const qIds = displayedQuestions.map((d) => d.question.id);
+                  sessionStorage.setItem("qz_shuffle_playlist_ids", JSON.stringify(qIds));
+                }
+                onClose();
+              }}
+              className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs flex items-center gap-1.5 shadow-sm hover:bg-primary-container active:scale-95 transition-all shrink-0"
+            >
+              <span className="material-symbols-outlined text-[15px]">shuffle</span>
+              <span>Practice (Shuffle)</span>
+            </Link>
+          </div>
+        )}
+
         {/* Question List */}
         <div className="flex-1 overflow-y-auto no-scrollbar py-2 flex flex-col gap-2.5">
           {isLoading ? (

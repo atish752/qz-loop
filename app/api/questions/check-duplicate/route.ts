@@ -4,7 +4,7 @@ import { db } from "@/lib/data/store";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { questionText, options } = body;
+    const { questionText, options, correctAnswerText } = body;
 
     if (!questionText || typeof questionText !== "string") {
       return NextResponse.json({
@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
       ? options.map((o: unknown) => (typeof o === "string" ? o : (o as { text?: string })?.text || "")).filter(Boolean)
       : undefined;
 
-    const checkResult = db.checkDuplicate(questionText, optionsText);
+    const answerText = typeof correctAnswerText === "string" && correctAnswerText.trim() ? correctAnswerText.trim() : undefined;
+
+    const checkResult = db.checkDuplicate(questionText, optionsText, answerText);
     return NextResponse.json({
       success: true,
       ...checkResult,
