@@ -1517,6 +1517,21 @@ Explanation: Ribosomes are the cellular machinery responsible for translating mR
   assert(parsedNoisy.options[3] === "ATP generation", "Option D is extracted without noise");
   assert(parsedNoisy.correctOptionId === "A", "Correct answer is detected as Option A");
 
+  // Optics / Physics terminology must never be stripped as noise
+  const opticsOcrSample = `10:30 AM 5G 85%
+Ask Gemini - a wX9uKjN_bL34kPoQw
+https://gemini.google.com/share/1234
+Q. A thin convex lens has a focal length of 25 cm. What is its optical power?
+(A) +4.0 D
+(B) -4.0 D
+(C) +0.25 D
+(D) Concave lens with -2.0 D
+Ans: A`;
+  const parsedOptics = parseQuestionAndOptions(opticsOcrSample);
+  assert(parsedOptics.questionText.includes("convex lens"), "Preserves 'convex lens' in optics physics questions");
+  assert(parsedOptics.options[3].includes("Concave lens"), "Preserves 'Concave lens' in options without truncating");
+  assert(!parsedOptics.questionText.includes("Gemini"), "Strips Gemini noise from optics question");
+
   // 2. Interactive Scanner Cropper UI & Prominent Action Buttons
   const scannerSrc = fs.readFileSync(path.join(__dirname, "../components/create/QuestionScanner.tsx"), "utf8");
   assert(scannerSrc.includes("Confirm Crop & Extract"), "QuestionScanner includes prominent 'Confirm Crop & Extract' button");
@@ -1542,11 +1557,22 @@ Explanation: Ribosomes are the cellular machinery responsible for translating mR
   const migration20261021 = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261021_serverless_persistence_fix.sql"), "utf8");
   assert(migration20261021.includes("CREATE POLICY \"Users can insert friend requests\" ON friendships"), "20261021 migration hardens friendships RLS insertion");
   assert(migration20261021.includes("WITH CHECK (true)"), "20261021 migration allows serverless friendship insertion");
+  assert(migration20261021.includes("CREATE TABLE IF NOT EXISTS profiles"), "20261021 migration ensures profiles table exists");
+  assert(migration20261021.includes("CREATE TABLE IF NOT EXISTS friendships"), "20261021 migration ensures friendships table exists");
+  assert(migration20261021.includes("CREATE TABLE IF NOT EXISTS direct_messages"), "20261021 migration ensures direct_messages table exists");
+  assert(migration20261021.includes("CREATE TABLE IF NOT EXISTS question_comments"), "20261021 migration ensures question_comments table exists");
+  assert(migration20261021.includes("CREATE TABLE IF NOT EXISTS question_likes"), "20261021 migration ensures question_likes table exists");
 
   // 6. Resilient In-App Comments & Draft Preservation
   const commentsModalSrc = fs.readFileSync(path.join(__dirname, "../components/loop/CommentsModal.tsx"), "utf8");
   assert(commentsModalSrc.includes("sessionStorage.setItem"), "CommentsModal preserves guest comment draft in sessionStorage");
   assert(commentsModalSrc.includes("sessionStorage.getItem"), "CommentsModal restores guest comment draft from sessionStorage upon sign-in");
+
+  // 7. Store Like State Sync on Unlike
+  db.syncQuestionLikes("test-q-sync-unlike", ["user-sync-1", "user-sync-2"]);
+  assert(db.getQuestionLikeStatus("test-q-sync-unlike").totalLikes === 2, "Sync likes sets initial count");
+  db.syncQuestionLikes("test-q-sync-unlike", ["user-sync-1"]);
+  assert(db.getQuestionLikeStatus("test-q-sync-unlike").totalLikes === 1, "Sync likes updates cleanly when user unlikes");
 
   console.log("\n=================================================");
   console.log("   ALL 61 ACCEPTANCE TEST SUITES PASSED (100%)   ");

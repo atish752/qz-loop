@@ -1606,9 +1606,12 @@ class DataStore {
   public getQuestionLikeStatus(arg1?: string, arg2?: string): { liked: boolean; totalLikes: number } {
     let qId = "";
     let uId: string | undefined = undefined;
-    if (arg1 && this.questions.some((q) => q.id === arg1)) {
+    if (arg1 && (this.questions.some((q) => q.id === arg1) || this.likes.has(arg1) || (!arg2 && typeof arg1 === "string"))) {
       qId = arg1;
       uId = arg2;
+    } else if (arg2 && (this.questions.some((q) => q.id === arg2) || this.likes.has(arg2))) {
+      uId = arg1;
+      qId = arg2;
     } else {
       uId = arg1;
       qId = arg2 || "";
@@ -1621,13 +1624,7 @@ class DataStore {
   }
 
   public syncQuestionLikes(questionId: string, userIds: string[]): void {
-    if (!this.likes.has(questionId)) {
-      this.likes.set(questionId, new Set<string>());
-    }
-    const set = this.likes.get(questionId)!;
-    userIds.forEach((uid) => {
-      if (uid) set.add(uid);
-    });
+    this.likes.set(questionId, new Set<string>(userIds.filter(Boolean)));
   }
 
   // --- Playlists / Collections System ---
@@ -1752,8 +1749,7 @@ class DataStore {
         (p) =>
           !currId ||
           (p.id !== currId &&
-            (!currentUser?.username || p.username.toLowerCase() !== currentUser.username.toLowerCase()) &&
-            (!currentUser?.display_name || p.display_name.toLowerCase() !== currentUser.display_name.toLowerCase()))
+            (!currentUser?.username || p.username.toLowerCase() !== currentUser.username.toLowerCase()))
       )
       .filter((p) =>
         (Boolean(p.username) && p.username.toLowerCase().includes(q)) ||
@@ -1786,8 +1782,7 @@ class DataStore {
     }
     if (
       targetUserIdOrName === currentUser.id ||
-      query === currentUser.username.toLowerCase() ||
-      cleanTarget.toLowerCase() === currentUser.display_name.toLowerCase()
+      query === currentUser.username.toLowerCase()
     ) {
       return { success: false, message: "You cannot add yourself as a study partner" };
     }
@@ -1903,9 +1898,25 @@ class DataStore {
     action: "accept" | "decline" | "reject"
   ): { success: boolean; message: string } {
     const userFriends = this.getFriends(userId);
-    const friend = userFriends.find((f) => f.id === friendId);
+    let friend = userFriends.find((f) => f.id === friendId);
     if (!friend) {
-      return { success: false, message: "Request not found" };
+      const friendProf = this.profiles.find((p) => p.id === friendId);
+      if (friendProf) {
+        friend = {
+          id: friendProf.id,
+          display_name: friendProf.display_name,
+          username: friendProf.username,
+          avatar_url: friendProf.avatar_url,
+          streak_days: friendProf.current_streak,
+          target_exam: friendProf.target_exam || "Aspirant",
+          status: "pending_incoming",
+          last_active: "Active recently",
+        };
+        userFriends.unshift(friend);
+        this.userFriends.set(userId, userFriends);
+      } else {
+        return { success: false, message: "Request not found" };
+      }
     }
     if (action === "accept") {
       friend.status = "friend";

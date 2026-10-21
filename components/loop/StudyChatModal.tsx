@@ -69,7 +69,8 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
               const pendingOptimistic = prev.filter(
                 (m) =>
                   m.id.startsWith("temp-") &&
-                  !serverMsgs.some((sm: any) => sm.text === m.text && sm.from_user_id === m.from_user_id)
+                  Date.now() - Number(m.id.replace("temp-", "")) < 20000 &&
+                  !serverMsgs.some((sm: any) => sm.id === m.id)
               );
               const combined = [...serverMsgs, ...pendingOptimistic];
               const uniqueMap = new Map<string, any>();

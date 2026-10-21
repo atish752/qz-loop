@@ -208,7 +208,8 @@ export const SocialView: React.FC = () => {
               const pendingOptimistic = prev.filter(
                 (m) =>
                   m.id.startsWith("temp-") &&
-                  !serverMsgs.some((sm: any) => sm.text === m.text && sm.from_user_id === m.from_user_id)
+                  Date.now() - Number(m.id.replace("temp-", "")) < 20000 &&
+                  !serverMsgs.some((sm: any) => sm.id === m.id)
               );
               const combined = [...serverMsgs, ...pendingOptimistic];
               const uniqueMap = new Map<string, any>();
@@ -370,8 +371,8 @@ export const SocialView: React.FC = () => {
     }
   };
 
-  // Accept or Decline Incoming Friend Request
-  const handleRespondFriendRequest = async (friendId: string, action: "accept" | "decline") => {
+  // Accept or Decline/Reject Incoming Friend Request
+  const handleRespondFriendRequest = async (friendId: string, action: "accept" | "decline" | "reject") => {
     setRespondingId(friendId);
     try {
       const currentUid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
@@ -767,11 +768,12 @@ export const SocialView: React.FC = () => {
                           <span>{lang === "hi" ? "स्वीकार" : "Accept"}</span>
                         </button>
                         <button
-                          onClick={() => handleRespondFriendRequest(req.id, "decline")}
+                          onClick={() => handleRespondFriendRequest(req.id, "reject")}
                           disabled={respondingId === req.id}
-                          className="px-2.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:text-error hover:bg-surface-container-high font-semibold text-xs transition-all"
+                          className="px-2.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:text-error hover:bg-surface-container-high font-semibold text-xs transition-all flex items-center gap-1"
                         >
-                          <span>{lang === "hi" ? "हटाएं" : "Decline"}</span>
+                          <span className="material-symbols-outlined text-[14px]">close</span>
+                          <span>{lang === "hi" ? "अस्वीकार" : "Reject"}</span>
                         </button>
                       </div>
                     </div>
@@ -1438,11 +1440,12 @@ export const SocialView: React.FC = () => {
                             <span>{lang === "hi" ? "स्वीकार" : "Accept"}</span>
                           </button>
                           <button
-                            onClick={() => handleRespondFriendRequest(req.id, "decline")}
+                            onClick={() => handleRespondFriendRequest(req.id, "reject")}
                             disabled={respondingId === req.id}
-                            className="px-2.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:text-error hover:bg-surface-container-high font-semibold text-xs transition-all"
+                            className="px-2.5 py-1.5 rounded-xl bg-surface-container text-secondary hover:text-error hover:bg-surface-container-high font-semibold text-xs transition-all flex items-center gap-1"
                           >
-                            <span>{lang === "hi" ? "हटाएं" : "Decline"}</span>
+                            <span className="material-symbols-outlined text-[14px]">close</span>
+                            <span>{lang === "hi" ? "अस्वीकार" : "Reject"}</span>
                           </button>
                         </div>
                       </div>
