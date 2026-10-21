@@ -18,16 +18,22 @@ export async function GET(request: NextRequest) {
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase) {
-        const { data: cloudLikes } = await supabase
+        const { data: cloudLikes, error: likesErr } = await supabase
           .from("question_likes")
           .select("user_id")
           .eq("question_id", questionId);
 
-        if (cloudLikes && cloudLikes.length > 0) {
-          db.syncQuestionLikes(
-            questionId,
-            cloudLikes.map((l) => l.user_id)
-          );
+        if (!likesErr && cloudLikes) {
+          const userIds = cloudLikes.map((l) => l.user_id);
+          db.syncQuestionLikes(questionId, userIds);
+          const isLiked = Boolean(userId && userId !== "guest" && userIds.includes(userId));
+          return NextResponse.json({
+            success: true,
+            liked: isLiked,
+            isLiked,
+            totalLikes: userIds.length,
+            likesCount: userIds.length,
+          });
         }
       }
     } catch (err) {
@@ -65,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     const result = db.toggleLikeQuestion(userId, questionId);
 
-    // Sync like state to Supabase question_likes
+    // Sync like state strictly to Supabase question_likes
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase) {
@@ -82,6 +88,24 @@ export async function POST(request: NextRequest) {
             .from("question_likes")
             .delete()
             .match({ user_id: userId, question_id: questionId });
+        }
+
+        // Query fresh exact total count from Supabase
+        const { data: latestLikes } = await supabase
+          .from("question_likes")
+          .select("user_id")
+          .eq("question_id", questionId);
+
+        if (latestLikes) {
+          const uids = latestLikes.map((l) => l.user_id);
+          db.syncQuestionLikes(questionId, uids);
+          return NextResponse.json({
+            success: true,
+            liked: result.liked,
+            isLiked: result.liked,
+            totalLikes: uids.length,
+            likesCount: uids.length,
+          });
         }
       }
     } catch (err) {
@@ -100,4 +124,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
-

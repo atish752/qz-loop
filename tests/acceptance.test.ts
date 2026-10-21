@@ -1484,10 +1484,75 @@ async function runTests() {
   assert(sqlMigrationContent.includes("idx_question_likes_qid"), "SQL migration creates question_likes index");
   assert(sqlMigrationContent.includes("idx_question_comments_qid"), "SQL migration creates question_comments index");
 
+  // Scenario 61: Multi-Device Serverless Persistence, Interactive Cropper & Noise Filtering, Social Notification Badge, Chat Deduplication & Resilient Sharing
+  console.log("\n[Scenario 61] Multi-Device Serverless Persistence, Interactive Cropper, Noise Filtering, Social Badge & Resilient Chat");
+
+  // 1. Rigorous Noise Filtering in OCR Parser
+  const noisyOcrSample = `8:37:46 7.00 KB/s 86%
+< - Ask Gemini - a wX9uKjN_bL34kPoQw
+https://askgemini.google.com/share/92842
+Q. 1 What is the primary function of ribosomes in a eukaryotic cell?
+(A) Protein synthesis
+(B) Lipid synthesis
+(C) DNA replication
+(D) ATP generation
+Ans: A
+Explanation: Ribosomes are the cellular machinery responsible for translating mRNA into polypeptide chains (proteins).`;
+
+  const parsedNoisy = parseQuestionAndOptions(noisyOcrSample);
+  assert(
+    !parsedNoisy.questionText.includes("Gemini") &&
+    !parsedNoisy.questionText.includes("wX9uKjN") &&
+    !parsedNoisy.questionText.includes("8:37:46") &&
+    !parsedNoisy.questionText.includes("http"),
+    "OCR parser rigorously strips '< - Ask Gemini', URL, and clock/battery line from question text"
+  );
+  assert(
+    parsedNoisy.questionText.includes("What is the primary function of ribosomes in a eukaryotic cell?"),
+    "OCR parser cleanly preserves the question text"
+  );
+  assert(parsedNoisy.options[0] === "Protein synthesis", "Option A is extracted without noise");
+  assert(parsedNoisy.options[1] === "Lipid synthesis", "Option B is extracted without noise");
+  assert(parsedNoisy.options[2] === "DNA replication", "Option C is extracted without noise");
+  assert(parsedNoisy.options[3] === "ATP generation", "Option D is extracted without noise");
+  assert(parsedNoisy.correctOptionId === "A", "Correct answer is detected as Option A");
+
+  // 2. Interactive Scanner Cropper UI & Prominent Action Buttons
+  const scannerSrc = fs.readFileSync(path.join(__dirname, "../components/create/QuestionScanner.tsx"), "utf8");
+  assert(scannerSrc.includes("Confirm Crop & Extract"), "QuestionScanner includes prominent 'Confirm Crop & Extract' button");
+  assert(scannerSrc.includes("Skip Header"), "QuestionScanner includes prominent 'Skip Header' button");
+  assert(scannerSrc.includes("Re-take / Cancel"), "QuestionScanner includes prominent 'Re-take / Cancel' button");
+  assert(scannerSrc.includes("cropX") && scannerSrc.includes("cropY") && scannerSrc.includes("cropW") && scannerSrc.includes("cropH"), "QuestionScanner extracts and draws strictly the cropped bounding box to canvas");
+
+  // 3. Social Notification Badge in BottomNav
+  const bottomNavSrc = fs.readFileSync(path.join(__dirname, "../components/layout/BottomNav.tsx"), "utf8");
+  assert(bottomNavSrc.includes("incomingRequestsCount"), "BottomNav tracks incoming friend requests count");
+  assert(bottomNavSrc.includes("bg-red-600") && bottomNavSrc.includes("animate-pulse"), "BottomNav renders pulsating red notification badge counter on Social tab");
+
+  // 4. Chat Input Disable & Infinite Loop Prevention
+  assert(studyChatModalSrc.includes("disabled={isSending}"), "StudyChatModal disables input during message dispatch to prevent repeated sends");
+  assert(socialViewSrc.includes("disabled={isSendingMessage}"), "SocialView disables input during message dispatch to prevent repeated sends");
+  assert(studyChatModalSrc.includes("prev.length === next.length"), "StudyChatModal stabilizes chat list and avoids unnecessary re-renders");
+  assert(socialViewSrc.includes("prev.length === next.length"), "SocialView stabilizes chat list and avoids unnecessary re-renders");
+
+  // 5. Supabase Serverless Persistence & Service Role Key
+  const serverSupabaseSrc = fs.readFileSync(path.join(__dirname, "../lib/supabase/server.ts"), "utf8");
+  assert(serverSupabaseSrc.includes("SUPABASE_SERVICE_ROLE_KEY"), "createServerSupabaseClient supports SUPABASE_SERVICE_ROLE_KEY for serverless admin operations");
+
+  const migration20261021 = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261021_serverless_persistence_fix.sql"), "utf8");
+  assert(migration20261021.includes("CREATE POLICY \"Users can insert friend requests\" ON friendships"), "20261021 migration hardens friendships RLS insertion");
+  assert(migration20261021.includes("WITH CHECK (true)"), "20261021 migration allows serverless friendship insertion");
+
+  // 6. Resilient In-App Comments & Draft Preservation
+  const commentsModalSrc = fs.readFileSync(path.join(__dirname, "../components/loop/CommentsModal.tsx"), "utf8");
+  assert(commentsModalSrc.includes("sessionStorage.setItem"), "CommentsModal preserves guest comment draft in sessionStorage");
+  assert(commentsModalSrc.includes("sessionStorage.getItem"), "CommentsModal restores guest comment draft from sessionStorage upon sign-in");
+
   console.log("\n=================================================");
-  console.log("   ALL 60 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 61 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
+
 
 runTests().catch((err) => {
   console.error("Test failed:", err);

@@ -287,8 +287,9 @@ export const StudyChatModal: React.FC<StudyChatModalProps> = ({
             type="text"
             placeholder={`Message ${peerDispName}...`}
             value={inputText}
+            disabled={isSending}
             onChange={(e) => setInputText(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary"
+            className="flex-1 px-3 py-2 rounded-xl bg-surface-container-low border border-surface-container-high/50 text-xs text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary disabled:opacity-50"
           />
           <button
             type="submit"

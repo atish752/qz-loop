@@ -1726,6 +1726,14 @@ class DataStore {
     return filtered;
   }
 
+  public syncFriendsList(userId: string, friends: FriendUser[]): void {
+    if (!userId || userId === "guest") return;
+    this.userFriends.set(userId, [...friends]);
+    if (userId === "user-current") {
+      this.friends = [...friends];
+    }
+  }
+
   public getIncomingFriendRequests(userId?: string): FriendUser[] {
     return this.getFriends(userId).filter(
       (f) => f.status === "pending_incoming" || f.status === "request_received"
@@ -1892,7 +1900,7 @@ class DataStore {
   public respondFriendRequest(
     userId: string,
     friendId: string,
-    action: "accept" | "decline"
+    action: "accept" | "decline" | "reject"
   ): { success: boolean; message: string } {
     const userFriends = this.getFriends(userId);
     const friend = userFriends.find((f) => f.id === friendId);

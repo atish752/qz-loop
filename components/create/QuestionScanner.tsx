@@ -640,27 +640,39 @@ export const QuestionScanner: React.FC<QuestionScannerProps> = ({
             </div>
           </div>
 
-          {/* Buttons: Confirm Crop & Extract vs Cancel / Retake */}
-          <div className="flex items-center gap-2 pt-1">
+          {/* Prominent Action Buttons: Confirm Crop & Extract, Skip Header, Re-take / Cancel */}
+          <div className="flex flex-col gap-2 pt-1">
             <button
               type="button"
               disabled={isProcessing}
               onClick={handleConfirmCrop}
-              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-xs shadow-md hover:opacity-95 active:scale-98 transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-xs shadow-md hover:opacity-95 active:scale-98 transition-all flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-[19px]">crop</span>
               <span>{lang === "hi" ? "क्रॉप करें और टेक्स्ट निकालें" : "Confirm Crop & Extract"}</span>
             </button>
 
-            <button
-              type="button"
-              disabled={isProcessing}
-              onClick={handleCancelCrop}
-              className="py-3 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs active:scale-98 transition-all flex items-center justify-center gap-1.5 shrink-0"
-            >
-              <span className="material-symbols-outlined text-[18px]">close</span>
-              <span>{lang === "hi" ? "रद्द / दोबारा लें" : "Cancel / Re-take"}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={() => setCropBox({ x: 2, y: 16, width: 96, height: 74 })}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-surface-container border border-primary/30 hover:bg-surface-container-high text-primary font-bold text-xs active:scale-98 transition-all flex items-center justify-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[17px]">vertical_align_bottom</span>
+                <span>{lang === "hi" ? "शीर्ष छोड़ें (Skip Header)" : "Skip Header"}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={handleCancelCrop}
+                className="py-2.5 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface font-semibold text-xs active:scale-98 transition-all flex items-center justify-center gap-1.5 shrink-0"
+              >
+                <span className="material-symbols-outlined text-[17px]">close</span>
+                <span>{lang === "hi" ? "रद्द / दोबारा लें" : "Re-take / Cancel"}</span>
+              </button>
+            </div>
           </div>
         </div>
       ) : (

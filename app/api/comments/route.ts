@@ -10,17 +10,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Question ID required" }, { status: 400 });
     }
 
-    // Sync cloud discussions from Supabase
+    let cloudCommentsList: any[] | null = null;
+
+    // 1. Sync authoritative discussions from Supabase question_comments
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase) {
-        const { data: cloudComments } = await supabase
+        const { data: cloudComments, error: comErr } = await supabase
           .from("question_comments")
           .select("*")
           .eq("question_id", questionId)
           .order("created_at", { ascending: false });
 
-        if (cloudComments && cloudComments.length > 0) {
+        if (comErr) {
+          console.error("Supabase comments select notice:", comErr);
+        } else if (cloudComments) {
+          cloudCommentsList = cloudComments;
           db.syncComments(
             questionId,
             cloudComments.map((c) => ({
@@ -40,7 +45,7 @@ export async function GET(request: NextRequest) {
       console.error("Supabase comments sync notice:", err);
     }
 
-    const comments = db.getComments(questionId);
+    const comments = cloudCommentsList || db.getComments(questionId);
     return NextResponse.json({ success: true, comments });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to load question discussions";
@@ -53,7 +58,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { questionId, text, action, commentId, userId } = body;
 
-    // Handle vote / like action via POST as well
+    // Handle vote / like action via POST
     if (action === "vote" || action === "like") {
       const targetCommentId = commentId || body.id;
       if (!targetCommentId) {
@@ -64,6 +69,20 @@ export async function POST(request: NextRequest) {
       if (!voteResult.comment) {
         return NextResponse.json({ success: false, error: "Comment not found" }, { status: 404 });
       }
+
+      // Sync likes count to Supabase
+      try {
+        const supabase = await createServerSupabaseClient();
+        if (supabase) {
+          await supabase
+            .from("question_comments")
+            .update({ likes_count: voteResult.comment.likes_count })
+            .eq("id", targetCommentId);
+        }
+      } catch (sbErr) {
+        console.error("Supabase comment vote sync notice:", sbErr);
+      }
+
       return NextResponse.json({ success: true, comment: voteResult.comment, isLiked: voteResult.isLiked });
     }
 
@@ -77,9 +96,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Recover user profile from Supabase if not yet in memory
+    let authorName = "Aspirant";
+    let authorAvatar: string | null = null;
     try {
       const supabase = await createServerSupabaseClient();
-      if (supabase && currentUid && !db.getProfileById(currentUid)) {
+      if (supabase && currentUid) {
         const { data: dbProfile } = await supabase
           .from("profiles")
           .select("*")
@@ -95,9 +116,17 @@ export async function POST(request: NextRequest) {
             target_exam: dbProfile.target_exam,
             preferred_examination_id: dbProfile.preferred_examination_id,
           });
+          authorName = dbProfile.display_name || authorName;
+          authorAvatar = dbProfile.avatar_url || null;
         }
       }
     } catch {}
+
+    const localProfile = db.getProfileById(currentUid);
+    if (localProfile) {
+      authorName = localProfile.display_name || authorName;
+      authorAvatar = localProfile.avatar_url || authorAvatar;
+    }
 
     const comment = db.addComment({
       questionId,
@@ -105,19 +134,29 @@ export async function POST(request: NextRequest) {
       text: text.trim(),
     });
 
-    // Sync to Supabase question_comments table
+    // Sync strictly to Supabase question_comments table
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase) {
-        await supabase.from("question_comments").insert({
-          id: comment.id,
-          question_id: questionId,
-          user_id: currentUid,
-          user_name: comment.user_name || "Aspirant",
-          user_avatar: comment.user_avatar || null,
-          comment_text: comment.comment_text,
-          likes_count: 0,
-        });
+        const { data: insertedComment, error: insErr } = await supabase
+          .from("question_comments")
+          .insert({
+            id: comment.id,
+            question_id: questionId,
+            user_id: currentUid,
+            user_name: authorName,
+            user_avatar: authorAvatar,
+            comment_text: comment.comment_text,
+            likes_count: 0,
+          })
+          .select()
+          .maybeSingle();
+
+        if (insErr) {
+          console.error("Supabase comment persist error:", insErr);
+        } else if (insertedComment) {
+          return NextResponse.json({ success: true, comment: insertedComment });
+        }
       }
     } catch (err) {
       console.error("Supabase comment persist notice:", err);
@@ -143,10 +182,22 @@ export async function PATCH(request: NextRequest) {
     if (!voteResult.comment) {
       return NextResponse.json({ success: false, error: "Comment not found" }, { status: 404 });
     }
+
+    try {
+      const supabase = await createServerSupabaseClient();
+      if (supabase) {
+        await supabase
+          .from("question_comments")
+          .update({ likes_count: voteResult.comment.likes_count })
+          .eq("id", targetCommentId);
+      }
+    } catch (sbErr) {
+      console.error("Supabase comment vote sync notice:", sbErr);
+    }
+
     return NextResponse.json({ success: true, comment: voteResult.comment, isLiked: voteResult.isLiked });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to vote comment";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
-

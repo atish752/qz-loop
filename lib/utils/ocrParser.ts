@@ -27,17 +27,19 @@ export function parseQuestionAndOptions(rawText: string): ParsedQuestion {
   const isNoiseLine = (line: string): boolean => {
     const trimmed = line.trim();
     if (!trimmed) return false;
-    // App header / Gemini / Google lens artifacts (e.g. "← Ask Gemini - a wX9uKjN_...")
-    if (/(?:Ask\s*Gemini|Gemini|Google\s*Lens|Google\s*Search|Search\s*Google|Google\s*Photos|Lens)[\s\-\:\—]*/i.test(trimmed)) return true;
+    // App header / Gemini / Google lens artifacts (e.g. "< - Ask Gemini - a wX9uKjN_...", "← Ask Gemini")
+    if (/(?:[<←→>|–—\-*\s]*)(?:Ask\s*Gemini|Gemini|Google\s*Lens|Google\s*Search|Search\s*Google|Google\s*Photos|Lens)\b/i.test(trimmed)) return true;
     // URL or web link
-    if (/https?:\/\/|www\.|\.com\b|\.org\b|\.in\b|\.net\b/i.test(trimmed)) return true;
-    // Random long hash tokens or alphanumeric IDs (e.g. "wX9uKjN_-GBcduOnXx4bElpwm1InNH832cY0rzciwbWdjW...")
-    if (/^[A-Za-z0-9_\-]{14,}$/.test(trimmed)) return true;
-    if (/[a-zA-Z0-9_\-]{10,}(?:[_\-][a-zA-Z0-9]{6,})+/.test(trimmed)) return true;
-    // Status bar clock / battery / network speed indicators (e.g. "8:37:46 7.00 KB/s 86%")
+    if (/https?:\/\/|www\.|\.com\b|\.org\b|\.in\b|\.net\b|\.edu\b|\.co\b/i.test(trimmed)) return true;
+    // Random long hash tokens or alphanumeric IDs (e.g. "wX9uKjN_-GBcduOnXx4bElpwm1InNH832cY0rzciwbWdjW...", "- a wX9uKjN_...")
+    if (/^(?:[<←→>|–—\-*~a-z0-9]{1,4}\s+)?[A-Za-z0-9_\-]{12,}$/.test(trimmed)) return true;
+    if (/[a-zA-Z0-9_\-]{10,}(?:[_\-][a-zA-Z0-9]{5,})+/.test(trimmed)) return true;
+    // Status bar clock / battery / network speed indicators (e.g. "8:37:46 7.00 KB/s 86%", "5G", "4G LTE")
     if (/^\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\s*(?:\d+(?:\.\d+)?\s*(?:KB\/s|MB\/s|kbps|K\/s|M\/s))?\s*(?:\d+%)?$/i.test(trimmed)) return true;
-    // Isolated phone signal or battery percentages
+    if (/^(?:(?:\d+%)|(?:\d+(?:\.\d+)?\s*(?:KB\/s|MB\/s|K\/s|kbps))|(?:5G|4G|LTE|VoLTE|\bWiFi\b))\s*$/i.test(trimmed)) return true;
     if (/^(?:\d+%\s*|\d+(?:\.\d+)?\s*(?:KB\/s|MB\/s|K\/s|kbps)\s*)+$/i.test(trimmed)) return true;
+    // Common mobile screenshot navigation words
+    if (/^(?:Back|Share|Edit|Cancel|Done|Settings|Search|Select|Ask|Copy|Lens)$/i.test(trimmed)) return true;
     // Textbook header/footer page markers like "Page 142" or "- 45 -"
     if (/^(?:Page\s*\d+|\-*\s*\d+\s*\-*)$/i.test(trimmed)) return true;
     return false;
@@ -278,15 +280,16 @@ export function parseQuestionAndOptions(rawText: string): ParsedQuestion {
 
   // 5. Clean up leading Question prefixes from question statement
   questionText = stripQuestionPrefix(questionText)
-    .replace(/^(?:[←→\<\-\>\|\s]*)(?:Ask\s*Gemini|Gemini|Google\s*Lens|Google|Lens)[\s\-\:\—]*/i, "")
-    .replace(/^[A-Za-z0-9_\-]{14,}\s*/i, "")
+    .replace(/^(?:[<←→>|–—\-*\s]*)(?:Ask\s*Gemini|Gemini|Google\s*Lens|Google|Lens)[\s\-–—\:\.]*(?:[a-z0-9]{1,4}\s+[A-Za-z0-9_\-]{8,})?[\s\-–—\:\.]*/i, "")
+    .replace(/^(?:[<←→>|–—\-*\s]*)[A-Za-z0-9_\-]{12,}\s*/i, "")
     .trim();
 
-  // Clean trailing punctuation or brackets in options
+  // Clean trailing punctuation, brackets, or residual Gemini/Lens headers in options
   for (let i = 0; i < 4; i++) {
     options[i] = (options[i] || "")
       .replace(/^[\(\[]?[A-D1-4कखगघअबसद][\)\.\:\-\]]\s*/i, "")
-      .replace(/[\s\-\:\—]*(?:Ask\s*Gemini|Google).*$/i, "")
+      .replace(/[\s\-\:\—]*(?:Ask\s*Gemini|Google|Lens).*$/i, "")
+      .replace(/^(?:[<←→>|–—\-*\s]*)(?:Ask\s*Gemini|Gemini|Google\s*Lens|Google|Lens)[\s\-–—\:\.]*/i, "")
       .trim();
   }
 

@@ -1019,9 +1019,10 @@ export const SocialView: React.FC = () => {
                   <input
                     type="text"
                     value={chatInputText}
+                    disabled={isSendingMessage}
                     onChange={(e) => setChatInputText(e.target.value)}
                     placeholder={t.typeStudyMessage || "Type study message or formula..."}
-                    className="flex-1 px-3 py-2 rounded-xl bg-surface-container-lowest border border-surface-container-high/60 text-xs text-on-surface focus:outline-none focus:border-primary"
+                    className="flex-1 px-3 py-2 rounded-xl bg-surface-container-lowest border border-surface-container-high/60 text-xs text-on-surface focus:outline-none focus:border-primary disabled:opacity-50"
                   />
                   <button
                     type="submit"

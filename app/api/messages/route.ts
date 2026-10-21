@@ -15,56 +15,63 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, messages: [], isGuest: true });
     }
 
-    // Sync cloud direct messages from Supabase
+    let cloudMessages: any[] | null = null;
+
+    // 1. Sync authoritative cloud direct messages from Supabase
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase && requestedUserId) {
-        const idsToHydrate = new Set<string>([requestedUserId]);
-        if (friendId) idsToHydrate.add(friendId);
-
         let query = supabase.from("direct_messages").select("*");
+
         if (friendId) {
-          query = query.or(
-            `and(from_user_id.eq.${requestedUserId},to_user_id.eq.${friendId}),and(from_user_id.eq.${friendId},to_user_id.eq.${requestedUserId})`
-          );
+          // Robust query without fragile PostgREST .or(and(...)) encoding
+          query = query
+            .in("from_user_id", [requestedUserId, friendId])
+            .in("to_user_id", [requestedUserId, friendId]);
         } else {
           query = query.or(
             `from_user_id.eq.${requestedUserId},to_user_id.eq.${requestedUserId}`
           );
         }
-        const { data: cloudMsgs } = await query
-          .order("created_at", { ascending: true })
-          .limit(50);
 
-        if (cloudMsgs && cloudMsgs.length > 0) {
+        const { data: cloudMsgs, error: msgsErr } = await query
+          .order("created_at", { ascending: true })
+          .limit(100);
+
+        if (msgsErr) {
+          console.error("Supabase direct_messages select notice:", msgsErr);
+        } else if (cloudMsgs) {
+          cloudMessages = cloudMsgs;
+          const idsToHydrate = new Set<string>([requestedUserId]);
+          if (friendId) idsToHydrate.add(friendId);
+
           for (const cm of cloudMsgs) {
             if (cm.from_user_id) idsToHydrate.add(cm.from_user_id);
             if (cm.to_user_id) idsToHydrate.add(cm.to_user_id);
           }
-        }
 
-        const participantIds = Array.from(idsToHydrate).filter(Boolean);
-        if (participantIds.length > 0) {
-          const { data: profilesData } = await supabase
-            .from("profiles")
-            .select("id, display_name, username, avatar_url, target_exam, current_streak, preferred_examination_id")
-            .in("id", participantIds);
+          const participantIds = Array.from(idsToHydrate).filter(Boolean);
+          if (participantIds.length > 0) {
+            const { data: profilesData } = await supabase
+              .from("profiles")
+              .select("id, display_name, username, avatar_url, target_exam, current_streak, preferred_examination_id")
+              .in("id", participantIds);
 
-          if (profilesData && profilesData.length > 0) {
-            for (const p of profilesData) {
-              db.syncUserFromAuth({
-                id: p.id,
-                display_name: p.display_name,
-                username: p.username,
-                avatar_url: p.avatar_url,
-                target_exam: p.target_exam,
-                preferred_examination_id: p.preferred_examination_id,
-              });
+            if (profilesData && profilesData.length > 0) {
+              for (const p of profilesData) {
+                db.syncUserFromAuth({
+                  id: p.id,
+                  display_name: p.display_name,
+                  username: p.username,
+                  avatar_url: p.avatar_url,
+                  target_exam: p.target_exam,
+                  preferred_examination_id: p.preferred_examination_id,
+                });
+              }
             }
           }
-        }
 
-        if (cloudMsgs && cloudMsgs.length > 0) {
+          // Populate local memory store for fallback & acceptance tests
           for (const cm of cloudMsgs) {
             const existingMsgs = db.getAllMessagesForUser(requestedUserId);
             if (!existingMsgs.some((m) => m.id === cm.id)) {
@@ -112,29 +119,32 @@ export async function GET(request: NextRequest) {
 
     if (!friendId) {
       // Return all messages involving requested user
-      const allMsgs = db.getAllMessagesForUser(requestedUserId);
-      const enhanced = allMsgs.map((m) => {
-        if (m.question_id) {
-          const q = db.getQuestionById(m.question_id);
+      const rawMsgs = cloudMessages || db.getAllMessagesForUser(requestedUserId);
+      const enhanced = rawMsgs.map((m: any) => {
+        const qId = m.question_id;
+        if (qId) {
+          const q = db.getQuestionById(qId);
           return { ...m, question: q };
         }
         return m;
       });
-      return NextResponse.json({ success: true, messages: enhanced, peers: buildPeers(allMsgs) });
+      return NextResponse.json({ success: true, messages: enhanced, peers: buildPeers(rawMsgs) });
     }
 
-    const messages = db.getMessages(requestedUserId, friendId);
+    const rawThread =
+      cloudMessages || db.getMessages(requestedUserId, friendId);
 
     // Enhance any question references with question preview
-    const enhanced = messages.map((m) => {
-      if (m.question_id) {
-        const q = db.getQuestionById(m.question_id);
+    const enhanced = rawThread.map((m: any) => {
+      const qId = m.question_id;
+      if (qId) {
+        const q = db.getQuestionById(qId);
         return { ...m, question: q };
       }
       return m;
     });
 
-    return NextResponse.json({ success: true, messages: enhanced, peers: buildPeers(messages) });
+    return NextResponse.json({ success: true, messages: enhanced, peers: buildPeers(rawThread) });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to load study chat messages";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
@@ -164,17 +174,21 @@ export async function POST(request: NextRequest) {
       questionId,
     });
 
-    // Sync to Supabase direct_messages table
+    // Sync strictly to Supabase direct_messages table
     try {
       const supabase = await createServerSupabaseClient();
       if (supabase) {
-        await supabase.from("direct_messages").insert({
+        const { error: insErr } = await supabase.from("direct_messages").insert({
           id: message.id,
           from_user_id: fromUserId,
           to_user_id: toUserId,
           text: text || "",
           question_id: questionId || null,
         });
+
+        if (insErr) {
+          console.error("Supabase direct message insert notice:", insErr);
+        }
       }
     } catch (err) {
       console.error("Supabase direct message persist notice:", err);
