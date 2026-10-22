@@ -111,20 +111,21 @@ export const BottomNav: React.FC = () => {
   return (
     <nav
       data-no-swipe="true"
+      style={{ touchAction: "none", overscrollBehavior: "none" }}
       onTouchStart={(e) => e.stopPropagation()}
-      onTouchMove={(e) => e.stopPropagation()}
+      onTouchMove={(e) => {
+        e.stopPropagation();
+        if (e.cancelable) e.preventDefault();
+      }}
       onTouchEnd={(e) => e.stopPropagation()}
-      className="fixed bottom-0 left-0 right-0 z-[100] pointer-events-none flex justify-center pb-safe select-none"
+      className="fixed bottom-0 left-0 right-0 z-[100] pointer-events-none flex justify-center select-none"
     >
-      <div className="w-full max-w-[480px] bg-surface-container-lowest/95 backdrop-blur-xl border-t border-surface-container-high/60 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] pointer-events-auto touch-manipulation">
+      <div className="w-full max-w-[480px] bg-surface-container-lowest/95 backdrop-blur-xl border-t border-surface-container-high/60 shadow-[0_-2px_12px_rgba(0,0,0,0.04)] pointer-events-auto touch-manipulation pb-safe">
         <div className="h-16 px-2 flex items-center justify-around">
           {/* 1. Home (Performance Matrix & Daily Study Dashboard) */}
           <Link
             href="/"
-            onClick={(e) => {
-              e.preventDefault();
-              handleTabClick("/");
-            }}
+            onClick={() => handleTabClick("/")}
             data-no-swipe="true"
             className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 cursor-pointer ${
               isHome ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
@@ -142,10 +143,7 @@ export const BottomNav: React.FC = () => {
           {/* 2. Plus / Create (Second Tab) */}
           <Link
             href="/create"
-            onClick={(e) => {
-              e.preventDefault();
-              handleTabClick("/create");
-            }}
+            onClick={() => handleTabClick("/create")}
             data-no-swipe="true"
             className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 cursor-pointer ${
               isCreate ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
@@ -163,10 +161,7 @@ export const BottomNav: React.FC = () => {
           {/* 3. Center Highlight: Qz Loop (Purple Background Main Highlight with Brand Icon) */}
           <Link
             href="/loop"
-            onClick={(e) => {
-              e.preventDefault();
-              handleTabClick("/loop");
-            }}
+            onClick={() => handleTabClick("/loop")}
             data-no-swipe="true"
             className="flex flex-col items-center justify-center min-w-[56px] min-h-[56px] -mt-5 group cursor-pointer"
             title="Qz Loop Reels"
@@ -199,10 +194,7 @@ export const BottomNav: React.FC = () => {
           {/* 4. Social (Chat & Friends) - Replaced Ranks */}
           <Link
             href="/social"
-            onClick={(e) => {
-              e.preventDefault();
-              handleTabClick("/social");
-            }}
+            onClick={() => handleTabClick("/social")}
             data-no-swipe="true"
             className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 relative cursor-pointer ${
               isSocial ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"
@@ -227,10 +219,7 @@ export const BottomNav: React.FC = () => {
           {/* 5. Profile (with uploaded photo in circular cutout if signed in, or default icon) */}
           <Link
             href="/profile"
-            onClick={(e) => {
-              e.preventDefault();
-              handleTabClick("/profile");
-            }}
+            onClick={() => handleTabClick("/profile")}
             data-no-swipe="true"
             className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors gap-0.5 cursor-pointer ${
               isProfile ? "text-primary font-bold" : "text-secondary hover:text-on-surface font-medium"

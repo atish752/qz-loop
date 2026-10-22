@@ -740,12 +740,13 @@ class DataStore {
     };
 
     // Priority: Direct user-authored questions first, then DUE spaced repetition questions, then new community questions, then standard questions
+    const isUserAuthored = (q: Question) => q.id.startsWith("q-usr-") || (Boolean(q.author_id) && q.author_id !== "system");
     const directAuthorQuestions = neverAnswered.filter((q) => userId && q.author_id === userId);
     const otherNewQuestions = neverAnswered.filter(
-      (q) => (!userId || q.author_id !== userId) && q.id.startsWith("q-usr-")
+      (q) => (!userId || q.author_id !== userId) && isUserAuthored(q)
     );
     const standardNeverAnswered = neverAnswered.filter(
-      (q) => !(userId && q.author_id === userId) && !q.id.startsWith("q-usr-")
+      (q) => !(userId && q.author_id === userId) && !isUserAuthored(q)
     );
 
     let selected = [

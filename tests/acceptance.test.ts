@@ -1574,8 +1574,85 @@ Ans: A`;
   db.syncQuestionLikes("test-q-sync-unlike", ["user-sync-1"]);
   assert(db.getQuestionLikeStatus("test-q-sync-unlike").totalLikes === 1, "Sync likes updates cleanly when user unlikes");
 
+  // Scenario 62: Tab Navigation Continuity, Scroll Isolation, PWA Install Button, Cross-User Publishing & Post-Answer Solution Modal
+  console.log("\n[Scenario 62] Tab Navigation Continuity, Scroll Isolation, PWA Install Button, Cross-User Publishing & Post-Answer Solution Modal");
+
+  // 1. Cross-User Question Publishing & Instant Feed Visibility
+  const newCommunityQ = db.createQuestion({
+    examinationId: "exam-neet-ug",
+    subjectId: "subj-biology",
+    questionText: "Which organelle is known as the powerhouse of the cell in aerobic respiration?",
+    options: [
+      { id: "A", text: "Mitochondria" },
+      { id: "B", text: "Endoplasmic Reticulum" },
+      { id: "C", text: "Golgi Apparatus" },
+      { id: "D", text: "Ribosome" },
+    ],
+    correctOptionId: "A",
+    explanation: "Mitochondria generate most of the chemical energy needed to power the cell's biochemical reactions (ATP).",
+    authorId: "user-author-peer-1",
+  });
+  assert(newCommunityQ.publication_status === "published", "Community question publication_status is published");
+  assert(newCommunityQ.moderation_status === "active", "Community question moderation_status is active");
+
+  // Other student preparing for NEET UG queries the feed
+  const peerFeed = db.getFeedQuestions({
+    userId: "user-peer-student-2",
+    examId: "exam-neet-ug",
+  });
+  assert(peerFeed.some((q) => q.id === newCommunityQ.id), "Published question is immediately visible in feed for peer students preparing for that exam");
+
+  // Guest visitor preparing for NEET UG queries the feed
+  const guestFeed = db.getFeedQuestions({
+    examId: "exam-neet-ug",
+  });
+  assert(guestFeed.some((q) => q.id === newCommunityQ.id), "Published question is immediately visible in feed for unauthenticated guest visitors");
+
+  // 2. Feed Route Dynamic & Cache-Control Configuration
+  const feedRouteSrc = fs.readFileSync(path.join(__dirname, "../app/api/feed/route.ts"), "utf8");
+  assert(feedRouteSrc.includes("export const dynamic = \"force-dynamic\""), "Feed route handler exports dynamic force-dynamic");
+  assert(feedRouteSrc.includes("no-store"), "Feed route response uses no-store cache control for instant visibility");
+  assert(feedRouteSrc.includes("lastCloudFeedSyncByExam"), "Feed route isolates cloud feed sync TTL per examination");
+
+  // 3. Tab Navigation & Qz Loop Resumption
+  const bottomNavFileSrc = fs.readFileSync(path.join(__dirname, "../components/layout/BottomNav.tsx"), "utf8");
+  assert(bottomNavFileSrc.includes("sessionStorage.setItem(\"qz_loop_is_active\", \"true\")"), "BottomNav saves loop active flag to sessionStorage on tab switch");
+  assert(bottomNavFileSrc.includes("pointer-events-auto touch-manipulation pb-safe"), "BottomNav inner container includes pb-safe with pointer-events-auto for full edge clickability");
+
+  const quizLoopContainerSrc = fs.readFileSync(path.join(__dirname, "../components/loop/QuizLoopContainer.tsx"), "utf8");
+  assert(quizLoopContainerSrc.includes("sessionStorage.getItem(\"qz_loop_cached_questions\")"), "QuizLoopContainer restores feed questions from sessionStorage on tab return");
+  assert(quizLoopContainerSrc.includes("sessionStorage.getItem(\"qz_loop_active_question_id\")"), "QuizLoopContainer restores exact active question from sessionStorage on tab return");
+  assert(quizLoopContainerSrc.includes("sessionStorage.getItem(\"qz_loop_answered_records\")"), "QuizLoopContainer restores answeredRecords from sessionStorage on tab return");
+
+  // 4. Timer Continuity Across Tab Switches
+  const questionReelCardSrc = fs.readFileSync(path.join(__dirname, "../components/loop/QuestionReelCard.tsx"), "utf8");
+  assert(questionReelCardSrc.includes("qz_timer_start_"), "QuestionReelCard uses persistent sessionStorage timer start key");
+  assert(questionReelCardSrc.includes("Date.now() - startTimeRef.current"), "QuestionReelCard calculates continuous elapsed solve time across tab navigation");
+
+  // 5. Touch Scroll Isolation & Rubber-Band Prevention
+  const globalsCssSrc = fs.readFileSync(path.join(__dirname, "../app/globals.css"), "utf8");
+  assert(globalsCssSrc.includes("overscroll-behavior: none"), "globals.css enforces overscroll-behavior: none on html and body");
+  assert(quizLoopContainerSrc.includes("data-no-swipe=\"true\""), "QuizLoopContainer marks controls with data-no-swipe");
+  assert(quizLoopContainerSrc.includes("targetEl?.closest(\".bottom-controls\")"), "QuizLoopContainer gesture detection ignores touches starting on bottom controls");
+  assert(quizLoopContainerSrc.includes("touchAction: \"none\""), "QuizLoopContainer bottom controls enforce inline touchAction: none");
+  assert(questionReelCardSrc.includes("touchAction: \"none\""), "QuestionReelCard action rail and top bar enforce inline touchAction: none");
+
+  // 6. TopHeader PWA Install / Download Webapp Button
+  const topHeaderSrc = fs.readFileSync(path.join(__dirname, "../components/layout/TopHeader.tsx"), "utf8");
+  assert(topHeaderSrc.includes("download_for_offline"), "TopHeader renders PWA download/install icon button");
+  assert(topHeaderSrc.includes("beforeinstallprompt"), "TopHeader listens for beforeinstallprompt event");
+  assert(topHeaderSrc.includes("appinstalled"), "TopHeader tracks appinstalled event state");
+  assert(topHeaderSrc.includes("Install Qz-loop App"), "TopHeader includes PWA installation guidance modal fallback");
+
+  // 7. Post-Answer Solution Modal & Spaced Repetition Buttons
+  assert(questionReelCardSrc.includes("setShowPostAnswerModal(false)"), "Solution popup modal is NOT pre-opened after answering");
+  assert(questionReelCardSrc.includes("Cut / Close Solution") || questionReelCardSrc.includes("Cut / Close modal"), "Post-answer solution popup includes cut/close option");
+  assert(quizLoopContainerSrc.includes("Quick Proof & Solution"), "QuizLoopContainer renders Quick Proof & Solution button on pinned bottom bar");
+  assert(quizLoopContainerSrc.includes("repeatDay"), "QuizLoopContainer renders Spaced Repetition Timeline buttons (1 Day, 1 Week, 1 Month, Never) below Quick Proof");
+  assert(quizLoopContainerSrc.includes("/api/questions/repeat"), "Spaced repetition selection posts to /api/questions/repeat");
+
   console.log("\n=================================================");
-  console.log("   ALL 61 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 62 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

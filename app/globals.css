@@ -78,6 +78,11 @@ html.dark {
 }
 
 @layer base {
+  html {
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+  }
+
   html, body {
     width: 100%;
     margin: 0;
@@ -94,6 +99,7 @@ html.dark {
   }
   
   body {
+    overscroll-behavior: none;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
   }

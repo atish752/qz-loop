@@ -47,10 +47,30 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const [user, setUser] = useState<UserProfile | null>(null);
   const [showExamModal, setShowExamModal] = useState<boolean>(false);
 
-  // Reel Feed State: resumes exact question index if returning from another tab
-  const [questions, setQuestions] = useState<Question[]>([]);
+  // Reel Feed State: resumes exact question list & index if returning from another tab
+  const [questions, setQuestions] = useState<Question[]>(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("qz_loop_is_active") === "true") {
+      try {
+        const cached = sessionStorage.getItem("qz_loop_cached_questions");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
   const [currentIndex, setCurrentIndex] = useState<number>(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && sessionStorage.getItem("qz_loop_is_active") === "true") {
+      const activeQId = sessionStorage.getItem("qz_loop_active_question_id");
+      const cached = sessionStorage.getItem("qz_loop_cached_questions");
+      if (activeQId && cached) {
+        try {
+          const list: Question[] = JSON.parse(cached);
+          const foundIdx = list.findIndex((q) => q.id === activeQId);
+          if (foundIdx >= 0) return foundIdx;
+        } catch {}
+      }
       const saved = sessionStorage.getItem("qz_last_loop_index");
       if (saved) {
         const parsed = parseInt(saved, 10);
@@ -63,7 +83,15 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Preserved Answer Records for session (So swiping back retains answered state & explanation)
-  const [answeredRecords, setAnsweredRecords] = useState<Record<string, AnswerRecord>>({});
+  const [answeredRecords, setAnsweredRecords] = useState<Record<string, AnswerRecord>>(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("qz_loop_is_active") === "true") {
+      try {
+        const raw = sessionStorage.getItem("qz_loop_answered_records");
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return {};
+  });
 
   // Active Answering status registered by child QuestionReelCard
   const activeStatusRef = useRef<{
@@ -470,18 +498,38 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     setSelectedSubjects(next);
   };
 
-  // Synchronize currentIndex to sessionStorage
+  // Synchronize questions, currentIndex, and active question ID to sessionStorage
   useEffect(() => {
     if (typeof window !== "undefined" && isStarted) {
       sessionStorage.setItem("qz_last_loop_index", String(currentIndex));
       localStorage.setItem("qz_last_loop_index", String(currentIndex));
+      if (questions.length > 0) {
+        try {
+          sessionStorage.setItem("qz_loop_cached_questions", JSON.stringify(questions));
+          if (questions[currentIndex]) {
+            sessionStorage.setItem("qz_loop_active_question_id", questions[currentIndex].id);
+          }
+        } catch {}
+      }
     }
-  }, [currentIndex, isStarted]);
+  }, [currentIndex, isStarted, questions]);
 
-  // On mount: if returning to loop from another tab, automatically fetch and resume
+  // Synchronize answeredRecords to sessionStorage
+  useEffect(() => {
+    if (typeof window !== "undefined" && isStarted && Object.keys(answeredRecords).length > 0) {
+      try {
+        sessionStorage.setItem("qz_loop_answered_records", JSON.stringify(answeredRecords));
+      } catch {}
+    }
+  }, [answeredRecords, isStarted]);
+
+  // On mount: if returning to loop from another tab, automatically resume if cached questions exist, otherwise fetch
   useEffect(() => {
     if (typeof window !== "undefined" && sessionStorage.getItem("qz_loop_is_active") === "true") {
-      loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, true);
+      const cached = sessionStorage.getItem("qz_loop_cached_questions");
+      if (!cached || cached === "[]") {
+        loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, true);
+      }
     }
   }, []);
 
@@ -490,6 +538,8 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     if (typeof window !== "undefined") {
       sessionStorage.setItem("qz_loop_is_active", "true");
       sessionStorage.setItem("qz_last_loop_index", "0");
+      sessionStorage.removeItem("qz_loop_cached_questions");
+      sessionStorage.removeItem("qz_loop_active_question_id");
     }
     setIsStarted(true);
     loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, true);
@@ -621,6 +671,15 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     touchTargetRef.current = e.target;
   };
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartYRef.current === null) return;
+    const targetEl = touchTargetRef.current as HTMLElement | null;
+    const scrollableEl = targetEl?.closest("[data-reel-scrollable='true'], [data-reel-explanation='true']");
+    if (!scrollableEl && e.cancelable) {
+      e.preventDefault();
+    }
+  };
+
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartYRef.current === null || touchStartXRef.current === null) return;
     const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
@@ -743,10 +802,18 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     record: AnswerRecord;
   }) => {
     // Save to answered records map so swiping back preserves state & explanation!
-    setAnsweredRecords((prev) => ({
-      ...prev,
-      [result.questionId]: result.record,
-    }));
+    setAnsweredRecords((prev) => {
+      const next = {
+        ...prev,
+        [result.questionId]: result.record,
+      };
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("qz_loop_answered_records", JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
     setActiveAnswerStatus((prev) => ({
       ...prev,
       isAnswered: true,
@@ -1077,6 +1144,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               if (typeof window !== "undefined") {
                 sessionStorage.removeItem("qz_loop_is_active");
                 sessionStorage.removeItem("qz_last_loop_index");
+                sessionStorage.removeItem("qz_loop_cached_questions");
+                sessionStorage.removeItem("qz_loop_active_question_id");
+                sessionStorage.removeItem("qz_loop_answered_records");
               }
               setIsStarted(false);
             }}
@@ -1156,6 +1226,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
       {/* Main Reel Feed Container */}
       <div
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onWheel={handleWheel}
         className="relative flex-1 w-full max-w-[480px] mx-auto overflow-hidden select-none"
@@ -1191,7 +1262,16 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               Great practice! Select more subjects or restart to keep your streak going.
             </p>
             <button
-              onClick={() => setIsStarted(false)}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  sessionStorage.removeItem("qz_loop_is_active");
+                  sessionStorage.removeItem("qz_last_loop_index");
+                  sessionStorage.removeItem("qz_loop_cached_questions");
+                  sessionStorage.removeItem("qz_loop_active_question_id");
+                  sessionStorage.removeItem("qz_loop_answered_records");
+                }
+                setIsStarted(false);
+              }}
               className="px-5 py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-md"
             >
               Select Subjects
@@ -1253,8 +1333,12 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         {activeQuestion && (
           <div
             data-no-swipe="true"
+            style={{ touchAction: "none", overscrollBehavior: "none" }}
             onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
+            onTouchMove={(e) => {
+              e.stopPropagation();
+              if (e.cancelable) e.preventDefault();
+            }}
             onTouchEnd={(e) => e.stopPropagation()}
             className="absolute bottom-0 left-0 right-0 z-30 px-4 sm:px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 pointer-events-auto flex flex-col gap-2 touch-none overscroll-none bottom-controls"
           >

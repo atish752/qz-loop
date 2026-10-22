@@ -19,6 +19,7 @@ export interface AnswerRecord {
   isCorrect: boolean;
   correctOptionId: string;
   explanation?: string;
+  responseTimeMs?: number;
   repeatInterval?: RepeatInterval;
   metrics?: {
     attempts: number;
@@ -233,7 +234,12 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
-  const stoppedTimeMsRef = useRef<number>(0);
+  const stoppedTimeMsRef = useRef<number>(
+    initialAnswerRecord?.responseTimeMs ||
+      (typeof window !== "undefined"
+        ? parseInt(sessionStorage.getItem(`qz_timer_stopped_${question.id}`) || "0", 10) || 0
+        : 0)
+  );
 
   // Modals
   const [showShareModal, setShowShareModal] = useState(false);
@@ -470,6 +476,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           isCorrect: data.isCorrect,
           correctOptionId: data.correctOptionId,
           explanation: data.explanation || question.explanation,
+          responseTimeMs: finalElapsedMs,
           repeatInterval,
           metrics: updatedMetrics,
         };
@@ -715,8 +722,12 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       {/* 1. Top Question Information Bar */}
       <div
         data-no-swipe="true"
+        style={{ touchAction: "none", overscrollBehavior: "none" }}
         onTouchStart={(e) => e.stopPropagation()}
-        onTouchMove={(e) => e.stopPropagation()}
+        onTouchMove={(e) => {
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+        }}
         onTouchEnd={(e) => e.stopPropagation()}
         className="flex items-center justify-between pb-2 border-b border-surface-container-high/30 shrink-0 touch-none select-none"
       >
@@ -834,7 +845,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
         {/* Options Stack (Shown when user taps Answer & Learn) */}
         {showOptions && (
-          <div className="shrink-0 flex flex-col gap-1.5 pb-24">
+          <div className="shrink-0 flex flex-col gap-1.5 pb-36 sm:pb-40">
             <div
               data-reel-scrollable="true"
               className="w-full flex flex-col gap-2 animate-in fade-in duration-200 max-h-[38vh] overflow-y-auto overscroll-contain no-scrollbar"
@@ -911,8 +922,12 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         {/* 4. Instagram-Style Floating Right-Side Action Column */}
         <div
           data-no-swipe="true"
+          style={{ touchAction: "none", overscrollBehavior: "none" }}
           onTouchStart={(e) => e.stopPropagation()}
-          onTouchMove={(e) => e.stopPropagation()}
+          onTouchMove={(e) => {
+            e.stopPropagation();
+            if (e.cancelable) e.preventDefault();
+          }}
           onTouchEnd={(e) => e.stopPropagation()}
           className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 z-30 select-none touch-none action-rail"
         >

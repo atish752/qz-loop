@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/data/store";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-let lastCloudFeedSync = 0;
-const CLOUD_FEED_SYNC_TTL_MS = 5 * 1000; // 5 seconds cache for fast cross-user publishing visibility
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const lastCloudFeedSyncByExam = new Map<string, number>();
+const CLOUD_FEED_SYNC_TTL_MS = 3 * 1000; // 3 seconds per exam for instant cross-user publishing visibility
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,9 +24,11 @@ export async function GET(request: NextRequest) {
     const sessionExcludedIds = excludedParam ? excludedParam.split(",") : [];
     const langParam = (searchParams.get("lang") || searchParams.get("language") || "all") as "en" | "hi" | "all";
 
-    // Recover community published questions from Supabase if connected (throttled by TTL to minimize egress)
+    // Recover community published questions from Supabase if connected (throttled per exam by TTL)
     const now = Date.now();
-    if (now - lastCloudFeedSync > CLOUD_FEED_SYNC_TTL_MS) {
+    const syncKey = examId || "all";
+    const lastExamSync = lastCloudFeedSyncByExam.get(syncKey) || 0;
+    if (now - lastExamSync > CLOUD_FEED_SYNC_TTL_MS) {
       try {
         const supabase = await createServerSupabaseClient();
         if (supabase) {
@@ -53,7 +58,7 @@ export async function GET(request: NextRequest) {
             cloudQuestions = fallbackQuestions;
           }
 
-          lastCloudFeedSync = now;
+          lastCloudFeedSyncByExam.set(syncKey, now);
 
         if (cloudQuestions && cloudQuestions.length > 0) {
           for (const cq of cloudQuestions) {
@@ -160,7 +165,7 @@ export async function GET(request: NextRequest) {
       },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=15, stale-while-revalidate=45",
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
         },
       }
     );
