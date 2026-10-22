@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Question, Examination, UserProfile, FriendUser } from "@/types/database";
+import { Question, Examination, UserProfile, FriendUser, RepeatInterval } from "@/types/database";
 import { QuestionReelCard, AnswerRecord } from "./QuestionReelCard";
 import { StudyChatModal } from "./StudyChatModal";
 import { SavePlaylistModal } from "./SavePlaylistModal";
@@ -31,8 +31,13 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   initialExams = [],
 }) => {
   const { lang, t } = useAppLanguage();
-  // Session Start State (Spec: When a user goes to quiz loop tab, it does NOT automatically start)
-  const [isStarted, setIsStarted] = useState<boolean>(false);
+  // Session Start State: resumes where student left off if active in session
+  const [isStarted, setIsStarted] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("qz_loop_is_active") === "true";
+    }
+    return false;
+  });
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(["all"]);
   const [quizLanguage, setQuizLanguage] = useState<"all" | "hi" | "en">("all");
 
@@ -42,9 +47,18 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const [user, setUser] = useState<UserProfile | null>(null);
   const [showExamModal, setShowExamModal] = useState<boolean>(false);
 
-  // Reel Feed State
+  // Reel Feed State: resumes exact question index if returning from another tab
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [currentIndex, setCurrentIndex] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("qz_last_loop_index");
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+    }
+    return 0;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -311,7 +325,17 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
           if (reset) {
             setQuestions(fetched);
-            setCurrentIndex(0);
+            let resumeIndex = 0;
+            if (typeof window !== "undefined") {
+              const saved = sessionStorage.getItem("qz_last_loop_index");
+              if (saved) {
+                const parsed = parseInt(saved, 10);
+                if (!isNaN(parsed) && parsed >= 0 && parsed < fetched.length) {
+                  resumeIndex = parsed;
+                }
+              }
+            }
+            setCurrentIndex(resumeIndex);
             displayedQuestionIdsRef.current.clear();
             fetched.forEach((q) => displayedQuestionIdsRef.current.add(q.id));
           } else {
@@ -446,8 +470,27 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     setSelectedSubjects(next);
   };
 
+  // Synchronize currentIndex to sessionStorage
+  useEffect(() => {
+    if (typeof window !== "undefined" && isStarted) {
+      sessionStorage.setItem("qz_last_loop_index", String(currentIndex));
+      localStorage.setItem("qz_last_loop_index", String(currentIndex));
+    }
+  }, [currentIndex, isStarted]);
+
+  // On mount: if returning to loop from another tab, automatically fetch and resume
+  useEffect(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("qz_loop_is_active") === "true") {
+      loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, true);
+    }
+  }, []);
+
   // Start Button Clicked
   const handleStartLoop = () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("qz_loop_is_active", "true");
+      sessionStorage.setItem("qz_last_loop_index", "0");
+    }
     setIsStarted(true);
     loadFeedQuestions(selectedSubjects, currentExamId, quizLanguage, true);
   };
@@ -554,6 +597,25 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const touchTargetRef = useRef<EventTarget | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    const targetEl = e.target as HTMLElement | null;
+    // Strictly isolate: swipe gestures only start from question statement or whitespace card body.
+    // Never trigger scroll/swipe from bottom buttons, metrics bar, action rail, or modals.
+    if (
+      targetEl?.closest('[data-no-swipe="true"]') ||
+      targetEl?.closest("button") ||
+      targetEl?.closest("a") ||
+      targetEl?.closest("input") ||
+      targetEl?.closest("select") ||
+      targetEl?.closest('[role="button"]') ||
+      targetEl?.closest(".bottom-controls") ||
+      targetEl?.closest(".action-rail")
+    ) {
+      touchStartYRef.current = null;
+      touchStartXRef.current = null;
+      touchTargetRef.current = null;
+      return;
+    }
+
     touchStartYRef.current = e.touches[0].clientY;
     touchStartXRef.current = e.touches[0].clientX;
     touchTargetRef.current = e.target;
@@ -615,6 +677,15 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const lastWheelTimeRef = useRef<number>(0);
   const handleWheel = (e: React.WheelEvent) => {
     const targetEl = e.target as HTMLElement | null;
+    if (
+      targetEl?.closest('[data-no-swipe="true"]') ||
+      targetEl?.closest("button") ||
+      targetEl?.closest("a") ||
+      targetEl?.closest(".bottom-controls") ||
+      targetEl?.closest(".action-rail")
+    ) {
+      return;
+    }
     const scrollableEl = targetEl?.closest("[data-reel-scrollable='true'], [data-reel-explanation='true']");
     if (scrollableEl) {
       const isScrollable = scrollableEl.scrollHeight > scrollableEl.clientHeight + 4;
@@ -991,13 +1062,25 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   // VIEW 2: ACTIVE QZ LOOP (Vertical Reels)
   // ==========================================
   return (
-    <div className="flex flex-col h-[100dvh] bg-surface overflow-hidden pb-16">
+    <div className="flex flex-col h-[100dvh] max-h-[100dvh] bg-surface overflow-hidden overscroll-none select-none pb-16 touch-none">
       {/* Subtle Top Reel Bar with Flow Pill & Combo Streak */}
-      <div className="h-12 px-4 flex items-center justify-between bg-surface-container-lowest/80 backdrop-blur-md border-b border-surface-container-high/40 z-30 shrink-0">
+      <div
+        data-no-swipe="true"
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+        className="h-12 px-4 flex items-center justify-between bg-surface-container-lowest/80 backdrop-blur-md border-b border-surface-container-high/40 z-30 shrink-0 touch-none overscroll-none"
+      >
         <div className="flex items-center gap-1.5">
           <button
-            onClick={() => setIsStarted(false)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-bold transition-colors"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                sessionStorage.removeItem("qz_loop_is_active");
+                sessionStorage.removeItem("qz_last_loop_index");
+              }
+              setIsStarted(false);
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-bold transition-colors cursor-pointer"
             title="Change Subject Flow"
           >
             <span className="material-symbols-outlined text-[15px] text-primary">tune</span>
@@ -1168,7 +1251,13 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
         {/* Pinned Bottom Answering Bar & 4 Community Metrics Bar (Rigidly Fixed, Zero Glitch) */}
         {activeQuestion && (
-          <div className="absolute bottom-0 left-0 right-0 z-30 px-4 sm:px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 pointer-events-auto flex flex-col gap-2">
+          <div
+            data-no-swipe="true"
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            className="absolute bottom-0 left-0 right-0 z-30 px-4 sm:px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 pointer-events-auto flex flex-col gap-2 touch-none overscroll-none bottom-controls"
+          >
             {!activeAnswerStatus.isAnswerMode && !activeAnswerStatus.isAnswered && !answeredRecords[activeQuestion.id] && (
               <div className="w-full">
                 <button
@@ -1224,20 +1313,95 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             )}
 
             {(activeAnswerStatus.isAnswered || Boolean(answeredRecords[activeQuestion.id])) && (
-              <div className="w-full">
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.dispatchEvent(
-                      new CustomEvent("qz_open_solution_modal", { detail: { questionId: activeQuestion.id } })
-                    );
-                  }}
-                  className="w-full h-11 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-2xs group cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">bolt</span>
-                  <span>{lang === "hi" ? "समाधान व दोहराव (Quick Proof)" : "Quick Proof & Solution"}</span>
-                </button>
-              </div>
+              <>
+                <div className="w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent("qz_open_solution_modal", { detail: { questionId: activeQuestion.id } })
+                      );
+                    }}
+                    className="w-full h-11 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-2xs group cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">bolt</span>
+                    <span>{lang === "hi" ? "समाधान देखें (Quick Proof & Solution)" : "Quick Proof & Solution"}</span>
+                  </button>
+                </div>
+
+                {/* Spaced Repetition Timeline Selector (1 Day, 1 Week, 1 Month, Never) */}
+                <div className="w-full bg-surface-container-low/95 rounded-xl p-2 border border-surface-container-high/50 flex flex-col gap-1 shadow-2xs animate-in fade-in">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-secondary px-0.5">
+                    <span className="flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px] text-primary">history</span>
+                      <span>{t.repeatPrompt || "Repeat question in (optional):"}</span>
+                    </span>
+                    {answeredRecords[activeQuestion.id]?.repeatInterval && (
+                      <span className="text-[10px] text-tertiary font-bold capitalize">
+                        {answeredRecords[activeQuestion.id]?.repeatInterval === "never"
+                          ? "Never"
+                          : `1 ${answeredRecords[activeQuestion.id]?.repeatInterval}`}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(
+                      [
+                        { id: "day", label: t.repeatDay || "1 Day" },
+                        { id: "week", label: t.repeatWeek || "1 Week" },
+                        { id: "month", label: t.repeatMonth || "1 Month" },
+                        { id: "never", label: t.repeatNever || "Never" },
+                      ] as const
+                    ).map((item) => {
+                      const currentRepeat = answeredRecords[activeQuestion.id]?.repeatInterval;
+                      const isChosen = currentRepeat === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
+                            setAnsweredRecords((prev) => {
+                              const rec = prev[activeQuestion.id] || {
+                                selectedOptionId: "",
+                                isCorrect: false,
+                                correctOptionId: activeQuestion.correct_option_id,
+                              };
+                              return {
+                                ...prev,
+                                [activeQuestion.id]: {
+                                  ...rec,
+                                  repeatInterval: item.id as RepeatInterval,
+                                },
+                              };
+                            });
+                            window.dispatchEvent(
+                              new CustomEvent("qz_select_repeat_interval", {
+                                detail: { questionId: activeQuestion.id, interval: item.id },
+                              })
+                            );
+                            fetch("/api/questions/repeat", {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                                ...(uid ? { "x-user-id": uid } : {}),
+                              },
+                              body: JSON.stringify({ questionId: activeQuestion.id, interval: item.id, userId: uid }),
+                            }).catch(() => {});
+                          }}
+                          className={`py-1.5 px-1 rounded-lg text-center text-xs font-bold transition-all border cursor-pointer ${
+                            isChosen
+                              ? "bg-primary text-on-primary border-primary shadow-xs"
+                              : "bg-surface-container/70 border-transparent text-secondary hover:text-on-surface hover:bg-surface-container"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
             )}
 
             {/* Community Performance Metrics Bar - Full Available Bottom Width */}

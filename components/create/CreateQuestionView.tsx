@@ -161,9 +161,9 @@ export const CreateQuestionView: React.FC = () => {
     (typeof window !== "undefined"
       ? localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam")
       : null) || null;
-  const effectiveExamId = "exam-neet-ug";
-  const currentExamObj = EXAMS_LIST.find((e) => e.id === "exam-neet-ug") || EXAMS_LIST[2] || EXAMS_LIST[0];
-  const currentExamSubjects = EXAM_SUBJECTS_MAP["exam-neet-ug"];
+  const effectiveExamId = selectedExamId || persistentExamId || user?.preferred_examination_id || "exam-neet-ug";
+  const currentExamObj = EXAMS_LIST.find((e) => e.id === effectiveExamId) || EXAMS_LIST.find((e) => e.id === "exam-neet-ug") || EXAMS_LIST[0];
+  const currentExamSubjects = EXAM_SUBJECTS_MAP[effectiveExamId] || EXAM_SUBJECTS_MAP["exam-neet-ug"];
   const currentSubjectObj = currentExamSubjects.find((s) => s.id === selectedSubjectId) || currentExamSubjects[0];
   const dynamicTopics = getTopicsForSubject(currentSubjectObj?.slug, currentSubjectObj?.name);
   const effectiveDynamicTopics = React.useMemo(() => {
@@ -413,9 +413,14 @@ export const CreateQuestionView: React.FC = () => {
   // Sync exam & subjects from user profile or localStorage automatically
   useEffect(() => {
     const syncExam = () => {
-      const activeId = "exam-neet-ug";
+      const activeId =
+        user?.preferred_examination_id ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem("qz_target_exam") || localStorage.getItem("qz_last_exam")
+          : null) ||
+        "exam-neet-ug";
       setSelectedExamId(activeId);
-      const subjs = EXAM_SUBJECTS_MAP["exam-neet-ug"];
+      const subjs = EXAM_SUBJECTS_MAP[activeId] || EXAM_SUBJECTS_MAP["exam-neet-ug"];
       if (subjs && subjs.length > 0) {
         setSelectedSubjectId((prev) => {
           const valid = subjs.some((s) => s.id === prev);

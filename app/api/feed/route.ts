@@ -3,7 +3,7 @@ import { db } from "@/lib/data/store";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 let lastCloudFeedSync = 0;
-const CLOUD_FEED_SYNC_TTL_MS = 60 * 1000; // 60 seconds cache
+const CLOUD_FEED_SYNC_TTL_MS = 5 * 1000; // 5 seconds cache for fast cross-user publishing visibility
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,13 +27,31 @@ export async function GET(request: NextRequest) {
       try {
         const supabase = await createServerSupabaseClient();
         if (supabase) {
-          const { data: cloudQuestions } = await supabase
+          let cloudQuery = supabase
             .from("questions")
             .select("*")
             .eq("publication_status", "published")
             .eq("moderation_status", "active")
             .order("created_at", { ascending: false })
             .limit(50);
+
+          if (examId && examId !== "all") {
+            cloudQuery = cloudQuery.eq("examination_id", examId);
+          }
+
+          let { data: cloudQuestions } = await cloudQuery;
+
+          // If no questions found for specific exam, fallback to latest published questions
+          if (!cloudQuestions || cloudQuestions.length === 0) {
+            const { data: fallbackQuestions } = await supabase
+              .from("questions")
+              .select("*")
+              .eq("publication_status", "published")
+              .eq("moderation_status", "active")
+              .order("created_at", { ascending: false })
+              .limit(50);
+            cloudQuestions = fallbackQuestions;
+          }
 
           lastCloudFeedSync = now;
 

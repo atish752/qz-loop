@@ -195,17 +195,25 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         setShowPostAnswerModal(true);
       }
     };
+    const handleRepeatIntervalSync = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId: string; interval: RepeatInterval }>;
+      if (customEvent.detail && customEvent.detail.questionId === question.id) {
+        setRepeatInterval(customEvent.detail.interval);
+      }
+    };
     window.addEventListener("qz_saved_changed", handleSavedSync);
     window.addEventListener("qz_comment_added", handleCommentAdded);
     window.addEventListener("qz_open_answer_options", handleOpenOptions);
     window.addEventListener("qz_hide_answer_options", handleHideOptions);
     window.addEventListener("qz_open_solution_modal", handleOpenSolution);
+    window.addEventListener("qz_select_repeat_interval", handleRepeatIntervalSync);
     return () => {
       window.removeEventListener("qz_saved_changed", handleSavedSync);
       window.removeEventListener("qz_comment_added", handleCommentAdded);
       window.removeEventListener("qz_open_answer_options", handleOpenOptions);
       window.removeEventListener("qz_hide_answer_options", handleHideOptions);
       window.removeEventListener("qz_open_solution_modal", handleOpenSolution);
+      window.removeEventListener("qz_select_repeat_interval", handleRepeatIntervalSync);
     };
   }, [question.id]);
 
@@ -221,7 +229,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       (question.fastest_correct_ms ? Number((question.fastest_correct_ms / 1000).toFixed(1)) : null),
   });
 
-  // Timer
+  // Timer: continuous across tab switches
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -282,12 +290,31 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       .catch(() => {});
   }, [question.id]);
 
-  // Start timer ONLY when active and not yet answered
+  // Start timer ONLY when active and not yet answered - continuous across tab switches
   useEffect(() => {
+    const timerStartKey = `qz_timer_start_${question.id}`;
     if (isActive && !isAnswered) {
       if (!startTimeRef.current) {
-        startTimeRef.current = Date.now();
+        if (typeof window !== "undefined") {
+          const stored = sessionStorage.getItem(timerStartKey);
+          if (stored) {
+            const parsed = parseInt(stored, 10);
+            if (!isNaN(parsed) && parsed > 0 && parsed <= Date.now()) {
+              startTimeRef.current = parsed;
+            }
+          }
+        }
+        if (!startTimeRef.current) {
+          startTimeRef.current = Date.now();
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem(timerStartKey, String(startTimeRef.current));
+          }
+        }
       }
+
+      const initialSecs = Math.max(0, Math.floor((Date.now() - startTimeRef.current) / 1000));
+      setElapsedSeconds(initialSecs);
+
       timerRef.current = setInterval(() => {
         if (startTimeRef.current) {
           const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
@@ -305,7 +332,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         clearInterval(timerRef.current);
       }
     };
-  }, [isActive, isAnswered]);
+  }, [isActive, isAnswered, question.id]);
 
   // Listen for pinned bottom bar events from parent container
   useEffect(() => {
@@ -413,7 +440,12 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         if (data.explanation) {
           setExplanation(data.explanation);
         }
-        setShowPostAnswerModal(true);
+        // Solution modal is optional to click - do NOT pre-open!
+        setShowPostAnswerModal(false);
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem(`qz_timer_start_${question.id}`);
+          sessionStorage.setItem(`qz_timer_stopped_${question.id}`, String(finalElapsedMs));
+        }
 
         const updatedMetrics = {
           attempts: data.updatedMetrics.total_attempts,
@@ -681,7 +713,13 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       )}
 
       {/* 1. Top Question Information Bar */}
-      <div className="flex items-center justify-between pb-2 border-b border-surface-container-high/30 shrink-0">
+      <div
+        data-no-swipe="true"
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+        className="flex items-center justify-between pb-2 border-b border-surface-container-high/30 shrink-0 touch-none select-none"
+      >
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm uppercase tracking-wider font-bold">
             {question.subject_name || "General"}
@@ -870,126 +908,14 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         )}
 
 
-        {/* 3. Explanation & Quick Proof Card (With Scroll Isolation & Spaced Repetition) */}
-        {isAnswered && (
-          <div
-            ref={explanationRef}
-            data-reel-explanation="true"
-            className="mt-2.5 overflow-y-auto no-scrollbar rounded-xl bg-surface-container-low border border-surface-container-high/60 p-3 max-h-[28vh] animate-in slide-in-from-top-2 duration-300"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-              <div className="flex items-center gap-1 text-primary font-bold text-xs">
-                <span className="material-symbols-outlined text-[16px]">bolt</span>
-                <span>{t.quickProof}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    isCorrect
-                      ? "bg-tertiary-fixed text-on-tertiary-fixed"
-                      : "bg-error-container text-on-error-container"
-                  }`}
-                >
-                  {isCorrect
-                    ? `+${scoringRule.marksPerCorrect.toFixed(2)} ${t.marksPlus}`
-                    : `-${scoringRule.penaltyPerWrong.toFixed(2)} ${t.marksPenalty}`}
-                </span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    isCorrect
-                      ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200"
-                      : "bg-rose-500/15 text-rose-800 dark:text-rose-200"
-                  }`}
-                >
-                  {isCorrect ? t.correctFeedback : t.reviewSolution}
-                </span>
-              </div>
-            </div>
-
-            <p className="text-xs text-on-surface leading-relaxed mb-3">
-              {activeExplanation}
-            </p>
-
-            {/* Peer Quality Verification Row */}
-            <div className="flex items-center justify-between py-1.5 border-t border-surface-container-high/40 text-xs mb-2">
-              <span className="text-secondary text-[11px] font-medium flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px] text-primary">verified</span>
-                {t.peerVerifiedPYQ}
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleQualityVote("up")}
-                  className={`px-2 py-0.5 rounded-md flex items-center gap-1 text-[11px] font-bold transition-colors ${
-                    userQualityVote === "up"
-                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40"
-                      : "bg-surface-container text-secondary hover:text-on-surface"
-                  }`}
-                  title="Accurate question and answer"
-                >
-                  <span>👍</span>
-                  <span>{upvotes}</span>
-                </button>
-                <button
-                  onClick={() => handleQualityVote("down")}
-                  className={`px-2 py-0.5 rounded-md flex items-center gap-1 text-[11px] font-bold transition-colors ${
-                    userQualityVote === "down"
-                      ? "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/40"
-                      : "bg-surface-container text-secondary hover:text-on-surface"
-                  }`}
-                  title="Report incorrect answer or typo"
-                >
-                  <span>👎</span>
-                  <span>{downvotes}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Spaced Repetition Interval Buttons */}
-            <div className="pt-2 border-t border-surface-container-high/40">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-1 text-secondary text-xs font-semibold">
-                  <span className="material-symbols-outlined text-[14px] text-primary">history</span>
-                  <span>{t.repeatPrompt}</span>
-                </div>
-                {repeatSavedBadge && (
-                  <span className="text-[10px] text-tertiary font-bold animate-in fade-in">
-                    {repeatSavedBadge}
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-4 gap-1.5">
-                {(
-                  [
-                    { id: "day", label: t.repeatDay, tip: "Quick" },
-                    { id: "week", label: t.repeatWeek, tip: "Week" },
-                    { id: "month", label: t.repeatMonth, tip: "Month" },
-                    { id: "never", label: t.repeatNever, tip: "Mastered" },
-                  ] as const
-                ).map((item) => {
-                  const isChosen = repeatInterval === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleSelectRepeat(item.id)}
-                      className={`py-1.5 px-1 rounded-lg text-center text-[11px] font-bold transition-all border ${
-                        isChosen
-                          ? "bg-primary text-on-primary border-primary shadow-xs"
-                          : "bg-surface-container border-transparent text-secondary hover:text-on-surface hover:bg-surface-container-high"
-                      }`}
-                      title={item.tip}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* 4. Instagram-Style Floating Right-Side Action Column */}
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 z-30 select-none">
+        <div
+          data-no-swipe="true"
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+          className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 z-30 select-none touch-none action-rail"
+        >
           {/* Creator Avatar & Follow Button */}
           <div className="relative mb-1">
             <button
@@ -1294,33 +1220,40 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         </div>
       )}
 
-      {/* Post-Answer Pop-up Modal */}
+      {/* Post-Answer Pop-up Modal (Large Popup with Cut / Close Option) */}
       {showPostAnswerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-sm sm:max-w-md bg-surface-container-lowest rounded-3xl p-5 shadow-2xl border border-surface-container-high/60 flex flex-col gap-3.5 max-h-[90vh] overflow-y-auto no-scrollbar animate-in zoom-in-95 duration-200 text-left">
-            {/* Top Result Banner */}
-            <div className="flex items-center justify-between pb-2 border-b border-surface-container-high/40">
-              <div className="flex items-center gap-2.5">
+        <div
+          data-no-swipe="true"
+          onClick={() => setShowPostAnswerModal(false)}
+          className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg sm:max-w-xl bg-surface-container-lowest rounded-3xl p-5 sm:p-6 shadow-2xl border border-surface-container-high/60 flex flex-col gap-4 max-h-[90vh] overflow-y-auto no-scrollbar animate-in zoom-in-95 duration-200 text-left"
+          >
+            {/* Top Result Banner & Cut Button */}
+            <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
+              <div className="flex items-center gap-3">
                 <div
-                  className={`w-9 h-9 rounded-2xl flex items-center justify-center text-white font-bold shrink-0 shadow-sm ${
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold shrink-0 shadow-sm ${
                     isCorrect ? "bg-emerald-600" : "bg-rose-600"
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[20px]">
+                  <span className="material-symbols-outlined text-[22px]">
                     {isCorrect ? "check" : "close"}
                   </span>
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-on-surface">
+                  <h3 className="font-bold text-base text-on-surface">
                     {isCorrect ? (t.correctFeedback || "Correct Answer!") : (t.reviewSolution || "Incorrect Solution")}
                   </h3>
-                  <span className="text-[11px] text-secondary font-mono">
+                  <span className="text-xs text-secondary font-mono">
                     Solved in {(stoppedTimeMsRef.current / 1000).toFixed(1)}s
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <span
                   className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                     isCorrect
@@ -1332,21 +1265,22 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                     ? `+${scoringRule.marksPerCorrect.toFixed(2)} ${t.marksPlus || "Marks"}`
                     : `-${scoringRule.penaltyPerWrong.toFixed(2)} ${t.marksPenalty || "Penalty"}`}
                 </span>
+                {/* Option to Cut ("X") */}
                 <button
                   type="button"
                   onClick={() => setShowPostAnswerModal(false)}
-                  className="w-7 h-7 rounded-full hover:bg-surface-container flex items-center justify-center text-secondary hover:text-on-surface"
-                  title="Close modal"
+                  className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-secondary hover:text-on-surface transition-colors cursor-pointer"
+                  title="Cut / Close modal"
                 >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
               </div>
             </div>
 
             {/* Correct Option Pill if Incorrect */}
             {!isCorrect && correctOptionId && (
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs sm:text-sm flex items-center gap-2.5">
+                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
                   {correctOptionId}
                 </span>
                 <span className="font-bold text-emerald-950 dark:text-emerald-200">
@@ -1355,19 +1289,19 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               </div>
             )}
 
-            {/* Quick Proof Explanation Section */}
-            <div className="bg-surface-container-low rounded-2xl p-3 border border-surface-container-high/40 flex flex-col gap-1.5">
-              <div className="flex items-center gap-1 text-primary font-bold text-xs">
-                <span className="material-symbols-outlined text-[16px]">bolt</span>
-                <span>{t.quickProof || "Quick Proof"}</span>
+            {/* Quick Proof Explanation Section - Large & Clear */}
+            <div className="bg-surface-container-low rounded-2xl p-4 border border-surface-container-high/40 flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 text-primary font-bold text-sm">
+                <span className="material-symbols-outlined text-[18px]">bolt</span>
+                <span>{t.quickProof || "Quick Proof & Solution"}</span>
               </div>
-              <p className="text-xs text-on-surface leading-relaxed max-h-36 overflow-y-auto no-scrollbar">
+              <p className="text-sm text-on-surface leading-relaxed max-h-56 overflow-y-auto no-scrollbar whitespace-pre-wrap">
                 {activeExplanation || (lang === "hi" ? "इस प्रश्न के लिए कोई व्याख्या उपलब्ध नहीं है।" : "Author did not provide an explanation for this question.")}
               </p>
             </div>
 
             {/* Spaced Repetition Timeline Selector */}
-            <div className="bg-surface-container-low rounded-2xl p-3 border border-surface-container-high/40 flex flex-col gap-2">
+            <div className="bg-surface-container-low rounded-2xl p-3.5 border border-surface-container-high/40 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1 text-secondary text-xs font-semibold">
                   <span className="material-symbols-outlined text-[15px] text-primary">history</span>
@@ -1382,9 +1316,9 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               <div className="grid grid-cols-4 gap-1.5">
                 {(
                   [
-                    { id: "day", label: t.repeatDay || "Same Day", tip: "< 1 Day" },
-                    { id: "week", label: t.repeatWeek || "In a Week", tip: "2-6 Days" },
-                    { id: "month", label: t.repeatMonth || "In a Month", tip: "14-28 Days" },
+                    { id: "day", label: t.repeatDay || "1 Day", tip: "< 1 Day" },
+                    { id: "week", label: t.repeatWeek || "1 Week", tip: "2-6 Days" },
+                    { id: "month", label: t.repeatMonth || "1 Month", tip: "14-28 Days" },
                     { id: "never", label: t.repeatNever || "Never", tip: "Mastered" },
                   ] as const
                 ).map((item) => {
@@ -1394,7 +1328,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                       key={item.id}
                       type="button"
                       onClick={() => handleSelectRepeat(item.id)}
-                      className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border ${
+                      className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all border cursor-pointer ${
                         isChosen
                           ? "bg-primary text-on-primary border-primary shadow-xs"
                           : "bg-surface-container border-transparent text-secondary hover:text-on-surface hover:bg-surface-container-high"
@@ -1408,7 +1342,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               </div>
             </div>
 
-            {/* Large Prominent Skip & Next Question Button */}
+            {/* Action Buttons: Skip & Next + Cut / Close Solution */}
             <div className="flex flex-col gap-2 pt-1">
               <button
                 type="button"
@@ -1416,7 +1350,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                   setShowPostAnswerModal(false);
                   onNextQuestion();
                 }}
-                className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-base shadow-lg hover:shadow-xl active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold text-base shadow-lg hover:shadow-xl active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>{lang === "hi" ? "छोड़ें और अगला प्रश्न (Skip & Next)" : "Skip & Next Question"}</span>
                 <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
@@ -1424,9 +1358,10 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
               <button
                 type="button"
                 onClick={() => setShowPostAnswerModal(false)}
-                className="py-1 text-center text-xs text-secondary hover:text-on-surface font-semibold"
+                className="w-full py-2.5 rounded-xl border border-surface-container-high text-secondary hover:text-on-surface hover:bg-surface-container text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                {lang === "hi" ? "कार्ड पर वापस देखें" : "Dismiss & View Question Card"}
+                <span className="material-symbols-outlined text-[16px]">close</span>
+                <span>{lang === "hi" ? "समाधान बंद करें (Cut / Close)" : "Cut / Close Solution"}</span>
               </button>
             </div>
           </div>
