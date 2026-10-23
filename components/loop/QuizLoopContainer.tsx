@@ -757,15 +757,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const targetEl = e.target as HTMLElement | null;
-    // Strictly isolate: swipe gestures only start from question statement or whitespace card body.
-    // Never trigger scroll/swipe from bottom buttons, metrics bar, action rail, or modals.
+    // Don't intercept swipe when interacting with text inputs, dropdowns, bottom controls, or the right vertical action rail
     if (
-      targetEl?.closest('[data-no-swipe="true"]') ||
-      targetEl?.closest("button") ||
-      targetEl?.closest("a") ||
       targetEl?.closest("input") ||
+      targetEl?.closest("textarea") ||
       targetEl?.closest("select") ||
-      targetEl?.closest('[role="button"]') ||
       targetEl?.closest(".bottom-controls") ||
       targetEl?.closest(".action-rail")
     ) {
@@ -846,9 +842,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const handleWheel = (e: React.WheelEvent) => {
     const targetEl = e.target as HTMLElement | null;
     if (
-      targetEl?.closest('[data-no-swipe="true"]') ||
-      targetEl?.closest("button") ||
-      targetEl?.closest("a") ||
+      targetEl?.closest("input") ||
+      targetEl?.closest("textarea") ||
+      targetEl?.closest("select") ||
       targetEl?.closest(".bottom-controls") ||
       targetEl?.closest(".action-rail")
     ) {
@@ -910,11 +906,17 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     responseTimeMs: number;
     record: AnswerRecord;
   }) => {
-    // Save to answered records map so swiping back preserves state & explanation!
+    // Save to answered records map with default repeat interval 'week' so scrolling is uninterrupted!
+    const effectiveRepeat = result.record.repeatInterval || "week";
+    const recordWithRepeat: AnswerRecord = {
+      ...result.record,
+      repeatInterval: effectiveRepeat,
+    };
+
     setAnsweredRecords((prev) => {
       const next = {
         ...prev,
-        [result.questionId]: result.record,
+        [result.questionId]: recordWithRepeat,
       };
       if (typeof window !== "undefined") {
         try {

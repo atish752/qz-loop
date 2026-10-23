@@ -1,35 +1,35 @@
 "use client";
 
 import React from "react";
-import { Clock, Zap, CheckCircle, Award } from "lucide-react";
+import { Clock, BookOpen, ShieldAlert, Award } from "lucide-react";
 
 const STATS = [
   {
     icon: Clock,
     value: "15s",
     label: "Micro-Sprint Interval",
-    desc: "Active recall under real time pressure",
+    desc: "Active recall under realistic exam time pressure",
     accent: "text-purple-400",
   },
   {
-    icon: Zap,
-    value: "250K+",
-    label: "Questions Solved",
-    desc: "By competitive aspirants across India",
+    icon: BookOpen,
+    value: "NCERT",
+    label: "100% Syllabus Aligned",
+    desc: "Direct line-by-line Biology, Chemistry & Physics",
     accent: "text-emerald-400",
   },
   {
-    icon: CheckCircle,
-    value: "100%",
-    label: "Syllabus Accurate",
-    desc: "SSC, RRB, NEET, JEE & UPSC PYQs",
-    accent: "text-indigo-400",
+    icon: ShieldAlert,
+    value: "-1.00",
+    label: "Official NTA Negative",
+    desc: "Conditions against reckless guessing in exam hall",
+    accent: "text-rose-400",
   },
   {
     icon: Award,
     value: "0 Guilt",
     label: "Virtuous Doomscroll",
-    desc: "10 mins = 25 questions practiced",
+    desc: "10 mins on bus = 25 questions practiced",
     accent: "text-amber-400",
   },
 ];

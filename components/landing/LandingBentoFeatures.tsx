@@ -91,14 +91,14 @@ export function LandingBentoFeatures() {
                 Real Negative Marking
               </h3>
               <p className="text-sm sm:text-base text-slate-300 leading-relaxed mb-6">
-                Gamified quiz apps reward random guessing. Qz Loop conditions against it. We enforce the exact official penalty rules: <span className="text-red-400 font-bold">-0.50</span> for SSC, <span className="text-red-400 font-bold">-0.33</span> for Railways, and <span className="text-red-400 font-bold">-1.00</span> for NEET.
+                Gamified quiz apps reward random guessing. Qz Loop conditions against it. We enforce the authentic NTA NEET UG penalty formula: <span className="text-emerald-400 font-bold">+4.00</span> for correct, and <span className="text-red-400 font-bold">-1.00</span> for incorrect.
               </p>
             </div>
 
             <div className="p-4 rounded-2xl bg-[#090d16] border border-red-500/20 text-xs">
               <div className="flex justify-between items-center text-red-300 font-bold mb-1">
-                <span>SSC CGL Scoring Formula</span>
-                <span>+2.00 / -0.50</span>
+                <span>NTA NEET UG Scoring Formula</span>
+                <span>+4.00 / -1.00</span>
               </div>
               <p className="text-[11px] text-slate-400">
                 Eliminates reckless guesses before your real exam hall pressure.

@@ -28,7 +28,7 @@ export function LandingFooter() {
             </p>
             <div className="flex items-center gap-2 text-[11px] text-slate-500">
               <span>Landing Page:</span>
-              <span className="text-slate-300 font-mono">qz-loop-home.vercel.app</span>
+              <span className="text-slate-300 font-mono">qz-loop.vercel.app/landing</span>
               <span>·</span>
               <span>Webapp:</span>
               <a
@@ -50,28 +50,28 @@ export function LandingFooter() {
             </h5>
             <ul className="space-y-2">
               <li>
-                <a href="#exams" className="hover:text-white transition-colors">
-                  SSC CGL & CHSL (Tier 1 & 2)
+                <a href="#exams" className="text-emerald-400 font-semibold hover:text-white transition-colors">
+                  NEET UG (Live Now)
                 </a>
               </li>
               <li>
-                <a href="#exams" className="hover:text-white transition-colors">
-                  Railways RRB NTPC & Group D
+                <a href="#exams" className="text-slate-500 hover:text-white transition-colors">
+                  JEE Main (Coming Soon)
                 </a>
               </li>
               <li>
-                <a href="#exams" className="hover:text-white transition-colors">
-                  NEET UG & JEE Main
+                <a href="#exams" className="text-slate-500 hover:text-white transition-colors">
+                  SSC CGL & CHSL (Coming Soon)
                 </a>
               </li>
               <li>
-                <a href="#exams" className="hover:text-white transition-colors">
-                  Banking (SBI & IBPS PO)
+                <a href="#exams" className="text-slate-500 hover:text-white transition-colors">
+                  Railways RRB NTPC (Coming Soon)
                 </a>
               </li>
               <li>
-                <a href="#exams" className="hover:text-white transition-colors">
-                  UPSC CSAT & State PCS
+                <a href="#exams" className="text-slate-500 hover:text-white transition-colors">
+                  UPSC CSAT (Coming Soon)
                 </a>
               </li>
             </ul>

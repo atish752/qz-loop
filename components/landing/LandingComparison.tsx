@@ -32,8 +32,8 @@ const COMPARISON_ROWS = [
   {
     feature: "Real Exam Negative Marking",
     doomscroll: "N/A",
-    traditional: "Only at end of 2-hour mock",
-    qzloop: "Instant (-0.50 / -0.33) feedback per question",
+    traditional: "Only at end of 3-hour mock",
+    qzloop: "Instant (+4 / -1 NTA) feedback per question",
   },
   {
     feature: "Spaced Repetition Recovery",

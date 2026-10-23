@@ -24,7 +24,7 @@ export function LandingHero() {
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/10 backdrop-blur-xl mb-6 shadow-lg shadow-purple-900/20 hover:border-purple-500/30 transition-all">
               <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
               <span className="text-xs font-bold text-slate-200 tracking-wide">
-                ⚡ INDIA'S 1ST REELS-STYLE COMPETITIVE EXAM APP
+                ⚡ INDIA'S 1ST REELS-STYLE NEET UG PRACTICE APP
               </span>
             </div>
 
@@ -32,21 +32,21 @@ export function LandingHero() {
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-[1.08] mb-6">
               Don't fight the doomscroll.{" "}
               <span className="bg-gradient-to-r from-purple-400 via-indigo-300 to-emerald-400 bg-clip-text text-transparent">
-                Weaponize it.
+                Weaponize it for NEET.
               </span>
             </h1>
 
             {/* Subtitle */}
             <p className="text-base sm:text-lg text-slate-300 max-w-2xl leading-relaxed mb-8 font-normal">
-              Aspirants spend <strong className="text-white font-semibold">4 to 7 hours daily</strong> on
-              Instagram Reels and YouTube Shorts. Qz Loop converts that reflexive thumb flick into
-              15-second active recall micro-sprints. 25 exam questions in 10 minutes.{" "}
-              <span className="text-emerald-400 font-semibold">Zero post-scroll guilt.</span> Real TCS
-              negative marking.
+              NEET aspirants spend <strong className="text-white font-semibold">4 to 7 hours daily</strong> on
+              social media reels. Qz Loop converts that reflexive thumb flick into
+              15-second active recall micro-sprints on NCERT Biology, Chemistry & Physics.
+              25 PYQs in 10 minutes. <span className="text-emerald-400 font-semibold">Zero post-scroll guilt.</span> Authentic
+              NTA negative marking (-1.00).
             </p>
 
             {/* High-Impact CTA Buttons */}
-            <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-4 mb-10">
+            <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-4 mb-8">
               {/* Primary Glowing Action Button */}
               <a
                 href={APP_LOOP_URL}
@@ -56,7 +56,7 @@ export function LandingHero() {
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-purple-500 via-emerald-400 to-indigo-500 rounded-2xl animate-border-shimmer" />
                 <span className="w-full sm:w-auto relative px-8 py-4 transition-all ease-out bg-[#090d16] rounded-2xl group-hover:bg-[#06080e] flex items-center justify-center gap-3 text-base text-white">
-                  <span>Start Solving Free (Try Now)</span>
+                  <span>Start Solving NEET PYQs (Free)</span>
                   <ArrowRight className="w-5 h-5 text-emerald-400 group-hover:translate-x-1.5 transition-transform" />
                 </span>
               </a>
@@ -71,30 +71,18 @@ export function LandingHero() {
               </a>
             </div>
 
-            {/* Credibility & Social Proof */}
-            <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center gap-4 text-xs text-slate-400">
-              <div className="flex -space-x-2">
-                <div className="w-8 h-8 rounded-full border-2 border-[#090d16] bg-purple-600 flex items-center justify-center text-white font-bold text-[10px]">
-                  AK
-                </div>
-                <div className="w-8 h-8 rounded-full border-2 border-[#090d16] bg-emerald-600 flex items-center justify-center text-white font-bold text-[10px]">
-                  PS
-                </div>
-                <div className="w-8 h-8 rounded-full border-2 border-[#090d16] bg-indigo-600 flex items-center justify-center text-white font-bold text-[10px]">
-                  VT
-                </div>
-                <div className="w-8 h-8 rounded-full border-2 border-[#090d16] bg-amber-600 flex items-center justify-center text-white font-bold text-[10px]">
-                  RJ
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex text-amber-400">
-                  {"★".repeat(5)}
-                </div>
-                <span className="font-medium text-slate-300">
-                  Joined by <strong>25,000+ aspirants</strong> across Mukherjee Nagar, Patna & Kota
-                </span>
-              </div>
+            {/* Truthful Product Highlights (No Fake Numbers) */}
+            <div className="pt-5 border-t border-white/10 flex flex-wrap items-center gap-3 text-xs text-slate-300">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                Exclusively for NEET UG 2025–2027
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/25 text-purple-300 font-semibold">
+                100% NCERT Biology, Physics & Chemistry
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 border border-white/10 text-slate-300 font-medium">
+                Official NTA Scoring (+4 / -1)
+              </span>
             </div>
           </div>
 

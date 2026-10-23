@@ -5,7 +5,7 @@ import { AuthSync } from "@/components/auth/AuthSync";
 
 export const metadata: Metadata = {
   title: "Qz Loop — Scroll. Solve. Improve. Repeat.",
-  description: "India's first mobile-first vertical-scroll micro-practice app for competitive exam aspirants (SSC, Railways, NEET, JEE & UPSC). 15-second active recall questions. Zero guilt.",
+  description: "India's first mobile-first vertical-scroll micro-practice app for NEET UG medical aspirants (Biology, Physics, Chemistry). 15-second active recall questions. Zero guilt.",
   manifest: "/manifest.json",
   icons: {
     icon: "/logo.jpg",
@@ -13,16 +13,16 @@ export const metadata: Metadata = {
     apple: "/logo.jpg",
   },
   openGraph: {
-    title: "Qz Loop — Don't Fight The Doomscroll. Weaponize It.",
-    description: "Replace mindless Instagram scrolling with 15-second syllabus-accurate exam questions. Real negative marking, spaced repetition, and 1v1 challenges.",
-    url: "https://qz-loop-home.vercel.app",
+    title: "Qz Loop — Don't Fight The Doomscroll. Weaponize It for NEET.",
+    description: "Replace mindless social media scrolling with 15-second NCERT syllabus-accurate exam questions. Real NTA negative marking, spaced repetition, and 1v1 challenges.",
+    url: "https://qz-loop.vercel.app/landing",
     siteName: "Qz Loop",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Qz Loop — India's 1st Reels-Style Exam Quiz App",
-    description: "Scroll. Solve. Improve. Repeat. 25 PYQs solved in 10 minutes.",
+    title: "Qz Loop — India's 1st Reels-Style NEET UG Quiz App",
+    description: "Scroll. Solve. Improve. Repeat. 25 NCERT PYQs solved in 10 minutes.",
   },
   appleWebApp: {
     capable: true,

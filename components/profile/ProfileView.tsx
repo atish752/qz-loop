@@ -1217,45 +1217,6 @@ export const ProfileView: React.FC = () => {
             </span>
           </a>
         </div>
-
-        {/* Demo Switcher for Verification & Multi-user Testing */}
-        <div className="px-1 pb-1">
-          <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider font-bold">
-            {t.switchDemoProfile}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          {allProfiles.map((p) => {
-            const isCurrent = p.id === user?.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => handleSwitchUser(p.id)}
-                className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
-                  isCurrent
-                    ? "bg-primary-container text-on-primary border-primary shadow-xs"
-                    : "bg-surface-container-low text-on-surface border-surface-container-high/40 hover:bg-surface-container"
-                }`}
-              >
-                <div className="w-7 h-7 rounded-full overflow-hidden bg-surface-container shrink-0">
-                  {p.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.avatar_url} alt={p.display_name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="material-symbols-outlined text-[16px]">person</span>
-                  )}
-                </div>
-                <div className="min-w-0 flex flex-col">
-                  <span className="font-label-md text-label-md font-bold truncate">{p.display_name}</span>
-                  <span className={`font-label-sm text-label-sm truncate ${isCurrent ? "text-on-primary-container" : "text-secondary"}`}>
-                    🔥 {p.current_streak}d
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
           </div>
 
           {!isLoggedIn && (

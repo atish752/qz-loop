@@ -19,11 +19,11 @@ const FAQS: FaqItem[] = [
   },
   {
     q: "How does the real exam negative marking work?",
-    a: "Unlike superficial quiz games that give positive points for guesses, Qz Loop conditions you for real exam halls. For SSC exams, wrong answers deduct 0.50 marks. For Railways, 0.33 marks. For NEET, 1.00 mark. You immediately see whether your guess was mathematically worth the risk.",
+    a: "Unlike superficial quiz games that give positive points for guesses, Qz Loop conditions you for the real NTA exam hall. In NEET UG, correct answers award +4.00 marks, while wrong answers deduct -1.00 mark. You immediately see whether your guess was mathematically worth the risk.",
   },
   {
     q: "What examinations are currently included?",
-    a: "We currently cover SSC CGL & CHSL (Tier 1 & 2), Railways RRB NTPC & Group D, NEET UG (Biology & Chemistry), Banking (SBI/IBPS PO & Clerk), UPSC CSAT, and State Police SI exams.",
+    a: "Currently, Qz Loop is live and exclusively tailored for NEET UG (NCERT Biology, Chemistry & Physics). Other examinations (JEE Main, SSC CGL, Railways RRB, and UPSC CSAT) are in development and will be rolled out in upcoming releases.",
   },
   {
     q: "How does the Spaced Repetition Matrix help me remember?",

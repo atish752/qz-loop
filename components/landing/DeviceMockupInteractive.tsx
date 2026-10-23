@@ -33,38 +33,8 @@ interface QuestionDemo {
 const DEMO_QUESTIONS: QuestionDemo[] = [
   {
     id: "q1",
-    exam: "SSC CGL (Tier-1) · 2024 PYQ",
-    subject: "General Awareness",
-    question: "Which Article of the Indian Constitution guarantees the 'Right to Constitutional Remedies'?",
-    options: [
-      { id: "A", label: "A", text: "Article 21" },
-      { id: "B", label: "B", text: "Article 32" },
-      { id: "C", label: "C", text: "Article 19" },
-      { id: "D", label: "D", text: "Article 44" },
-    ],
-    correctId: "B",
-    explanation: "Dr. B.R. Ambedkar called Article 32 the 'Heart and Soul' of the Constitution.",
-    negativePenalty: "-0.50",
-  },
-  {
-    id: "q2",
-    exam: "RRB NTPC (Stage 1) · 2024 PYQ",
-    subject: "General Intelligence & Reasoning",
-    question: "If CLOUD is coded as 59, and RAIN is coded as 42, what will be the code for STORM?",
-    options: [
-      { id: "A", label: "A", text: "87" },
-      { id: "B", label: "B", text: "89" },
-      { id: "C", label: "C", text: "91" },
-      { id: "D", label: "D", text: "94" },
-    ],
-    correctId: "C",
-    explanation: "Sum of reverse positional alphabet values: S(8) + T(7) + O(12) + R(9) + M(14) = 50 + 41 = 91.",
-    negativePenalty: "-0.33",
-  },
-  {
-    id: "q3",
-    exam: "NEET UG · Biology PYQ",
-    subject: "Cell Biology",
+    exam: "NEET UG · Biology (Cell Biology)",
+    subject: "Botany & Zoology",
     question: "Which cellular organelle is directly responsible for synthesizing ribosomal RNA (rRNA)?",
     options: [
       { id: "A", label: "A", text: "Nucleolus" },
@@ -73,7 +43,37 @@ const DEMO_QUESTIONS: QuestionDemo[] = [
       { id: "D", label: "D", text: "Lysosome" },
     ],
     correctId: "A",
-    explanation: "The nucleolus is the primary site for active rRNA transcription and ribosome assembly.",
+    explanation: "NCERT Class 11 Biology: The nucleolus is the active site for rRNA transcription and ribosomal sub-unit synthesis.",
+    negativePenalty: "-1.00",
+  },
+  {
+    id: "q2",
+    exam: "NEET UG · Chemistry (Chemical Bonding)",
+    subject: "Chemistry",
+    question: "Which of the following planar molecules has a net dipole moment of zero due to symmetry?",
+    options: [
+      { id: "A", label: "A", text: "NH3 (Ammonia)" },
+      { id: "B", label: "B", text: "BF3 (Boron Trifluoride)" },
+      { id: "C", label: "C", text: "H2O (Water)" },
+      { id: "D", label: "D", text: "SO2 (Sulfur Dioxide)" },
+    ],
+    correctId: "B",
+    explanation: "NCERT Class 11 Chemistry: BF3 is trigonal planar (sp2 hybridized) with 120° bond angles; bond dipoles cancel out completely (μ = 0).",
+    negativePenalty: "-1.00",
+  },
+  {
+    id: "q3",
+    exam: "NEET UG · Physics (Units & Dimensions)",
+    subject: "Physics",
+    question: "What is the dimensional formula of Electric Potential (V)?",
+    options: [
+      { id: "A", label: "A", text: "[M L² T⁻³ A⁻¹]" },
+      { id: "B", label: "B", text: "[M L T⁻² A⁻¹]" },
+      { id: "C", label: "C", text: "[M L² T⁻² A]" },
+      { id: "D", label: "D", text: "[M L³ T⁻³ A⁻¹]" },
+    ],
+    correctId: "A",
+    explanation: "Potential V = Work / Charge = [M L² T⁻²] / [A T] = [M L² T⁻³ A⁻¹].",
     negativePenalty: "-1.00",
   },
 ];
@@ -296,10 +296,10 @@ export function DeviceMockupInteractive() {
                   <div className="flex items-center justify-between font-bold text-[11px] mb-1">
                     <span>
                       {selectedOption === currentQ.correctId
-                        ? "✓ Correct (+2.00 Marks)"
+                        ? "✓ Correct (+4.00 Marks)"
                         : `✗ Wrong (${currentQ.negativePenalty} Negative)`}
                     </span>
-                    <span className="text-[10px] text-slate-400">TCS Pattern</span>
+                    <span className="text-[10px] text-slate-400">NTA NEET UG</span>
                   </div>
                   <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
                     {currentQ.explanation}
@@ -332,7 +332,7 @@ export function DeviceMockupInteractive() {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h5 className="font-extrabold text-sm text-slate-100">
-                      Syllabus Mastery Radar
+                      NEET Syllabus Mastery Radar
                     </h5>
                     <p className="text-[10px] text-slate-400">
                       Spaced Repetition Algorithm (Asia/Kolkata)
@@ -347,7 +347,7 @@ export function DeviceMockupInteractive() {
                 <div className="space-y-3 my-4">
                   <div>
                     <div className="flex justify-between text-[11px] font-medium mb-1">
-                      <span className="text-slate-300">General Awareness</span>
+                      <span className="text-slate-300">Biology (Botany & Zoology)</span>
                       <span className="text-emerald-400 font-bold">84% Accuracy</span>
                     </div>
                     <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
@@ -357,21 +357,21 @@ export function DeviceMockupInteractive() {
 
                   <div>
                     <div className="flex justify-between text-[11px] font-medium mb-1">
-                      <span className="text-slate-300">General Intelligence (Reasoning)</span>
-                      <span className="text-purple-400 font-bold">92% Accuracy</span>
+                      <span className="text-slate-300">Chemistry (Organic & Physical)</span>
+                      <span className="text-purple-400 font-bold">78% Accuracy</span>
                     </div>
                     <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-purple-400 rounded-full w-[92%]" />
+                      <div className="h-full bg-purple-400 rounded-full w-[78%]" />
                     </div>
                   </div>
 
                   <div>
                     <div className="flex justify-between text-[11px] font-medium mb-1">
-                      <span className="text-slate-300">Quantitative Aptitude</span>
-                      <span className="text-amber-400 font-bold">68% (Weakness)</span>
+                      <span className="text-slate-300">Physics (Mechanics & Waves)</span>
+                      <span className="text-amber-400 font-bold">64% (Review Needed)</span>
                     </div>
                     <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-400 rounded-full w-[68%]" />
+                      <div className="h-full bg-amber-400 rounded-full w-[64%]" />
                     </div>
                   </div>
                 </div>
@@ -380,23 +380,22 @@ export function DeviceMockupInteractive() {
                 <div className="p-3 rounded-xl bg-purple-900/30 border border-purple-500/30 text-xs">
                   <div className="flex items-center gap-1.5 font-bold text-purple-200 mb-1">
                     <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Spaced Repetition Triggered</span>
+                    <span>Spaced Repetition Active</span>
                   </div>
                   <p className="text-[11px] text-slate-300 leading-snug">
-                    3 questions failed in Profit & Loss re-queued to your feed in 24 hours.
-                    Active recall locked.
+                    Missed questions in Genetics & Chemical Bonding automatically re-queued for your review session.
                   </p>
                 </div>
               </div>
 
               <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] text-slate-400 block">Today's Solved</span>
-                  <span className="text-base font-extrabold text-white">48 Questions</span>
+                  <span className="text-[10px] text-slate-400 block">Session Practice</span>
+                  <span className="text-base font-extrabold text-white">Active Solving</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-slate-400 block">Net Mock Score</span>
-                  <span className="text-base font-extrabold text-emerald-400">+88.50</span>
+                  <span className="text-[10px] text-slate-400 block">Scoring Rule</span>
+                  <span className="text-base font-extrabold text-emerald-400">+4 / -1 NTA</span>
                 </div>
               </div>
             </div>
@@ -412,10 +411,10 @@ export function DeviceMockupInteractive() {
                     <span>WhatsApp Speed Duel</span>
                   </span>
                   <h5 className="font-extrabold text-base text-slate-100">
-                    Live Aspirant Challenge
+                    NEET Aspirant Challenge
                   </h5>
                   <p className="text-[11px] text-slate-400">
-                    Send 5 questions to your library study partner
+                    Challenge your study partner with 5 NCERT questions
                   </p>
                 </div>
 
@@ -429,11 +428,11 @@ export function DeviceMockupInteractive() {
                       <div>
                         <span className="text-xs font-bold text-white block">You</span>
                         <span className="text-[10px] text-emerald-400 font-semibold">
-                          4/5 Correct · 38s
+                          4/5 Correct · +15 Marks
                         </span>
                       </div>
                     </div>
-                    <span className="text-xs font-black text-emerald-400">WINNER 🏆</span>
+                    <span className="text-xs font-black text-emerald-400">FASTER 🏆</span>
                   </div>
 
                   <div className="w-full h-[1px] bg-white/10" />
@@ -441,18 +440,18 @@ export function DeviceMockupInteractive() {
                   <div className="flex items-center justify-between opacity-80">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-purple-600 text-white font-black text-xs flex items-center justify-center">
-                        RK
+                        SP
                       </div>
                       <div>
                         <span className="text-xs font-bold text-white block">
-                          Rahul (Patna)
+                          Study Partner
                         </span>
                         <span className="text-[10px] text-slate-400 font-semibold">
-                          3/5 Correct · 49s
+                          3/5 Correct · +11 Marks
                         </span>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-slate-400">-0.50 Penalty</span>
+                    <span className="text-xs font-bold text-slate-400">-1.00 Penalty</span>
                   </div>
                 </div>
               </div>

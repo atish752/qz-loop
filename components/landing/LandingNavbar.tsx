@@ -29,7 +29,7 @@ export function LandingNavbar() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-3 group">
+        <Link href="/landing" className="flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-emerald-400 p-[1.5px] shadow-[0_0_20px_rgba(168,85,247,0.35)] group-hover:shadow-[0_0_28px_rgba(168,85,247,0.6)] transition-all">
             <div className="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center">
               <Zap className="w-5 h-5 text-emerald-400 fill-emerald-400/20" />
@@ -40,8 +40,8 @@ export function LandingNavbar() {
               <span className="font-extrabold text-xl tracking-tight text-white group-hover:text-purple-200 transition-colors">
                 QZ<span className="text-emerald-400">·</span>LOOP
               </span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 uppercase tracking-widest">
-                v2.0
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 uppercase tracking-widest">
+                NEET UG
               </span>
             </div>
             <span className="text-[11px] text-slate-400 font-medium tracking-wide">

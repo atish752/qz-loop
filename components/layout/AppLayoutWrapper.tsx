@@ -13,8 +13,8 @@ interface AppLayoutWrapperProps {
 
 export function AppLayoutWrapper({ children }: AppLayoutWrapperProps) {
   const pathname = usePathname();
-  // Landing page runs at '/' or '/home'
-  const isLandingPage = pathname === "/" || pathname === "/home";
+  // Landing page is dedicated to '/landing'
+  const isLandingPage = pathname === "/landing";
   const isLoop = pathname === "/loop" || pathname === "/qzloop";
 
   if (isLandingPage) {

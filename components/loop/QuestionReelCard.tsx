@@ -155,6 +155,18 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
     initialAnswerRecord?.repeatInterval
   );
   const [repeatSavedBadge, setRepeatSavedBadge] = useState<string | null>(null);
+  const [showRepeatBadge, setShowRepeatBadge] = useState<boolean>(Boolean(question.is_repeat));
+
+  // Auto-hide repeat badge after 4 seconds so it doesn't obstruct the question behind it
+  useEffect(() => {
+    if (isActive && question.is_repeat) {
+      setShowRepeatBadge(true);
+      const timer = setTimeout(() => {
+        setShowRepeatBadge(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [isActive, question.is_repeat]);
 
   // Sync state when initialAnswerRecord is provided or changes (preserving answered state upon swiping back)
   useEffect(() => {
@@ -501,13 +513,27 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           });
         }
 
+        // Default repeat interval to "week" so user doesn't need to manually click
+        const defaultRepeat: RepeatInterval = repeatInterval || "week";
+        if (!repeatInterval) {
+          setRepeatInterval(defaultRepeat);
+          fetch("/api/questions/repeat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(currentUid ? { "x-user-id": currentUid } : {}),
+            },
+            body: JSON.stringify({ questionId: question.id, interval: "week", userId: currentUid }),
+          }).catch(() => {});
+        }
+
         const answerRecord: AnswerRecord = {
           selectedOptionId: optionId,
           isCorrect: data.isCorrect,
           correctOptionId: data.correctOptionId,
           explanation: data.explanation || question.explanation,
           responseTimeMs: finalElapsedMs,
-          repeatInterval,
+          repeatInterval: defaultRepeat,
           metrics: updatedMetrics,
         };
 
@@ -862,9 +888,9 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       {/* 2. Main Question Card Body + Floating Action Bar on the Right */}
       <div className="relative flex-1 flex flex-col justify-center pt-2 pb-24 pr-16 sm:pr-20 min-h-0 overflow-hidden">
 
-        {/* Prominent Repeat Question Badge if resurfaced via Spaced Repetition */}
-        {question.is_repeat && (
-          <div className="mb-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-900 dark:text-amber-200 text-xs font-bold flex items-center gap-2 shadow-2xs animate-in fade-in shrink-0">
+        {/* Prominent Repeat Question Badge if resurfaced via Spaced Repetition (Auto-hides in 4s to uncover question) */}
+        {question.is_repeat && showRepeatBadge && (
+          <div className="mb-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-900 dark:text-amber-200 text-xs font-bold flex items-center gap-2 shadow-2xs animate-in fade-in transition-all duration-300 shrink-0">
             <span className="material-symbols-outlined text-[18px] text-amber-600 dark:text-amber-400">
               replay
             </span>
