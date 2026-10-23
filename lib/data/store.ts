@@ -1250,7 +1250,7 @@ class DataStore {
 
     // Weekly consistency bars (last 7 calendar days in Asia/Kolkata)
     const now = new Date();
-    const userAllAttempts = this.attempts.filter((a) => a.user_id === userId);
+    const userAllAttempts = (!userId || userId === "guest") ? [] : this.attempts.filter((a) => a.user_id === userId);
     const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const weeklyActivity: { day: string; count: number; day_label: string }[] = [];
     for (let i = 6; i >= 0; i--) {
@@ -1269,7 +1269,7 @@ class DataStore {
     }
 
     // Subject breakdown (Target exam subject matrix)
-    const user = this.profiles.find((p) => p.id === userId) || this.getCurrentUser();
+    const user = userId && userId !== "guest" ? this.profiles.find((p) => p.id === userId) : null;
     const targetExamId = user?.preferred_examination_id || "exam-neet-ug";
     let relevantSubjects = this.subjects.filter((s) => s.examination_id === targetExamId);
     if (relevantSubjects.length === 0) {

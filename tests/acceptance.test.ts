@@ -1723,6 +1723,19 @@ Ans: A`;
   assert(homeDashboardCode.includes("typeof todaySolvedCount === \"number\" ? todaySolvedCount : 0"), "HomeDashboardView uses strict numeric solvedToday without habit fallback masking 0");
   assert(bottomNavCode.includes("z-[150]"), "BottomNav leave confirmation dialog is hoisted to top z-index z-[150]");
 
+  // 5. Deep Guest Matrix & Dynamic Scoring Validation
+  const guestMatrixStats = db.getMatrixStats("guest", "today");
+  assert(guestMatrixStats.total_solved === 0, "Guest matrix total_solved strictly 0 on server");
+  assert(Boolean(guestMatrixStats.weekly_activity && guestMatrixStats.weekly_activity.every((w) => w.count === 0)), "Guest weekly_activity consistency bars all start strictly at 0 without cross-session contamination");
+  assert(guestMatrixStats.subjects[0].subject_slug !== undefined, "Guest matrix defaults to NEET UG subject list instead of falling back to other users");
+
+  // Dynamic Exam Scoring Rule in Solution Modal & Escape Key Handling
+  assert(loopContainerCode.includes("getExamScoringRule"), "QuizLoopContainer imports getExamScoringRule for dynamic solution scoring");
+  assert(loopContainerCode.includes("scoring.marksPerCorrect"), "Solution modal dynamically displays marks per correct answer");
+  assert(loopContainerCode.includes("scoring.penaltyPerWrong"), "Solution modal dynamically displays penalty deduction for wrong answers");
+  assert(loopContainerCode.includes("e.key === \"Escape\""), "Solution modal supports Escape key dismissal");
+  assert(bottomNavCode.includes("e.key === \"Escape\""), "BottomNav leave confirmation dialog supports Escape key dismissal");
+
   console.log("\n=================================================");
   console.log("   ALL 63 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");

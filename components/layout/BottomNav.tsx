@@ -103,6 +103,19 @@ export const BottomNav: React.FC = () => {
   const [pendingTargetHref, setPendingTargetHref] = useState<string>("");
   const [pendingTargetLabel, setPendingTargetLabel] = useState<string>("");
 
+  useEffect(() => {
+    if (!showLeaveConfirmation) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowLeaveConfirmation(false);
+        setPendingTargetHref("");
+        setPendingTargetLabel("");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showLeaveConfirmation]);
+
   const handleTabClick = (e: React.MouseEvent, targetHref: string, tabLabel: string) => {
     const isLoopActive =
       (pathname === "/loop" || pathname === "/qzloop" || pathname === "/feed") &&
@@ -114,6 +127,7 @@ export const BottomNav: React.FC = () => {
         e.preventDefault();
         return;
       }
+      e.preventDefault();
       // Note: sessionStorage.setItem("qz_loop_is_active", "true") is only set by QuizLoopContainer when user clicks Start Qz Loop
       router.push(targetHref);
       return;
@@ -127,6 +141,7 @@ export const BottomNav: React.FC = () => {
       return;
     }
 
+    e.preventDefault();
     router.push(targetHref);
   };
 

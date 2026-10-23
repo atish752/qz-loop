@@ -139,8 +139,8 @@ export const HomeDashboardView: React.FC = () => {
                     const attIstStr = attDate.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
                     if (period === "today") return attIstStr === istTodayStr;
                     const diffMs = now.getTime() - attDate.getTime();
-                    if (period === "week") return diffMs >= 0 && diffMs <= 7 * 86400000;
-                    if (period === "month") return diffMs >= 0 && diffMs <= 30 * 86400000;
+                    if (period === "week") return diffMs >= -60000 && diffMs <= 7 * 86400000;
+                    if (period === "month") return diffMs >= -60000 && diffMs <= 30 * 86400000;
                     return true;
                   });
 
@@ -159,6 +159,20 @@ export const HomeDashboardView: React.FC = () => {
                       fastestSec = Number((minMs / 1000).toFixed(1));
                     }
 
+                    let updatedWeeklyActivity = finalStats.weekly_activity;
+                    if (Array.isArray(updatedWeeklyActivity) && updatedWeeklyActivity.length > 0) {
+                      updatedWeeklyActivity = updatedWeeklyActivity.map((w) => {
+                        const localCount = localAttempts.filter((a: any) => {
+                          const aDay = new Date(a.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+                          return aDay === w.day;
+                        }).length;
+                        return {
+                          ...w,
+                          count: isGuest ? localCount : Math.max(w.count, localCount),
+                        };
+                      });
+                    }
+
                     finalStats = {
                       ...finalStats,
                       total_solved: totalSolved,
@@ -168,6 +182,7 @@ export const HomeDashboardView: React.FC = () => {
                       avg_time_seconds: avgTimeSec,
                       fastest_correct_seconds: fastestSec,
                       total_time_seconds: Math.round(totalTime / 1000),
+                      weekly_activity: updatedWeeklyActivity,
                     };
                   }
                 }

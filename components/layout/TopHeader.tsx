@@ -123,7 +123,20 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       <div className="h-14 px-3 flex items-center justify-between">
         {/* Brand Name Prominently Displayed */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <Link href="/" className="flex items-center gap-2 group shrink-0">
+          <Link
+            href="/"
+            onClick={() => {
+              if (typeof window !== "undefined" && sessionStorage.getItem("qz_loop_is_active") === "true") {
+                sessionStorage.removeItem("qz_loop_is_active");
+                sessionStorage.removeItem("qz_loop_cached_questions");
+                sessionStorage.removeItem("qz_loop_active_question_id");
+                sessionStorage.removeItem("qz_loop_answered_records");
+                sessionStorage.removeItem("qz_last_loop_index");
+                window.dispatchEvent(new CustomEvent("qz_leave_quiz_loop"));
+              }
+            }}
+            className="flex items-center gap-2 group shrink-0"
+          >
             <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 shadow-xs border border-primary/20">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img

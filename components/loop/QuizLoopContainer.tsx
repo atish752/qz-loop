@@ -15,6 +15,7 @@ import { ExamSwitchModal } from "../feed/ExamSwitchModal";
 import { OFFICIAL_WHATSAPP_GROUP_URL } from "@/lib/utils/whatsapp";
 import { useAppLanguage, LANGUAGE_CHANGE_EVENT } from "@/lib/utils/i18n";
 import { EXAMS_LIST, EXAM_SUBJECTS_MAP } from "@/components/create/CreateQuestionView";
+import { getExamScoringRule } from "@/lib/utils/examScoring";
 
 interface QuizLoopContainerProps {
   initialExams?: Examination[];
@@ -127,6 +128,8 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
   // Hoisted Modals State (Eliminates CSS transform positioning glitch across reels)
   const [showSolutionModal, setShowSolutionModal] = useState<boolean>(false);
+  const [solutionQuestionId, setSolutionQuestionId] = useState<string | null>(null);
+  const [todaySolvedCount, setTodaySolvedCount] = useState<number>(0);
   const [activeSaveQuestion, setActiveSaveQuestion] = useState<Question | null>(null);
   const [activeShareQuestion, setActiveShareQuestion] = useState<Question | null>(null);
   const [activeCommentsQuestion, setActiveCommentsQuestion] = useState<Question | null>(null);
@@ -134,6 +137,46 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const [activeReportQuestionId, setActiveReportQuestionId] = useState<string | null>(null);
   const [activeSuggestionQuestion, setActiveSuggestionQuestion] = useState<Question | null>(null);
   const [savedQuestionIds, setSavedQuestionIds] = useState<Set<string>>(new Set());
+
+  // Handle Escape key to dismiss solution modal
+  useEffect(() => {
+    if (!showSolutionModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowSolutionModal(false);
+        setSolutionQuestionId(null);
+        window.dispatchEvent(new CustomEvent("qz_close_solution_modal"));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showSolutionModal]);
+
+  // Synchronize today's solved count strictly for Asia/Kolkata today
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const uid = localStorage.getItem("qz_user_id");
+        const storageKey = `qz_user_attempts_${uid || "guest"}`;
+        const cachedRaw = localStorage.getItem(storageKey);
+        if (cachedRaw) {
+          const list = JSON.parse(cachedRaw);
+          if (Array.isArray(list)) {
+            const istTodayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+            const count = list.filter((a: any) => {
+              const aIstStr = new Date(a.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+              return aIstStr === istTodayStr;
+            }).length;
+            setTodaySolvedCount(uid ? Math.max(count, user?.today_solved_count || 0) : count);
+            return;
+          }
+        }
+        setTodaySolvedCount(user?.today_solved_count || 0);
+      } catch {
+        setTodaySolvedCount(user?.today_solved_count || 0);
+      }
+    }
+  }, [user?.today_solved_count, isStarted]);
 
   // Load user's saved collections on mount to initialize bookmark state accurately
   useEffect(() => {
@@ -306,7 +349,11 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     };
     window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLangChange);
 
-    const handleOpenSolutionModal = () => {
+    const handleOpenSolutionModal = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId?: string }>;
+      if (customEvent.detail?.questionId) {
+        setSolutionQuestionId(customEvent.detail.questionId);
+      }
       setShowSolutionModal(true);
     };
     window.addEventListener("qz_open_solution_modal", handleOpenSolutionModal);
@@ -316,6 +363,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
       setCurrentIndex(0);
       setQuestions([]);
       setShowSolutionModal(false);
+      setSolutionQuestionId(null);
       if (typeof window !== "undefined") {
         sessionStorage.removeItem("qz_loop_is_active");
         sessionStorage.removeItem("qz_loop_cached_questions");
@@ -1038,7 +1086,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             <div className="p-3 rounded-xl bg-surface-container-low border border-surface-container-high/40">
               <span className="text-secondary text-[11px] font-semibold uppercase">{t.dailyGoal}</span>
               <div className="text-base font-bold text-primary mt-0.5">
-                {user?.today_solved_count ?? 0} / {user?.daily_goal ?? 10} {t.solvedOutOf}
+                {todaySolvedCount} / {user?.daily_goal ?? 10} {t.solvedOutOf}
               </div>
             </div>
           </div>
@@ -1711,30 +1759,35 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
       {/* Full-Window Quick Proof & Solution Pop-up Modal (Cut/Close 'X' on Top Right) */}
       {showSolutionModal && activeQuestion && (() => {
-        const currentRecord = answeredRecords[activeQuestion.id];
+        const modalQuestion = (solutionQuestionId ? questions.find((q) => q.id === solutionQuestionId) : null) || activeQuestion;
+        const currentRecord = answeredRecords[modalQuestion.id];
         const isSolved = Boolean(currentRecord);
         const isCorr = currentRecord?.isCorrect;
-        const correctOptId = activeQuestion.correct_option_id;
+        const correctOptId = modalQuestion.correct_option_id;
         const selectedOptId = currentRecord?.selectedOptionId;
         const solveTimeSec = currentRecord?.responseTimeMs ? (currentRecord.responseTimeMs / 1000).toFixed(1) : null;
+        const scoring = getExamScoringRule(modalQuestion.examination_id || currentExamId);
         const explanationText =
-          (lang === "hi" && activeQuestion.hindi_explanation)
-            ? activeQuestion.hindi_explanation
-            : activeQuestion.explanation ||
+          (lang === "hi" && modalQuestion.hindi_explanation)
+            ? modalQuestion.hindi_explanation
+            : modalQuestion.explanation ||
               currentRecord?.explanation ||
               (lang === "hi" ? "इस प्रश्न के लिए कोई व्याख्या उपलब्ध नहीं है।" : "Author did not provide an explanation for this question.");
 
-        const questionText = (lang === "hi" && activeQuestion.hindi_question_text)
-          ? activeQuestion.hindi_question_text
-          : activeQuestion.question_text;
+        const questionText = (lang === "hi" && modalQuestion.hindi_question_text)
+          ? modalQuestion.hindi_question_text
+          : modalQuestion.question_text;
+
+        const handleCloseSolution = () => {
+          setShowSolutionModal(false);
+          setSolutionQuestionId(null);
+          window.dispatchEvent(new CustomEvent("qz_close_solution_modal"));
+        };
 
         return (
           <div
             data-no-swipe="true"
-            onClick={() => {
-              setShowSolutionModal(false);
-              window.dispatchEvent(new CustomEvent("qz_close_solution_modal"));
-            }}
+            onClick={handleCloseSolution}
             className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-text touch-auto pointer-events-auto"
           >
             <div
@@ -1748,14 +1801,14 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                     <span className="material-symbols-outlined text-[16px]">bolt</span>
                     <span>{lang === "hi" ? "त्वरित समाधान व प्रमाण" : "Quick Proof & Solution"}</span>
                   </span>
-                  {activeQuestion.subject_name && (
+                  {modalQuestion.subject_name && (
                     <span className="px-2.5 py-1 rounded-full bg-surface-container text-secondary text-xs font-semibold">
-                      {activeQuestion.subject_name}
+                      {modalQuestion.subject_name}
                     </span>
                   )}
-                  {activeQuestion.syllabus_tag && (
+                  {modalQuestion.syllabus_tag && (
                     <span className="px-2.5 py-1 rounded-full bg-surface-container text-secondary text-[11px] font-medium hidden sm:inline-block truncate max-w-xs">
-                      {activeQuestion.syllabus_tag}
+                      {modalQuestion.syllabus_tag}
                     </span>
                   )}
                 </div>
@@ -1763,10 +1816,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 {/* Prominent Cut / Close button on Top Right side */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowSolutionModal(false);
-                    window.dispatchEvent(new CustomEvent("qz_close_solution_modal"));
-                  }}
+                  onClick={handleCloseSolution}
                   className="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-xs"
                   title="Cut / Close modal"
                   aria-label="Cut / Close modal"
@@ -1814,7 +1864,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                         : "bg-rose-600 text-white"
                     }`}
                   >
-                    {isCorr ? "+4.00" : "-1.00"} Marks
+                    {isCorr
+                      ? `+${scoring.marksPerCorrect.toFixed(2)} Marks`
+                      : `-${scoring.penaltyPerWrong.toFixed(2)} Marks`}
                   </span>
                 </div>
               )}
@@ -1835,7 +1887,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                   {lang === "hi" ? "विकल्प (Options)" : "Options"}
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {activeQuestion.options.map((opt) => {
+                  {modalQuestion.options.map((opt) => {
                     const isOptionCorrect = opt.id === correctOptId;
                     const isOptionSelected = opt.id === selectedOptId;
                     const optText = (lang === "hi" && opt.hindi_text) ? opt.hindi_text : opt.text;
@@ -1895,10 +1947,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               <div className="flex items-center gap-2.5 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowSolutionModal(false);
-                    window.dispatchEvent(new CustomEvent("qz_close_solution_modal"));
-                  }}
+                  onClick={handleCloseSolution}
                   className="flex-1 py-3 px-4 rounded-xl border border-surface-container-high text-secondary hover:text-on-surface hover:bg-surface-container text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
@@ -1907,7 +1956,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setShowSolutionModal(false);
+                    handleCloseSolution();
                     attemptNextQuestion();
                   }}
                   className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary text-xs font-bold shadow-md hover:shadow-lg active:scale-98 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
