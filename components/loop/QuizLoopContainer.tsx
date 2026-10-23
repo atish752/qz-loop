@@ -1364,10 +1364,10 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               e.stopPropagation();
             }}
             onTouchEnd={(e) => e.stopPropagation()}
-            className="absolute bottom-16 sm:bottom-[4.5rem] left-0 right-0 z-30 px-3.5 sm:px-4 pb-[max(0.25rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/98 to-transparent pt-2.5 pointer-events-auto flex flex-col gap-1.5 overscroll-none bottom-controls"
+            className="absolute bottom-16 sm:bottom-16 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-30 px-3.5 sm:px-4 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-surface via-surface/98 to-transparent pt-2.5 pointer-events-auto flex flex-col gap-1.5 overscroll-none bottom-controls"
           >
             {!activeAnswerStatus.isAnswerMode && !activeAnswerStatus.isAnswered && !answeredRecords[activeQuestion.id] && (
-              <div className="w-full">
+              <div className="w-full pr-12 sm:pr-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -1398,7 +1398,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             )}
 
             {activeAnswerStatus.isAnswerMode && !activeAnswerStatus.isAnswered && !answeredRecords[activeQuestion.id] && (
-              <div className="w-full">
+              <div className="w-full pr-12 sm:pr-0">
                 <div className="w-full h-11 px-3 rounded-xl bg-surface-container-high/80 text-secondary border border-surface-container-high flex items-center justify-between text-xs font-semibold">
                   <span className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[18px] text-primary">touch_app</span>
@@ -1422,7 +1422,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
 
             {(activeAnswerStatus.isAnswered || Boolean(answeredRecords[activeQuestion.id])) && (
               <>
-                <div className="w-full">
+                <div className="w-full pr-12 sm:pr-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -1439,7 +1439,8 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 </div>
 
                 {/* Spaced Repetition Timeline Selector (1 Day, 1 Week, 1 Month, Never) */}
-                <div className="w-full bg-surface-container-low/95 rounded-xl p-2 border border-surface-container-high/50 flex flex-col gap-1 shadow-2xs animate-in fade-in">
+                <div className="w-full pr-12 sm:pr-0">
+                  <div className="w-full bg-surface-container-low/95 rounded-xl p-2 border border-surface-container-high/50 flex flex-col gap-1 shadow-2xs animate-in fade-in">
                   <div className="flex items-center justify-between text-[11px] font-semibold text-secondary px-0.5">
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-[14px] text-primary">history</span>
@@ -1510,8 +1511,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                     })}
                   </div>
                 </div>
-              </>
-            )}
+              </div>
+            </>
+          )}
 
             {/* Community Performance Metrics Bar - Full Available Bottom Width */}
             {(() => {

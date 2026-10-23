@@ -89,39 +89,33 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   const { lang, t } = useAppLanguage();
   // Bilingual display language toggle ('en' | 'hi')
   const [displayLang, setDisplayLang] = useState<"en" | "hi">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("qz_quiz_lang");
+      if (saved === "hi") return "hi";
+      if (saved === "en") return "en";
+    }
     const effectivePref = preferredLanguage || lang;
-    if (effectivePref === "hi" && (question.hindi_question_text || question.language === "hi")) {
-      return "hi";
-    }
-    if (effectivePref === "en" && question.question_text) {
-      return "en";
-    }
+    if (effectivePref === "hi") return "hi";
+    if (effectivePref === "en") return "en";
     return question.language === "hi" ? "hi" : "en";
   });
 
   useEffect(() => {
-    if (preferredLanguage === "hi" && (question.hindi_question_text || question.language === "hi")) {
-      setDisplayLang("hi");
-    } else if (preferredLanguage === "en" && question.question_text) {
-      setDisplayLang("en");
+    if (preferredLanguage === "hi" || preferredLanguage === "en") {
+      setDisplayLang(preferredLanguage);
     }
-  }, [preferredLanguage, question]);
+  }, [preferredLanguage]);
 
   useEffect(() => {
     const handleGlobalLang = (e: Event) => {
       const customEvent = e as CustomEvent<{ lang: "en" | "hi" }>;
       if (customEvent.detail?.lang) {
-        const next = customEvent.detail.lang;
-        if (next === "hi" && (question.hindi_question_text || question.language === "hi")) {
-          setDisplayLang("hi");
-        } else if (next === "en" && question.question_text) {
-          setDisplayLang("en");
-        }
+        setDisplayLang(customEvent.detail.lang);
       }
     };
     window.addEventListener("qz_language_changed", handleGlobalLang);
     return () => window.removeEventListener("qz_language_changed", handleGlobalLang);
-  }, [question]);
+  }, []);
 
   const handleToggleLang = (target: "en" | "hi") => {
     setDisplayLang(target);
@@ -745,7 +739,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   const authorUsername = getAuthorFallbackUsername(question.author_name, question.author_id);
 
   return (
-    <div className="relative w-full h-full flex flex-col justify-between p-4 sm:p-5 select-none text-on-surface overflow-hidden">
+    <div className="relative w-full h-full flex flex-col justify-between p-3.5 sm:p-5 select-none text-on-surface overflow-hidden">
       {/* Floating Quick Save Toast */}
       {quickSaveToast && (
         <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 px-3.5 py-1.5 rounded-full bg-on-surface text-surface text-xs font-bold shadow-lg animate-in fade-in slide-in-from-top-2 flex items-center gap-1.5">
@@ -764,9 +758,9 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           if (e.cancelable) e.preventDefault();
         }}
         onTouchEnd={(e) => e.stopPropagation()}
-        className="flex items-center justify-between gap-1.5 pb-2 border-b border-surface-container-high/30 shrink-0 touch-none select-none"
+        className="flex items-center justify-between gap-1 sm:gap-1.5 pb-2 border-b border-surface-container-high/30 shrink-0 touch-none select-none w-full min-w-0"
       >
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 overflow-hidden">
           {/* Interactive Subject Switcher Button */}
           <button
             type="button"
@@ -777,7 +771,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                 window.dispatchEvent(new CustomEvent("qz_change_subject_flow"));
               }
             }}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-surface-container text-on-surface text-[11px] sm:text-xs font-bold transition-all cursor-pointer border border-surface-container-high/60 shadow-2xs max-w-[130px] sm:max-w-[170px] group shrink-0"
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-surface-container text-on-surface text-[11px] sm:text-xs font-bold transition-all cursor-pointer border border-surface-container-high/60 shadow-2xs min-w-0 max-w-[110px] xs:max-w-[130px] sm:max-w-[170px] group flex-shrink"
             title="Switch Subject Flow"
           >
             <span className="material-symbols-outlined text-[14px] text-primary shrink-0 transition-transform group-hover:rotate-45">tune</span>
@@ -814,15 +808,15 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           </div>
 
           {/* Question Index / Counter */}
-          <span className="text-secondary font-mono text-[11px] sm:text-xs font-bold shrink-0">
+          <span className="text-secondary font-mono text-[10px] sm:text-xs font-bold shrink-0 whitespace-nowrap">
             · {index} / {totalQuestions}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           {/* Active Question Sleek Digital Timer Display */}
           <div
-            className={`relative flex items-center px-2.5 sm:px-3 py-1 rounded-xl font-mono text-xs sm:text-sm font-extrabold tracking-widest border transition-all duration-300 ${
+            className={`relative flex items-center px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl font-mono text-xs sm:text-sm font-extrabold tracking-widest border transition-all duration-300 ${
               isAnswered
                 ? "bg-surface-container/80 text-secondary border-surface-container-high/40 shadow-xs"
                 : "bg-gradient-to-r from-primary/10 via-primary-container/20 to-primary/10 text-primary border-primary/30 shadow-[0_0_12px_rgba(83,0,183,0.18)] dark:shadow-[0_0_15px_rgba(208,188,255,0.2)]"
@@ -830,7 +824,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             title="Elapsed solve time"
           >
             {!isAnswered && (
-              <span className="relative flex h-2 w-2 mr-1.5 sm:mr-2">
+              <span className="relative flex h-2 w-2 mr-1 sm:mr-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
               </span>
@@ -856,7 +850,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           <button
             type="button"
             onClick={() => setShowThreeDotMenu(true)}
-            className="p-1 rounded-full text-secondary hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+            className="p-1 rounded-full text-secondary hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer shrink-0"
             title={t.moreOptions || "More options"}
             aria-label="More options"
           >
@@ -916,7 +910,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
         {/* Options Stack (Shown when user taps Answer & Learn) */}
         {showOptions && (
-          <div className="shrink-0 flex flex-col gap-1.5 pb-36 sm:pb-40">
+          <div className="shrink-0 flex flex-col gap-1.5 pb-44 sm:pb-48">
             <div
               data-reel-scrollable="true"
               className="w-full flex flex-col gap-2 animate-in fade-in duration-200 max-h-[38vh] overflow-y-auto overscroll-contain no-scrollbar"
@@ -1000,10 +994,10 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             if (e.cancelable) e.preventDefault();
           }}
           onTouchEnd={(e) => e.stopPropagation()}
-          className="absolute right-2 sm:right-2.5 top-[36%] -translate-y-1/2 sm:top-[38%] flex flex-col items-center gap-2 sm:gap-2.5 z-30 select-none touch-none action-rail"
+          className="absolute right-2 sm:right-2.5 top-[36%] -translate-y-1/2 sm:top-[38%] flex flex-col items-center gap-1.5 sm:gap-2.5 z-30 select-none touch-none action-rail"
         >
           {/* Creator Avatar & Follow Button */}
-          <div className="relative mb-1">
+          <div className="relative mb-0.5">
             <button
               type="button"
               onClick={() => {
@@ -1013,7 +1007,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                   setShowAuthorModal(true);
                 }
               }}
-              className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-fixed via-primary-container/20 to-secondary-fixed border-2 border-surface-container-lowest shadow-sm flex items-center justify-center group active:scale-95 transition-transform overflow-hidden"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-primary-fixed via-primary-container/20 to-secondary-fixed border-2 border-surface-container-lowest shadow-sm flex items-center justify-center group active:scale-95 transition-transform overflow-hidden"
               title={`Question by ${question.author_name || "Aspirant"} (@${authorUsername})`}
             >
               {question.author_avatar && !avatarError ? (
@@ -1043,7 +1037,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                 }
                 setIsFollowing((prev) => !prev);
               }}
-              className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full flex items-center justify-center text-[11px] font-bold shadow-xs transition-colors ${
+              className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shadow-xs transition-colors ${
                 isFollowing ? "bg-tertiary text-on-tertiary" : "bg-primary text-on-primary"
               }`}
               title={isFollowing ? "Following" : "Follow Creator"}
@@ -1059,20 +1053,20 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             title="Like question (Fire)"
           >
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${
                 isLiked
-                  ? "bg-rose-500/20 text-rose-600 scale-110"
+                  ? "bg-rose-500/20 text-rose-600 scale-105"
                   : "bg-surface-container-low text-secondary hover:text-rose-500 hover:bg-surface-container"
               }`}
             >
               <span
-                className="material-symbols-outlined text-[22px]"
+                className="material-symbols-outlined text-[20px] sm:text-[22px]"
                 style={isLiked ? { fontVariationSettings: "'FILL' 1" } : {}}
               >
                 local_fire_department
               </span>
             </div>
-            <span className="text-[11px] font-bold text-secondary mt-0.5">{likesCount}</span>
+            <span className="text-[10px] sm:text-[11px] font-bold text-secondary mt-0.5">{likesCount}</span>
           </button>
 
           {/* Comments / Discussion Button */}
@@ -1087,10 +1081,10 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             className="flex flex-col items-center group active:scale-90 transition-transform"
             title="Shortcuts & Discussions"
           >
-            <div className="w-10 h-10 rounded-full bg-surface-container-low text-secondary hover:text-primary hover:bg-surface-container flex items-center justify-center transition-all">
-              <span className="material-symbols-outlined text-[22px]">chat</span>
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-surface-container-low text-secondary hover:text-primary hover:bg-surface-container flex items-center justify-center transition-all">
+              <span className="material-symbols-outlined text-[20px] sm:text-[22px]">chat</span>
             </div>
-            <span className="text-[11px] font-bold text-secondary mt-0.5">{commentsCount}</span>
+            <span className="text-[10px] sm:text-[11px] font-bold text-secondary mt-0.5">{commentsCount}</span>
           </button>
 
           {/* Share / Friends Button (Vibrant Green) */}
@@ -1105,10 +1099,10 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             className="flex flex-col items-center group active:scale-90 transition-transform"
             title="Share to study friends & WhatsApp"
           >
-            <div className="w-10 h-10 rounded-full bg-emerald-500/15 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/25 flex items-center justify-center transition-all shadow-sm">
-              <span className="material-symbols-outlined text-[22px] text-emerald-500">send</span>
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-500/15 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/25 flex items-center justify-center transition-all shadow-sm">
+              <span className="material-symbols-outlined text-[20px] sm:text-[22px] text-emerald-500">send</span>
             </div>
-            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">Share</span>
+            <span className="text-[10px] sm:text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">Share</span>
           </button>
 
           {/* Instagram-Style Bookmark / Collection Button */}
@@ -1135,20 +1129,20 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             title={t.saveToCollection || "Save to Collection / Playlist"}
           >
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all ${
                 isSaved
                   ? "bg-primary text-on-primary scale-105"
                   : "bg-surface-container-low text-secondary hover:text-primary hover:bg-surface-container"
               }`}
             >
               <span
-                className="material-symbols-outlined text-[22px]"
+                className="material-symbols-outlined text-[20px] sm:text-[22px]"
                 style={isSaved ? { fontVariationSettings: "'FILL' 1" } : {}}
               >
                 bookmark
               </span>
             </div>
-            <span className="text-[11px] font-bold text-secondary mt-0.5">{isSaved ? t.save : t.save}</span>
+            <span className="text-[10px] sm:text-[11px] font-bold text-secondary mt-0.5">{isSaved ? t.save : t.save}</span>
           </button>
         </div>
       </div>
@@ -1275,6 +1269,56 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
+
+            {/* Day / Night Theme Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  const isDark = document.documentElement.classList.contains("dark");
+                  if (isDark) {
+                    document.documentElement.classList.remove("dark");
+                    localStorage.setItem("qz_theme", "light");
+                  } else {
+                    document.documentElement.classList.add("dark");
+                    localStorage.setItem("qz_theme", "dark");
+                  }
+                  window.dispatchEvent(new CustomEvent("qz_theme_changed"));
+                }
+                setShowThreeDotMenu(false);
+              }}
+              className="w-full p-2.5 rounded-xl flex items-center gap-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-lg bg-surface-container text-on-surface flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[18px]">contrast</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold">Toggle Day / Night Mode</span>
+                <span className="text-[10px] text-secondary font-normal">Switch light / dark theme</span>
+              </div>
+            </button>
+
+            {/* Switch Subject Flow */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowThreeDotMenu(false);
+                if (onSwitchSubject) {
+                  onSwitchSubject();
+                } else {
+                  window.dispatchEvent(new CustomEvent("qz_change_subject_flow"));
+                }
+              }}
+              className="w-full p-2.5 rounded-xl flex items-center gap-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[18px]">tune</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold">Change Subject</span>
+                <span className="text-[10px] text-secondary font-normal">Switch practice subjects or exam</span>
+              </div>
+            </button>
 
             <button
               onClick={() => {

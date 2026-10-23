@@ -1757,6 +1757,13 @@ Ans: A`;
   assert(s64LoopCode.includes("onSwitchSubject={handleExitToSubjectSelect}"), "QuizLoopContainer wires subject flow switcher to QuestionReelCard");
   assert(s64WrapperCode.includes("isLoop") && s64WrapperCode.includes("h-[100dvh] max-h-[100dvh] overflow-hidden"), "AppLayoutWrapper locks loop viewport height to eliminate mobile scroll jumping");
 
+  const s64GlobalsCode = fs.readFileSync(path.join(__dirname, "../app/globals.css"), "utf8");
+  assert(s64GlobalsCode.includes("env(safe-area-inset-bottom, 0px)"), "globals.css pb-safe defaults to 0px for pixel-perfect flush docking on standard devices");
+  assert(s64ReelCode.includes("flex-shrink") && s64ReelCode.includes("truncate uppercase"), "QuestionReelCard subject switcher button gracefully shrinks with ellipsis on narrow mobile viewports");
+  assert(s64ReelCode.includes("Toggle Day / Night Mode"), "QuestionReelCard 3-dots menu provides Day/Night mode theme toggle");
+  assert(s64LoopCode.includes("pr-12 sm:pr-0"), "QuizLoopContainer bottom controls provide right rail clearance isolating buttons from floating action column");
+  assert(s64ReelCode.includes("pb-44 sm:pb-48"), "QuestionReelCard options container provides extended bottom padding ensuring Option D scrolls clear of bottom controls");
+
   console.log("  ✓ QuestionReelCard renders interactive Subject switcher button with tune icon and dropdown chevron");
   console.log("  ✓ QuestionReelCard provides subject switcher interaction hook");
   console.log("  ✓ QuestionReelCard top bar renders segmented bilingual EN / HI toggle switch");
@@ -1771,6 +1778,11 @@ Ans: A`;
   console.log("  ✓ QuizLoopContainer wires language change synchronization to QuestionReelCard");
   console.log("  ✓ QuizLoopContainer wires subject flow switcher to QuestionReelCard");
   console.log("  ✓ AppLayoutWrapper locks loop viewport height to eliminate mobile scroll jumping");
+  console.log("  ✓ globals.css pb-safe defaults to 0px for pixel-perfect flush docking on standard devices");
+  console.log("  ✓ QuestionReelCard subject switcher button gracefully shrinks with ellipsis on narrow mobile viewports");
+  console.log("  ✓ QuestionReelCard 3-dots menu provides Day/Night mode theme toggle");
+  console.log("  ✓ QuizLoopContainer bottom controls provide right rail clearance isolating buttons from floating action column");
+  console.log("  ✓ QuestionReelCard options container provides extended bottom padding ensuring Option D scrolls clear of bottom controls");
 
   console.log("\n=================================================");
   console.log("   ALL 64 ACCEPTANCE TEST SUITES PASSED (100%)   ");
