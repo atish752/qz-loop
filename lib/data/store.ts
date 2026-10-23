@@ -1203,6 +1203,7 @@ class DataStore {
   }
 
   public getAttemptsInPeriod(userId: string, period: "today" | "week" | "month" | "lifetime"): QuestionAttempt[] {
+    if (!userId || userId === "guest") return [];
     const userAttempts = this.attempts.filter((a) => a.user_id === userId);
     if (period === "lifetime") return userAttempts;
 
@@ -1218,14 +1219,13 @@ class DataStore {
         return attIstStr === istTodayStr;
       }
 
+      const diffMs = now.getTime() - attDate.getTime();
       if (period === "week") {
-        const diffMs = now.getTime() - attDate.getTime();
-        return diffMs <= 7 * 86400000;
+        return diffMs >= -60000 && diffMs <= 7 * 86400000;
       }
 
       if (period === "month") {
-        const diffMs = now.getTime() - attDate.getTime();
-        return diffMs <= 30 * 86400000;
+        return diffMs >= -60000 && diffMs <= 30 * 86400000;
       }
 
       return true;
@@ -2141,11 +2141,15 @@ class DataStore {
   // --- Habit Formation, Goals & Boosts ---
   public getHabitSettings(userId: string): HabitSettings {
     let settings = this.habitSettings.get(userId);
-    const user = userId ? this.profiles.find((p) => p.id === userId) : null;
+    const user = userId && userId !== "guest" ? this.profiles.find((p) => p.id === userId) : null;
+    const todayCount = user ? this.getAttemptsInPeriod(user.id, "today").length : 0;
+    if (user) {
+      user.today_solved_count = todayCount;
+    }
     if (!settings) {
       settings = {
         daily_goal: user?.daily_goal || 25,
-        solved_today: user?.today_solved_count || 0,
+        solved_today: todayCount,
         combo_streak: 0,
         boost_multiplier: 1.5,
         schedule_slots: [
@@ -2156,9 +2160,7 @@ class DataStore {
       };
       this.habitSettings.set(userId, settings);
     }
-    if (user) {
-      settings.solved_today = user.today_solved_count || 0;
-    }
+    settings.solved_today = todayCount;
     return settings;
   }
 

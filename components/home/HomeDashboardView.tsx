@@ -131,7 +131,7 @@ export const HomeDashboardView: React.FC = () => {
                   created_at: string;
                 }> = JSON.parse(cachedRaw);
 
-                if (Array.isArray(localAttempts) && localAttempts.length > 0) {
+                if (Array.isArray(localAttempts)) {
                   const now = new Date();
                   const istTodayStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
                   const filtered = localAttempts.filter((a) => {
@@ -144,13 +144,14 @@ export const HomeDashboardView: React.FC = () => {
                     return true;
                   });
 
-                  if (filtered.length > (finalStats.total_solved || 0)) {
+                  const isGuest = !uid || uid === "guest";
+                  if (isGuest || filtered.length > (finalStats.total_solved || 0)) {
                     const totalSolved = filtered.length;
                     const correctCount = filtered.filter((a) => a.is_correct).length;
                     const incorrectCount = totalSolved - correctCount;
-                    const accuracy = Math.round((correctCount / totalSolved) * 100);
+                    const accuracy = totalSolved > 0 ? Math.round((correctCount / totalSolved) * 100) : 0;
                     const totalTime = filtered.reduce((acc, a) => acc + (a.response_time_ms || 10000), 0);
-                    const avgTimeSec = Math.round(totalTime / totalSolved / 1000);
+                    const avgTimeSec = totalSolved > 0 ? Math.round(totalTime / totalSolved / 1000) : 0;
                     const correctAttempts = filtered.filter((a) => a.is_correct);
                     let fastestSec: number | null = null;
                     if (correctAttempts.length > 0) {
@@ -170,6 +171,17 @@ export const HomeDashboardView: React.FC = () => {
                     };
                   }
                 }
+              } else if (!uid || uid === "guest") {
+                finalStats = {
+                  ...finalStats,
+                  total_solved: 0,
+                  correct_count: 0,
+                  incorrect_count: 0,
+                  accuracy_percentage: 0,
+                  avg_time_seconds: 0,
+                  fastest_correct_seconds: null,
+                  total_time_seconds: 0,
+                };
               }
             } catch {}
           }
@@ -192,16 +204,18 @@ export const HomeDashboardView: React.FC = () => {
               const attIstStr = new Date(a.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
               return attIstStr === istTodayStr;
             }).length;
-            setTodaySolvedCount(Math.max(localTodayCount, user?.today_solved_count || 0));
+            setTodaySolvedCount(isLoggedIn ? Math.max(localTodayCount, user?.today_solved_count || 0) : localTodayCount);
+          } else {
+            setTodaySolvedCount(isLoggedIn ? (user?.today_solved_count || 0) : 0);
           }
         } else {
-          setTodaySolvedCount(user?.today_solved_count || 0);
+          setTodaySolvedCount(isLoggedIn ? (user?.today_solved_count || 0) : 0);
         }
       } catch {
-        setTodaySolvedCount(user?.today_solved_count || 0);
+        setTodaySolvedCount(isLoggedIn ? (user?.today_solved_count || 0) : 0);
       }
     } else {
-      setTodaySolvedCount(user?.today_solved_count || 0);
+      setTodaySolvedCount(isLoggedIn ? (user?.today_solved_count || 0) : 0);
     }
   }, [period, isLoggedIn, refreshCount, user?.today_solved_count]);
 
@@ -333,7 +347,7 @@ export const HomeDashboardView: React.FC = () => {
   };
 
   const dailyGoal = habit?.daily_goal || user?.daily_goal || 25;
-  const solvedToday = isLoggedIn ? (todaySolvedCount || habit?.solved_today || 0) : todaySolvedCount;
+  const solvedToday = typeof todaySolvedCount === "number" ? todaySolvedCount : 0;
   const currentStreak = isLoggedIn ? (user?.current_streak || 0) : 0;
   const goalProgress = Math.min(100, Math.round((solvedToday / dailyGoal) * 100));
   const activeExamId = "exam-neet-ug";

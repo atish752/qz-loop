@@ -1360,10 +1360,9 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => {
               e.stopPropagation();
-              if (e.cancelable) e.preventDefault();
             }}
             onTouchEnd={(e) => e.stopPropagation()}
-            className="absolute bottom-16 sm:bottom-[4.5rem] left-0 right-0 z-30 px-4 sm:px-5 pb-[max(0.25rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 pointer-events-auto flex flex-col gap-2 touch-none overscroll-none bottom-controls"
+            className="absolute bottom-16 sm:bottom-[4.5rem] left-0 right-0 z-30 px-4 sm:px-5 pb-[max(0.25rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 pointer-events-auto flex flex-col gap-2 overscroll-none bottom-controls"
           >
             {!activeAnswerStatus.isAnswerMode && !activeAnswerStatus.isAnswered && !answeredRecords[activeQuestion.id] && (
               <div className="w-full">
@@ -1732,12 +1731,15 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
         return (
           <div
             data-no-swipe="true"
-            onClick={() => setShowSolutionModal(false)}
-            className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-text"
+            onClick={() => {
+              setShowSolutionModal(false);
+              window.dispatchEvent(new CustomEvent("qz_close_solution_modal"));
+            }}
+            className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-text touch-auto pointer-events-auto"
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl bg-surface-container-lowest rounded-3xl p-5 sm:p-7 shadow-2xl border border-surface-container-high/60 flex flex-col gap-4 max-h-[92vh] overflow-y-auto no-scrollbar animate-in zoom-in-95 duration-200 text-left"
+              className="w-full max-w-2xl bg-surface-container-lowest rounded-3xl p-5 sm:p-7 shadow-2xl border border-surface-container-high/60 flex flex-col gap-4 max-h-[92vh] overflow-y-auto no-scrollbar animate-in zoom-in-95 duration-200 text-left touch-auto"
             >
               {/* Header with Exam/Subject Badge & Top-Right Cut/Close ('X') Button */}
               <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
@@ -1761,7 +1763,10 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                 {/* Prominent Cut / Close button on Top Right side */}
                 <button
                   type="button"
-                  onClick={() => setShowSolutionModal(false)}
+                  onClick={() => {
+                    setShowSolutionModal(false);
+                    window.dispatchEvent(new CustomEvent("qz_close_solution_modal"));
+                  }}
                   className="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-xs"
                   title="Cut / Close modal"
                   aria-label="Cut / Close modal"
@@ -1890,7 +1895,10 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               <div className="flex items-center gap-2.5 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowSolutionModal(false)}
+                  onClick={() => {
+                    setShowSolutionModal(false);
+                    window.dispatchEvent(new CustomEvent("qz_close_solution_modal"));
+                  }}
                   className="flex-1 py-3 px-4 rounded-xl border border-surface-container-high text-secondary hover:text-on-surface hover:bg-surface-container text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>

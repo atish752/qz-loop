@@ -196,6 +196,9 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         setShowPostAnswerModal(true);
       }
     };
+    const handleCloseSolution = () => {
+      setShowPostAnswerModal(false);
+    };
     const handleRepeatIntervalSync = (e: Event) => {
       const customEvent = e as CustomEvent<{ questionId: string; interval: RepeatInterval }>;
       if (customEvent.detail && customEvent.detail.questionId === question.id) {
@@ -207,6 +210,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
     window.addEventListener("qz_open_answer_options", handleOpenOptions);
     window.addEventListener("qz_hide_answer_options", handleHideOptions);
     window.addEventListener("qz_open_solution_modal", handleOpenSolution);
+    window.addEventListener("qz_close_solution_modal", handleCloseSolution);
     window.addEventListener("qz_select_repeat_interval", handleRepeatIntervalSync);
     return () => {
       window.removeEventListener("qz_saved_changed", handleSavedSync);
@@ -214,6 +218,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       window.removeEventListener("qz_open_answer_options", handleOpenOptions);
       window.removeEventListener("qz_hide_answer_options", handleHideOptions);
       window.removeEventListener("qz_open_solution_modal", handleOpenSolution);
+      window.removeEventListener("qz_close_solution_modal", handleCloseSolution);
       window.removeEventListener("qz_select_repeat_interval", handleRepeatIntervalSync);
     };
   }, [question.id]);
@@ -1132,8 +1137,13 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           <div className="w-full">
             <button
               type="button"
-              onClick={() => setShowPostAnswerModal(true)}
-              className="w-full h-11 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-2xs group"
+              onClick={() => {
+                setShowPostAnswerModal(true);
+                window.dispatchEvent(
+                  new CustomEvent("qz_open_solution_modal", { detail: { questionId: question.id } })
+                );
+              }}
+              className="w-full h-11 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-2xs group cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">bolt</span>
               <span>{lang === "hi" ? "समाधान व दोहराव (Quick Proof)" : "Quick Proof & Solution"}</span>

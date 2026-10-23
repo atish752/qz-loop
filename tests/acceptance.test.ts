@@ -1717,6 +1717,12 @@ Ans: A`;
   assert(bottomNavCode.includes("qz_leave_quiz_loop"), "BottomNav dispatches qz_leave_quiz_loop event on confirm");
   assert(loopContainerCode.includes("qz_leave_quiz_loop"), "QuizLoopContainer listens to qz_leave_quiz_loop to reset active loop state");
 
+  // 4. Guest Server Isolation & Zero Count Integrity
+  const guestAttemptsToday = db.getAttemptsInPeriod("guest", "today");
+  assert(guestAttemptsToday.length === 0, "Guest attempts are never aggregated across sessions on server");
+  assert(homeDashboardCode.includes("typeof todaySolvedCount === \"number\" ? todaySolvedCount : 0"), "HomeDashboardView uses strict numeric solvedToday without habit fallback masking 0");
+  assert(bottomNavCode.includes("z-[150]"), "BottomNav leave confirmation dialog is hoisted to top z-index z-[150]");
+
   console.log("\n=================================================");
   console.log("   ALL 63 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");

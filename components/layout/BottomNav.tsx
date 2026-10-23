@@ -114,9 +114,7 @@ export const BottomNav: React.FC = () => {
         e.preventDefault();
         return;
       }
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("qz_loop_is_active", "true");
-      }
+      // Note: sessionStorage.setItem("qz_loop_is_active", "true") is only set by QuizLoopContainer when user clicks Start Qz Loop
       router.push(targetHref);
       return;
     }
@@ -129,11 +127,6 @@ export const BottomNav: React.FC = () => {
       return;
     }
 
-    if (pathname === "/loop" || pathname === "/qzloop" || pathname === "/feed") {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("qz_loop_is_active", "true");
-      }
-    }
     router.push(targetHref);
   };
 
@@ -309,7 +302,7 @@ export const BottomNav: React.FC = () => {
         <div
           data-no-swipe="true"
           onClick={handleCancelLeave}
-          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150 select-text pointer-events-auto"
+          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150 select-text pointer-events-auto"
         >
           <div
             onClick={(e) => e.stopPropagation()}
