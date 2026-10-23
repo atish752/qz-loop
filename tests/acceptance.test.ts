@@ -1651,8 +1651,74 @@ Ans: A`;
   assert(quizLoopContainerSrc.includes("repeatDay"), "QuizLoopContainer renders Spaced Repetition Timeline buttons (1 Day, 1 Week, 1 Month, Never) below Quick Proof");
   assert(quizLoopContainerSrc.includes("/api/questions/repeat"), "Spaced repetition selection posts to /api/questions/repeat");
 
+  // Scenario 63: Strict Calendar Day Metrics, Full-Window Solution Pop-up & Loop Exit Confirmation
+  console.log("\n[Scenario 63] Strict Calendar Day Metrics, Full-Window Solution Pop-up & Loop Exit Confirmation");
+  
+  // 1. Strict Asia/Kolkata Calendar Day Metrics
+  const testUser63 = db.signUpUser({
+    username: "metric_accuracy_user",
+    display_name: "Accuracy Tester",
+    target_exam: "NEET UG (Medical Entrance)",
+    preferred_examination_id: "exam-neet-ug",
+  });
+  assert(testUser63.today_solved_count === 0, "New user starts with 0 solved today");
+
+  // Record an attempt that happened yesterday in Asia/Kolkata (30 hours ago)
+  const yesterdayDate = new Date(Date.now() - 30 * 3600000);
+  db.syncCloudAttempt({
+    id: "att-yesterday-1",
+    user_id: testUser63.id,
+    question_id: "q-neet-bio-1",
+    selected_option_id: "B",
+    is_correct: true,
+    response_time_ms: 7500,
+    created_at: yesterdayDate.toISOString(),
+  });
+
+  const matrixTodayYesterday = db.getMatrixStats(testUser63.id, "today");
+  assert(matrixTodayYesterday.total_solved === 0, "Yesterday attempt strictly yields 0 solved for today in Asia/Kolkata");
+  
+  const matrixWeekYesterday = db.getMatrixStats(testUser63.id, "week");
+  assert(matrixWeekYesterday.total_solved === 1, "Yesterday attempt is counted in weekly metrics");
+
+  // Submit an attempt today in Asia/Kolkata
+  db.submitAttempt({
+    userId: testUser63.id,
+    questionId: "q-neet-bio-2",
+    selectedOptionId: "B",
+    responseTimeMs: 6200,
+  });
+
+  const matrixTodayNow = db.getMatrixStats(testUser63.id, "today");
+  assert(matrixTodayNow.total_solved === 1, "Attempt submitted today increments today solved to 1");
+  const matrixWeekNow = db.getMatrixStats(testUser63.id, "week");
+  assert(matrixWeekNow.total_solved === 2, "Week metrics reflect total 2 attempts");
+
+  // Check HomeDashboardView client-side hydration uses Asia/Kolkata timezone equality
+  const homeDashboardCode = fs.readFileSync(path.join(__dirname, "../components/home/HomeDashboardView.tsx"), "utf8");
+  assert(homeDashboardCode.includes("timeZone: \"Asia/Kolkata\""), "HomeDashboardView hydrates client cache using Asia/Kolkata timezone");
+  assert(homeDashboardCode.includes("attIstStr === istTodayStr"), "HomeDashboardView matches strict calendar day string for today's attempts");
+  assert(homeDashboardCode.includes("todaySolvedCount"), "HomeDashboardView maintains todaySolvedCount for real-time goal progress");
+
+  // 2. Full-Window Quick Proof & Solution Pop-up Modal
+  const loopContainerCode = fs.readFileSync(path.join(__dirname, "../components/loop/QuizLoopContainer.tsx"), "utf8");
+  assert(loopContainerCode.includes("showSolutionModal"), "QuizLoopContainer declares showSolutionModal state");
+  assert(loopContainerCode.includes("setShowSolutionModal(true)"), "Quick Proof & Solution button opens solution modal");
+  assert(loopContainerCode.includes("z-[130]"), "Solution modal is hoisted with top z-index z-[130]");
+  assert(loopContainerCode.includes("Cut / Close modal"), "Full-window solution modal includes prominent top-right cut/close option");
+  assert(loopContainerCode.includes("Detailed Proof & Solution"), "Solution modal renders Detailed Proof & Solution section");
+  assert(loopContainerCode.includes("bottom-16"), "QuizLoopContainer elevates bottom controls above BottomNav");
+
+  // 3. Tab Switch Confirmation Dialog when in Quiz Loop
+  const bottomNavCode = fs.readFileSync(path.join(__dirname, "../components/layout/BottomNav.tsx"), "utf8");
+  assert(bottomNavCode.includes("showLeaveConfirmation"), "BottomNav declares showLeaveConfirmation state");
+  assert(bottomNavCode.includes("Leave Quiz Loop?"), "BottomNav confirmation modal renders 'Leave Quiz Loop?' heading");
+  assert(bottomNavCode.includes("Confirm & Leave"), "BottomNav confirmation modal renders 'Confirm & Leave' button");
+  assert(bottomNavCode.includes("qz_leave_quiz_loop"), "BottomNav dispatches qz_leave_quiz_loop event on confirm");
+  assert(loopContainerCode.includes("qz_leave_quiz_loop"), "QuizLoopContainer listens to qz_leave_quiz_loop to reset active loop state");
+
   console.log("\n=================================================");
-  console.log("   ALL 62 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 63 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

@@ -491,23 +491,22 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         }
 
         if (typeof window !== "undefined") {
-          if (currentUid) {
-            try {
-              const storageKey = `qz_user_attempts_${currentUid}`;
-              const existingRaw = localStorage.getItem(storageKey);
-              const list = existingRaw ? JSON.parse(existingRaw) : [];
-              list.push({
-                id: data.attemptId || `att-${Date.now()}`,
-                user_id: currentUid,
-                question_id: question.id,
-                selected_option_id: optionId,
-                is_correct: data.isCorrect,
-                response_time_ms: finalElapsedMs,
-                created_at: new Date().toISOString(),
-              });
-              localStorage.setItem(storageKey, JSON.stringify(list));
-            } catch {}
-          }
+          const effectiveUid = currentUid || "guest";
+          try {
+            const storageKey = `qz_user_attempts_${effectiveUid}`;
+            const existingRaw = localStorage.getItem(storageKey);
+            const list = existingRaw ? JSON.parse(existingRaw) : [];
+            list.push({
+              id: data.attemptId || `att-${Date.now()}`,
+              user_id: effectiveUid,
+              question_id: question.id,
+              selected_option_id: optionId,
+              is_correct: data.isCorrect,
+              response_time_ms: finalElapsedMs,
+              created_at: new Date().toISOString(),
+            });
+            localStorage.setItem(storageKey, JSON.stringify(list));
+          } catch {}
           window.dispatchEvent(
             new CustomEvent("qz_attempt_submitted", {
               detail: {

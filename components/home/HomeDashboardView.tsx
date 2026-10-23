@@ -103,6 +103,8 @@ export const HomeDashboardView: React.FC = () => {
       .catch(() => {});
   }, [isLoggedIn, refreshCount]);
 
+  const [todaySolvedCount, setTodaySolvedCount] = useState<number>(0);
+
   useEffect(() => {
     setIsLoading(true);
     const uid = typeof window !== "undefined" ? localStorage.getItem("qz_user_id") : null;
@@ -115,9 +117,10 @@ export const HomeDashboardView: React.FC = () => {
         if (data.success && data.stats) {
           let finalStats = data.stats;
           // Hydrate from client attempt cache if server stats returned 0 attempts
-          if (uid && typeof window !== "undefined") {
+          if (typeof window !== "undefined") {
             try {
-              const cachedRaw = localStorage.getItem(`qz_user_attempts_${uid}`);
+              const storageKey = `qz_user_attempts_${uid || "guest"}`;
+              const cachedRaw = localStorage.getItem(storageKey);
               if (cachedRaw) {
                 const localAttempts: Array<{
                   id: string;
@@ -129,12 +132,15 @@ export const HomeDashboardView: React.FC = () => {
                 }> = JSON.parse(cachedRaw);
 
                 if (Array.isArray(localAttempts) && localAttempts.length > 0) {
-                  const now = Date.now();
+                  const now = new Date();
+                  const istTodayStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
                   const filtered = localAttempts.filter((a) => {
-                    const diffMs = now - new Date(a.created_at).getTime();
-                    if (period === "today") return diffMs <= 86400000;
-                    if (period === "week") return diffMs <= 7 * 86400000;
-                    if (period === "month") return diffMs <= 30 * 86400000;
+                    const attDate = new Date(a.created_at);
+                    const attIstStr = attDate.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+                    if (period === "today") return attIstStr === istTodayStr;
+                    const diffMs = now.getTime() - attDate.getTime();
+                    if (period === "week") return diffMs >= 0 && diffMs <= 7 * 86400000;
+                    if (period === "month") return diffMs >= 0 && diffMs <= 30 * 86400000;
                     return true;
                   });
 
@@ -145,6 +151,12 @@ export const HomeDashboardView: React.FC = () => {
                     const accuracy = Math.round((correctCount / totalSolved) * 100);
                     const totalTime = filtered.reduce((acc, a) => acc + (a.response_time_ms || 10000), 0);
                     const avgTimeSec = Math.round(totalTime / totalSolved / 1000);
+                    const correctAttempts = filtered.filter((a) => a.is_correct);
+                    let fastestSec: number | null = null;
+                    if (correctAttempts.length > 0) {
+                      const minMs = Math.min(...correctAttempts.map((a) => a.response_time_ms || 10000));
+                      fastestSec = Number((minMs / 1000).toFixed(1));
+                    }
 
                     finalStats = {
                       ...finalStats,
@@ -153,6 +165,8 @@ export const HomeDashboardView: React.FC = () => {
                       incorrect_count: incorrectCount,
                       accuracy_percentage: accuracy,
                       avg_time_seconds: avgTimeSec,
+                      fastest_correct_seconds: fastestSec,
+                      total_time_seconds: Math.round(totalTime / 1000),
                     };
                   }
                 }
@@ -164,7 +178,32 @@ export const HomeDashboardView: React.FC = () => {
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, [period, isLoggedIn, refreshCount]);
+
+    // Synchronize today's solved count strictly for Asia/Kolkata today
+    if (typeof window !== "undefined") {
+      try {
+        const storageKey = `qz_user_attempts_${uid || "guest"}`;
+        const cachedRaw = localStorage.getItem(storageKey);
+        if (cachedRaw) {
+          const localAttempts = JSON.parse(cachedRaw);
+          if (Array.isArray(localAttempts)) {
+            const istTodayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+            const localTodayCount = localAttempts.filter((a: any) => {
+              const attIstStr = new Date(a.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+              return attIstStr === istTodayStr;
+            }).length;
+            setTodaySolvedCount(Math.max(localTodayCount, user?.today_solved_count || 0));
+          }
+        } else {
+          setTodaySolvedCount(user?.today_solved_count || 0);
+        }
+      } catch {
+        setTodaySolvedCount(user?.today_solved_count || 0);
+      }
+    } else {
+      setTodaySolvedCount(user?.today_solved_count || 0);
+    }
+  }, [period, isLoggedIn, refreshCount, user?.today_solved_count]);
 
   const handleShare = async () => {
     if (!stats) return;
@@ -294,7 +333,7 @@ export const HomeDashboardView: React.FC = () => {
   };
 
   const dailyGoal = habit?.daily_goal || user?.daily_goal || 25;
-  const solvedToday = isLoggedIn ? (habit?.solved_today || stats?.total_solved || 0) : 0;
+  const solvedToday = isLoggedIn ? (todaySolvedCount || habit?.solved_today || 0) : todaySolvedCount;
   const currentStreak = isLoggedIn ? (user?.current_streak || 0) : 0;
   const goalProgress = Math.min(100, Math.round((solvedToday / dailyGoal) * 100));
   const activeExamId = "exam-neet-ug";

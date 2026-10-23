@@ -126,6 +126,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   const [activeChatFriend, setActiveChatFriend] = useState<FriendUser | null>(null);
 
   // Hoisted Modals State (Eliminates CSS transform positioning glitch across reels)
+  const [showSolutionModal, setShowSolutionModal] = useState<boolean>(false);
   const [activeSaveQuestion, setActiveSaveQuestion] = useState<Question | null>(null);
   const [activeShareQuestion, setActiveShareQuestion] = useState<Question | null>(null);
   const [activeCommentsQuestion, setActiveCommentsQuestion] = useState<Question | null>(null);
@@ -305,11 +306,33 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     };
     window.addEventListener(LANGUAGE_CHANGE_EVENT, handleLangChange);
 
+    const handleOpenSolutionModal = () => {
+      setShowSolutionModal(true);
+    };
+    window.addEventListener("qz_open_solution_modal", handleOpenSolutionModal);
+
+    const handleLeaveQuizLoop = () => {
+      setIsStarted(false);
+      setCurrentIndex(0);
+      setQuestions([]);
+      setShowSolutionModal(false);
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("qz_loop_is_active");
+        sessionStorage.removeItem("qz_loop_cached_questions");
+        sessionStorage.removeItem("qz_loop_active_question_id");
+        sessionStorage.removeItem("qz_loop_answered_records");
+        sessionStorage.removeItem("qz_last_loop_index");
+      }
+    };
+    window.addEventListener("qz_leave_quiz_loop", handleLeaveQuizLoop);
+
     return () => {
       window.removeEventListener("qz_auth_changed", checkAuthAndLoad);
       window.removeEventListener("qz_exam_changed", handleExamChanged);
       window.removeEventListener("qz_question_created", handleQuestionCreated);
       window.removeEventListener(LANGUAGE_CHANGE_EVENT, handleLangChange);
+      window.removeEventListener("qz_open_solution_modal", handleOpenSolutionModal);
+      window.removeEventListener("qz_leave_quiz_loop", handleLeaveQuizLoop);
     };
   }, []);
 
@@ -1340,7 +1363,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               if (e.cancelable) e.preventDefault();
             }}
             onTouchEnd={(e) => e.stopPropagation()}
-            className="absolute bottom-0 left-0 right-0 z-30 px-4 sm:px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 pointer-events-auto flex flex-col gap-2 touch-none overscroll-none bottom-controls"
+            className="absolute bottom-16 sm:bottom-[4.5rem] left-0 right-0 z-30 px-4 sm:px-5 pb-[max(0.25rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 pointer-events-auto flex flex-col gap-2 touch-none overscroll-none bottom-controls"
           >
             {!activeAnswerStatus.isAnswerMode && !activeAnswerStatus.isAnswered && !answeredRecords[activeQuestion.id] && (
               <div className="w-full">
@@ -1402,6 +1425,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      setShowSolutionModal(true);
                       window.dispatchEvent(
                         new CustomEvent("qz_open_solution_modal", { detail: { questionId: activeQuestion.id } })
                       );
@@ -1685,6 +1709,209 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
           onClose={() => setActiveSuggestionQuestion(null)}
         />
       )}
+
+      {/* Full-Window Quick Proof & Solution Pop-up Modal (Cut/Close 'X' on Top Right) */}
+      {showSolutionModal && activeQuestion && (() => {
+        const currentRecord = answeredRecords[activeQuestion.id];
+        const isSolved = Boolean(currentRecord);
+        const isCorr = currentRecord?.isCorrect;
+        const correctOptId = activeQuestion.correct_option_id;
+        const selectedOptId = currentRecord?.selectedOptionId;
+        const solveTimeSec = currentRecord?.responseTimeMs ? (currentRecord.responseTimeMs / 1000).toFixed(1) : null;
+        const explanationText =
+          (lang === "hi" && activeQuestion.hindi_explanation)
+            ? activeQuestion.hindi_explanation
+            : activeQuestion.explanation ||
+              currentRecord?.explanation ||
+              (lang === "hi" ? "इस प्रश्न के लिए कोई व्याख्या उपलब्ध नहीं है।" : "Author did not provide an explanation for this question.");
+
+        const questionText = (lang === "hi" && activeQuestion.hindi_question_text)
+          ? activeQuestion.hindi_question_text
+          : activeQuestion.question_text;
+
+        return (
+          <div
+            data-no-swipe="true"
+            onClick={() => setShowSolutionModal(false)}
+            className="fixed inset-0 z-[130] flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-text"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-2xl bg-surface-container-lowest rounded-3xl p-5 sm:p-7 shadow-2xl border border-surface-container-high/60 flex flex-col gap-4 max-h-[92vh] overflow-y-auto no-scrollbar animate-in zoom-in-95 duration-200 text-left"
+            >
+              {/* Header with Exam/Subject Badge & Top-Right Cut/Close ('X') Button */}
+              <div className="flex items-center justify-between pb-3 border-b border-surface-container-high/40">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center gap-1.5 border border-primary/20">
+                    <span className="material-symbols-outlined text-[16px]">bolt</span>
+                    <span>{lang === "hi" ? "त्वरित समाधान व प्रमाण" : "Quick Proof & Solution"}</span>
+                  </span>
+                  {activeQuestion.subject_name && (
+                    <span className="px-2.5 py-1 rounded-full bg-surface-container text-secondary text-xs font-semibold">
+                      {activeQuestion.subject_name}
+                    </span>
+                  )}
+                  {activeQuestion.syllabus_tag && (
+                    <span className="px-2.5 py-1 rounded-full bg-surface-container text-secondary text-[11px] font-medium hidden sm:inline-block truncate max-w-xs">
+                      {activeQuestion.syllabus_tag}
+                    </span>
+                  )}
+                </div>
+
+                {/* Prominent Cut / Close button on Top Right side */}
+                <button
+                  type="button"
+                  onClick={() => setShowSolutionModal(false)}
+                  className="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-xs"
+                  title="Cut / Close modal"
+                  aria-label="Cut / Close modal"
+                >
+                  <span className="material-symbols-outlined text-[22px]">close</span>
+                </button>
+              </div>
+
+              {/* Status Banner if answered */}
+              {isSolved && (
+                <div
+                  className={`p-3 sm:p-3.5 rounded-2xl flex items-center justify-between border ${
+                    isCorr
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-950 dark:text-emerald-100"
+                      : "bg-rose-500/10 border-rose-500/30 text-rose-950 dark:text-rose-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold shrink-0 shadow-xs ${
+                        isCorr ? "bg-emerald-600" : "bg-rose-600"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        {isCorr ? "check" : "close"}
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm">
+                        {isCorr
+                          ? (lang === "hi" ? "सही उत्तर!" : "Correct Answer!")
+                          : (lang === "hi" ? "गलत उत्तर" : "Incorrect Answer")}
+                      </h4>
+                      {solveTimeSec && (
+                        <span className="text-[11px] opacity-80 font-mono">
+                          {lang === "hi" ? `हल करने में लगा समय: ${solveTimeSec}s` : `Solved in ${solveTimeSec}s`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                      isCorr
+                        ? "bg-emerald-600 text-white"
+                        : "bg-rose-600 text-white"
+                    }`}
+                  >
+                    {isCorr ? "+4.00" : "-1.00"} Marks
+                  </span>
+                </div>
+              )}
+
+              {/* Complete Question Text */}
+              <div className="bg-surface-container-low rounded-2xl p-4 border border-surface-container-high/40 flex flex-col gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-secondary">
+                  {lang === "hi" ? "प्रश्न" : "Question"}
+                </span>
+                <p className="text-sm sm:text-base text-on-surface font-semibold leading-relaxed whitespace-pre-wrap">
+                  {questionText}
+                </p>
+              </div>
+
+              {/* Options Breakdown with Correct Answer clearly highlighted */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-secondary">
+                  {lang === "hi" ? "विकल्प (Options)" : "Options"}
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {activeQuestion.options.map((opt) => {
+                    const isOptionCorrect = opt.id === correctOptId;
+                    const isOptionSelected = opt.id === selectedOptId;
+                    const optText = (lang === "hi" && opt.hindi_text) ? opt.hindi_text : opt.text;
+
+                    let cardClass = "bg-surface-container-low border-surface-container-high/50 text-on-surface";
+                    if (isOptionCorrect) {
+                      cardClass = "bg-emerald-500/15 border-emerald-500/40 text-emerald-950 dark:text-emerald-100 ring-2 ring-emerald-500/30";
+                    } else if (isOptionSelected && !isCorr) {
+                      cardClass = "bg-rose-500/15 border-rose-500/40 text-rose-950 dark:text-rose-100 ring-2 ring-rose-500/30";
+                    }
+
+                    return (
+                      <div
+                        key={opt.id}
+                        className={`p-3 rounded-xl border flex items-center gap-2.5 text-xs sm:text-sm font-medium transition-all ${cardClass}`}
+                      >
+                        <span
+                          className={`w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 ${
+                            isOptionCorrect
+                              ? "bg-emerald-600 text-white shadow-xs"
+                              : isOptionSelected && !isCorr
+                              ? "bg-rose-600 text-white shadow-xs"
+                              : "bg-surface-container text-secondary"
+                          }`}
+                        >
+                          {opt.id}
+                        </span>
+                        <span className="flex-1 leading-snug">{optText}</span>
+                        {isOptionCorrect && (
+                          <span className="material-symbols-outlined text-[18px] text-emerald-600 shrink-0" title="Correct Option">
+                            check_circle
+                          </span>
+                        )}
+                        {isOptionSelected && !isCorr && (
+                          <span className="material-symbols-outlined text-[18px] text-rose-600 shrink-0" title="Your Choice">
+                            cancel
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Detailed Proof & Solution Box */}
+              <div className="bg-gradient-to-br from-primary/5 via-primary-container/10 to-transparent rounded-2xl p-4 sm:p-5 border border-primary/25 flex flex-col gap-2.5">
+                <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                  <span className="material-symbols-outlined text-[20px]">psychology</span>
+                  <span>{lang === "hi" ? "विस्तृत प्रमाण व हल (Detailed Proof & Solution)" : "Detailed Proof & Solution"}</span>
+                </div>
+                <div className="text-xs sm:text-sm text-on-surface leading-relaxed max-h-64 overflow-y-auto no-scrollbar whitespace-pre-wrap font-normal">
+                  {explanationText}
+                </div>
+              </div>
+
+              {/* Action Buttons: Close Solution & Skip Next */}
+              <div className="flex items-center gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSolutionModal(false)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-surface-container-high text-secondary hover:text-on-surface hover:bg-surface-container text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  <span>{lang === "hi" ? "समाधान बंद करें (Cut / Close Solution)" : "Cut / Close Solution"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSolutionModal(false);
+                    attemptNextQuestion();
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-on-primary text-xs font-bold shadow-md hover:shadow-lg active:scale-98 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>{lang === "hi" ? "अगला प्रश्न" : "Next Question"}</span>
+                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
