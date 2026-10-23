@@ -52,6 +52,8 @@ interface QuestionReelCardProps {
   }) => void;
   onOpenChatWithFriend?: (friend: FriendUser) => void;
   preferredLanguage?: "en" | "hi" | "all";
+  onLanguageChange?: (lang: "en" | "hi") => void;
+  onSwitchSubject?: () => void;
   onOpenSaveModal?: (question: Question) => void;
   onOpenShareModal?: (question: Question) => void;
   onOpenCommentsModal?: (question: Question) => void;
@@ -74,6 +76,8 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
   onRegisterAnsweringStatus,
   onOpenChatWithFriend,
   preferredLanguage,
+  onLanguageChange,
+  onSwitchSubject,
   onOpenSaveModal,
   onOpenShareModal,
   onOpenCommentsModal,
@@ -102,6 +106,33 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
       setDisplayLang("en");
     }
   }, [preferredLanguage, question]);
+
+  useEffect(() => {
+    const handleGlobalLang = (e: Event) => {
+      const customEvent = e as CustomEvent<{ lang: "en" | "hi" }>;
+      if (customEvent.detail?.lang) {
+        const next = customEvent.detail.lang;
+        if (next === "hi" && (question.hindi_question_text || question.language === "hi")) {
+          setDisplayLang("hi");
+        } else if (next === "en" && question.question_text) {
+          setDisplayLang("en");
+        }
+      }
+    };
+    window.addEventListener("qz_language_changed", handleGlobalLang);
+    return () => window.removeEventListener("qz_language_changed", handleGlobalLang);
+  }, [question]);
+
+  const handleToggleLang = (target: "en" | "hi") => {
+    setDisplayLang(target);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("qz_quiz_lang", target);
+    }
+    if (onLanguageChange) {
+      onLanguageChange(target);
+    }
+    window.dispatchEvent(new CustomEvent("qz_language_changed", { detail: { lang: target } }));
+  };
 
   // Quality peer verification votes
   const [upvotes, setUpvotes] = useState<number>(question.quality_upvotes || 0);
@@ -723,7 +754,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
         </div>
       )}
 
-      {/* 1. Top Question Information Bar */}
+      {/* 1. Top Question Information & Controls Bar */}
       <div
         data-no-swipe="true"
         style={{ touchAction: "none", overscrollBehavior: "none" }}
@@ -733,31 +764,65 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
           if (e.cancelable) e.preventDefault();
         }}
         onTouchEnd={(e) => e.stopPropagation()}
-        className="flex items-center justify-between pb-2 border-b border-surface-container-high/30 shrink-0 touch-none select-none"
+        className="flex items-center justify-between gap-1.5 pb-2 border-b border-surface-container-high/30 shrink-0 touch-none select-none"
       >
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm uppercase tracking-wider font-bold">
-            {question.subject_name || "General"}
-          </span>
-          <span className="text-secondary font-label-sm text-label-sm font-mono">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {/* Interactive Subject Switcher Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onSwitchSubject) {
+                onSwitchSubject();
+              } else {
+                window.dispatchEvent(new CustomEvent("qz_change_subject_flow"));
+              }
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-surface-container text-on-surface text-[11px] sm:text-xs font-bold transition-all cursor-pointer border border-surface-container-high/60 shadow-2xs max-w-[130px] sm:max-w-[170px] group shrink-0"
+            title="Switch Subject Flow"
+          >
+            <span className="material-symbols-outlined text-[14px] text-primary shrink-0 transition-transform group-hover:rotate-45">tune</span>
+            <span className="truncate uppercase tracking-wider">{question.subject_name || "All Subjects"}</span>
+            <span className="material-symbols-outlined text-[13px] text-secondary shrink-0">expand_more</span>
+          </button>
+
+          {/* Bilingual English / Hindi Switch Button */}
+          <div className="flex items-center rounded-lg bg-surface-container p-0.5 text-[10px] sm:text-[11px] font-bold border border-surface-container-high/60 shadow-2xs shrink-0">
+            <button
+              type="button"
+              onClick={() => handleToggleLang("en")}
+              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                displayLang === "en"
+                  ? "bg-primary text-on-primary shadow-xs font-bold"
+                  : "text-secondary hover:text-on-surface font-semibold"
+              }`}
+              title="Switch question to English"
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleLang("hi")}
+              className={`px-1.5 sm:px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                displayLang === "hi"
+                  ? "bg-primary text-on-primary shadow-xs font-bold"
+                  : "text-secondary hover:text-on-surface font-semibold"
+              }`}
+              title="Switch question to Hindi (हिन्दी)"
+            >
+              HI
+            </button>
+          </div>
+
+          {/* Question Index / Counter */}
+          <span className="text-secondary font-mono text-[11px] sm:text-xs font-bold shrink-0">
             · {index} / {totalQuestions}
           </span>
-          {question.syllabus_tag && (
-            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-primary-fixed/30 text-primary font-label-sm text-[10px] font-bold">
-              {question.syllabus_tag}
-            </span>
-          )}
-          {question.pyq_info && (
-            <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-900 dark:text-amber-200 font-label-sm text-[10px] font-bold">
-              {question.pyq_info}
-            </span>
-          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Active Question Sleek Digital Timer Display */}
           <div
-            className={`relative flex items-center px-3 py-1 rounded-xl font-mono text-xs sm:text-sm font-extrabold tracking-widest border transition-all duration-300 ${
+            className={`relative flex items-center px-2.5 sm:px-3 py-1 rounded-xl font-mono text-xs sm:text-sm font-extrabold tracking-widest border transition-all duration-300 ${
               isAnswered
                 ? "bg-surface-container/80 text-secondary border-surface-container-high/40 shadow-xs"
                 : "bg-gradient-to-r from-primary/10 via-primary-container/20 to-primary/10 text-primary border-primary/30 shadow-[0_0_12px_rgba(83,0,183,0.18)] dark:shadow-[0_0_15px_rgba(208,188,255,0.2)]"
@@ -765,7 +830,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             title="Elapsed solve time"
           >
             {!isAnswered && (
-              <span className="relative flex h-2 w-2 mr-2">
+              <span className="relative flex h-2 w-2 mr-1.5 sm:mr-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
               </span>
@@ -789,9 +854,11 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
 
           {/* Three-Dot More Options Button (Report & Suggest Correction) */}
           <button
+            type="button"
             onClick={() => setShowThreeDotMenu(true)}
-            className="p-1 rounded-full text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"
+            className="p-1 rounded-full text-secondary hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
             title={t.moreOptions || "More options"}
+            aria-label="More options"
           >
             <span className="material-symbols-outlined text-[20px]">more_vert</span>
           </button>
@@ -933,7 +1000,7 @@ export const QuestionReelCard: React.FC<QuestionReelCardProps> = ({
             if (e.cancelable) e.preventDefault();
           }}
           onTouchEnd={(e) => e.stopPropagation()}
-          className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 z-30 select-none touch-none action-rail"
+          className="absolute right-2 sm:right-2.5 top-[36%] -translate-y-1/2 sm:top-[38%] flex flex-col items-center gap-2 sm:gap-2.5 z-30 select-none touch-none action-rail"
         >
           {/* Creator Avatar & Follow Button */}
           <div className="relative mb-1">

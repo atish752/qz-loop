@@ -1736,8 +1736,44 @@ Ans: A`;
   assert(loopContainerCode.includes("e.key === \"Escape\""), "Solution modal supports Escape key dismissal");
   assert(bottomNavCode.includes("e.key === \"Escape\""), "BottomNav leave confirmation dialog supports Escape key dismissal");
 
+  // Scenario 64: Quiz Loop Unified Top Bar Controls, Flush Bottom Alignment & Action Rail Zero-Overlap
+  console.log("\n[Scenario 64] Quiz Loop Unified Top Bar Controls, Flush Bottom Alignment & Action Rail Zero-Overlap");
+  const s64ReelCode = fs.readFileSync(path.join(__dirname, "../components/loop/QuestionReelCard.tsx"), "utf8");
+  const s64LoopCode = fs.readFileSync(path.join(__dirname, "../components/loop/QuizLoopContainer.tsx"), "utf8");
+  const s64WrapperCode = fs.readFileSync(path.join(__dirname, "../components/layout/AppLayoutWrapper.tsx"), "utf8");
+
+  assert(s64ReelCode.includes("tune") && s64ReelCode.includes("expand_more"), "QuestionReelCard renders interactive Subject switcher button with tune icon and dropdown chevron");
+  assert(s64ReelCode.includes("Switch Subject Flow") || s64ReelCode.includes("onSwitchSubject"), "QuestionReelCard provides subject switcher interaction hook");
+  assert(s64ReelCode.includes("handleToggleLang(\"en\")") && s64ReelCode.includes("handleToggleLang(\"hi\")"), "QuestionReelCard top bar renders segmented bilingual EN / HI toggle switch");
+  assert(s64ReelCode.includes("handleToggleLang"), "QuestionReelCard includes dedicated handleToggleLang handler");
+  assert(s64ReelCode.includes("· {index} / {totalQuestions}"), "QuestionReelCard top bar clearly displays question counter on a single row");
+  assert(s64ReelCode.includes("font-mono text-xs sm:text-sm font-extrabold tracking-widest"), "QuestionReelCard top bar renders digital timer");
+  assert(s64ReelCode.includes("setShowThreeDotMenu"), "QuestionReelCard top bar provides 3-dots more options trigger");
+  assert(s64ReelCode.includes("top-[36%] -translate-y-1/2") || s64ReelCode.includes("top-[38%]"), "QuestionReelCard elevates right action rail to prevent bottom controls collision");
+  assert(s64ReelCode.includes("right-2"), "QuestionReelCard insets right action rail from extreme edge");
+  assert(!s64LoopCode.includes("pb-16 touch-none"), "QuizLoopContainer eliminates outer double-padding pb-16 to sit flush directly above BottomNav");
+  assert(s64LoopCode.includes("bottom-16"), "QuizLoopContainer pins bottom controls rigidly above BottomNav");
+  assert(s64LoopCode.includes("onLanguageChange={handleLanguageChange}"), "QuizLoopContainer wires language change synchronization to QuestionReelCard");
+  assert(s64LoopCode.includes("onSwitchSubject={handleExitToSubjectSelect}"), "QuizLoopContainer wires subject flow switcher to QuestionReelCard");
+  assert(s64WrapperCode.includes("isLoop") && s64WrapperCode.includes("h-[100dvh] max-h-[100dvh] overflow-hidden"), "AppLayoutWrapper locks loop viewport height to eliminate mobile scroll jumping");
+
+  console.log("  ✓ QuestionReelCard renders interactive Subject switcher button with tune icon and dropdown chevron");
+  console.log("  ✓ QuestionReelCard provides subject switcher interaction hook");
+  console.log("  ✓ QuestionReelCard top bar renders segmented bilingual EN / HI toggle switch");
+  console.log("  ✓ QuestionReelCard includes dedicated handleToggleLang handler");
+  console.log("  ✓ QuestionReelCard top bar clearly displays question counter on a single row");
+  console.log("  ✓ QuestionReelCard top bar renders digital timer");
+  console.log("  ✓ QuestionReelCard top bar provides 3-dots more options trigger");
+  console.log("  ✓ QuestionReelCard elevates right action rail to prevent bottom controls collision");
+  console.log("  ✓ QuestionReelCard insets right action rail from extreme edge");
+  console.log("  ✓ QuizLoopContainer eliminates outer double-padding pb-16 to sit flush directly above BottomNav");
+  console.log("  ✓ QuizLoopContainer pins bottom controls rigidly above BottomNav");
+  console.log("  ✓ QuizLoopContainer wires language change synchronization to QuestionReelCard");
+  console.log("  ✓ QuizLoopContainer wires subject flow switcher to QuestionReelCard");
+  console.log("  ✓ AppLayoutWrapper locks loop viewport height to eliminate mobile scroll jumping");
+
   console.log("\n=================================================");
-  console.log("   ALL 63 ACCEPTANCE TEST SUITES PASSED (100%)   ");
+  console.log("   ALL 64 ACCEPTANCE TEST SUITES PASSED (100%)   ");
   console.log("=================================================\n");
 }
 

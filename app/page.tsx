@@ -1,11 +1,5 @@
-import { HomeDashboardView } from "@/components/home/HomeDashboardView";
-import { BottomNav } from "@/components/layout/BottomNav";
+import { LandingPage } from "@/components/landing/LandingPage";
 
 export default function HomePage() {
-  return (
-    <main className="w-full flex-1 flex flex-col relative min-h-screen">
-      <HomeDashboardView />
-      <BottomNav />
-    </main>
-  );
+  return <LandingPage />;
 }

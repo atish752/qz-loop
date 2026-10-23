@@ -15,6 +15,7 @@ export function AppLayoutWrapper({ children }: AppLayoutWrapperProps) {
   const pathname = usePathname();
   // Landing page runs at '/' or '/home'
   const isLandingPage = pathname === "/" || pathname === "/home";
+  const isLoop = pathname === "/loop" || pathname === "/qzloop";
 
   if (isLandingPage) {
     return (
@@ -28,7 +29,11 @@ export function AppLayoutWrapper({ children }: AppLayoutWrapperProps) {
   }
 
   return (
-    <div className="w-full max-w-[480px] min-h-screen bg-surface-container-lowest flex flex-col relative shadow-[0_0_24px_rgba(0,0,0,0.06)] md:border-x md:border-surface-container-high/60">
+    <div
+      className={`w-full max-w-[480px] bg-surface-container-lowest flex flex-col relative shadow-[0_0_24px_rgba(0,0,0,0.06)] md:border-x md:border-surface-container-high/60 ${
+        isLoop ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : "min-h-screen"
+      }`}
+    >
       {children}
       <AuthModal />
       <UsernameOnboardingModal />

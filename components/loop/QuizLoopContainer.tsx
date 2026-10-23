@@ -269,6 +269,44 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
     }
   };
 
+  // Handler to smoothly exit back to Subject Flow selector
+  const handleExitToSubjectSelect = useCallback(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("qz_loop_is_active");
+      sessionStorage.removeItem("qz_last_loop_index");
+      sessionStorage.removeItem("qz_loop_cached_questions");
+      sessionStorage.removeItem("qz_loop_active_question_id");
+      sessionStorage.removeItem("qz_loop_answered_records");
+    }
+    setIsStarted(false);
+  }, []);
+
+  // Language change handler synchronized with localStorage & state
+  const handleLanguageChange = useCallback((newLang: "en" | "hi" | "all") => {
+    setQuizLanguage(newLang);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("qz_quiz_lang", newLang);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleGlobalLang = (e: Event) => {
+      const customEvent = e as CustomEvent<{ lang: "en" | "hi" }>;
+      if (customEvent.detail?.lang) {
+        handleLanguageChange(customEvent.detail.lang);
+      }
+    };
+    const handleSubjectFlow = () => {
+      handleExitToSubjectSelect();
+    };
+    window.addEventListener("qz_language_changed", handleGlobalLang);
+    window.addEventListener("qz_change_subject_flow", handleSubjectFlow);
+    return () => {
+      window.removeEventListener("qz_language_changed", handleGlobalLang);
+      window.removeEventListener("qz_change_subject_flow", handleSubjectFlow);
+    };
+  }, [handleLanguageChange, handleExitToSubjectSelect]);
+
   // Track session displayed question IDs to avoid repeats
   const displayedQuestionIdsRef = useRef<Set<string>>(new Set());
 
@@ -1200,96 +1238,10 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
   // VIEW 2: ACTIVE QZ LOOP (Vertical Reels)
   // ==========================================
   return (
-    <div className="flex flex-col h-[100dvh] max-h-[100dvh] bg-surface overflow-hidden overscroll-none select-none pb-16 touch-none">
-      {/* Subtle Top Reel Bar with Flow Pill & Combo Streak */}
-      <div
-        data-no-swipe="true"
-        onTouchStart={(e) => e.stopPropagation()}
-        onTouchMove={(e) => e.stopPropagation()}
-        onTouchEnd={(e) => e.stopPropagation()}
-        className="h-12 px-4 flex items-center justify-between bg-surface-container-lowest/80 backdrop-blur-md border-b border-surface-container-high/40 z-30 shrink-0 touch-none overscroll-none"
-      >
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                sessionStorage.removeItem("qz_loop_is_active");
-                sessionStorage.removeItem("qz_last_loop_index");
-                sessionStorage.removeItem("qz_loop_cached_questions");
-                sessionStorage.removeItem("qz_loop_active_question_id");
-                sessionStorage.removeItem("qz_loop_answered_records");
-              }
-              setIsStarted(false);
-            }}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-bold transition-colors cursor-pointer"
-            title="Change Subject Flow"
-          >
-            <span className="material-symbols-outlined text-[15px] text-primary">tune</span>
-            <span className="capitalize">
-              {selectedSubjects.includes("all")
-                ? "All Subjects"
-                : selectedSubjects.join(" + ")}
-            </span>
-            <span className="material-symbols-outlined text-[13px] text-secondary">expand_more</span>
-          </button>
-
-          {/* Bilingual English / Hindi Switch Button beside All Subject */}
-          <div className="flex items-center rounded-lg bg-surface-container p-0.5 text-[11px] font-bold border border-surface-container-high/60 shadow-2xs">
-            <button
-              onClick={() => {
-                setQuizLanguage("en");
-                localStorage.setItem("qz_quiz_lang", "en");
-              }}
-              className={`px-2 py-0.5 rounded-md transition-all ${
-                quizLanguage === "en" || (quizLanguage === "all" && lang === "en")
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "text-secondary hover:text-on-surface"
-              }`}
-            >
-              EN
-            </button>
-            <button
-              onClick={() => {
-                setQuizLanguage("hi");
-                localStorage.setItem("qz_quiz_lang", "hi");
-              }}
-              className={`px-2 py-0.5 rounded-md transition-all ${
-                quizLanguage === "hi" || (quizLanguage === "all" && lang === "hi")
-                  ? "bg-primary text-on-primary shadow-xs"
-                  : "text-secondary hover:text-on-surface"
-              }`}
-            >
-              हिन्दी
-            </button>
-          </div>
-        </div>
-
-        {/* Right Section: Theme Toggle, Combo Streak, and Question Counter */}
-        <div className="flex items-center gap-2">
-          {comboCount >= 2 && (
-            <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[11px] font-bold animate-pulse">
-              🔥 {comboCount}x Combo!
-            </span>
-          )}
-          <span className="text-secondary font-mono text-xs">
-            {currentIndex + 1}/{questions.length}
-          </span>
-          <button
-            onClick={toggleDarkModeInLoop}
-            className="p-1 rounded-full text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"
-            title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
-            aria-label="Toggle Night Mode"
-          >
-            <span className="material-symbols-outlined text-[18px]">
-              {isDarkMode ? "light_mode" : "dark_mode"}
-            </span>
-          </button>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-[100dvh] max-h-[100dvh] bg-surface overflow-hidden overscroll-none select-none touch-none">
       {/* Dopamine Combo Toast */}
       {comboToast && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 rounded-full bg-primary text-on-primary font-bold text-xs shadow-lg animate-in fade-in slide-in-from-top-2">
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 rounded-full bg-primary text-on-primary font-bold text-xs shadow-lg animate-in fade-in slide-in-from-top-2">
           {comboToast}
         </div>
       )}
@@ -1387,6 +1339,8 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
                   }}
                   onOpenChatWithFriend={(friend) => setActiveChatFriend(friend)}
                   preferredLanguage={quizLanguage}
+                  onLanguageChange={handleLanguageChange}
+                  onSwitchSubject={handleExitToSubjectSelect}
                   onOpenSaveModal={(question) => setActiveSaveQuestion(question)}
                   onOpenShareModal={(question) => setActiveShareQuestion(question)}
                   onOpenCommentsModal={(question) => setActiveCommentsQuestion(question)}
@@ -1410,7 +1364,7 @@ export const QuizLoopContainer: React.FC<QuizLoopContainerProps> = ({
               e.stopPropagation();
             }}
             onTouchEnd={(e) => e.stopPropagation()}
-            className="absolute bottom-16 sm:bottom-[4.5rem] left-0 right-0 z-30 px-4 sm:px-5 pb-[max(0.25rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/95 to-transparent pt-3 pointer-events-auto flex flex-col gap-2 overscroll-none bottom-controls"
+            className="absolute bottom-16 sm:bottom-[4.5rem] left-0 right-0 z-30 px-3.5 sm:px-4 pb-[max(0.25rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-surface via-surface/98 to-transparent pt-2.5 pointer-events-auto flex flex-col gap-1.5 overscroll-none bottom-controls"
           >
             {!activeAnswerStatus.isAnswerMode && !activeAnswerStatus.isAnswered && !answeredRecords[activeQuestion.id] && (
               <div className="w-full">
