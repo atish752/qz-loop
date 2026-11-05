@@ -20,6 +20,9 @@
 # Local env files
 .env*.local
 
+# Supabase CLI temp
+supabase/.temp/
+
 # Vercel
 .vercel
 

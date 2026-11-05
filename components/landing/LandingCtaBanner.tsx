@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { ArrowRight, Sparkles, Zap, ShieldCheck } from "lucide-react";
-import { APP_LOOP_URL } from "./LandingNavbar";
+import { ArrowRight, Download, MessageCircle, ShieldCheck, Zap } from "lucide-react";
+import { OFFICIAL_PLAYSTORE_URL, OFFICIAL_WHATSAPP_GROUP_URL } from "./LandingNavbar";
 
 export function LandingCtaBanner() {
   return (
@@ -15,7 +15,7 @@ export function LandingCtaBanner() {
         <div className="p-8 sm:p-14 rounded-[36px] bg-white/[0.03] border border-white/10 backdrop-blur-2xl shadow-[0_20px_70px_rgba(0,0,0,0.6)]">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-bold mb-6">
             <Zap className="w-3.5 h-3.5" />
-            <span>Turn Idle Chai Breaks Into Exam Ranks</span>
+            <span>Turn Idle Breaks Into Exam Ranks</span>
           </div>
 
           <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight mb-6">
@@ -26,21 +26,34 @@ export function LandingCtaBanner() {
           </h2>
 
           <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Your competition is currently scrolling Reels. In 10 minutes on Qz Loop, you can solve 25 high-probability Previous Year Questions with authentic negative marking.
+            Your peers are scrolling brainrot. In 10 minutes on Qz-loop, you can solve 25 high-yield MCQs with genuine negative marking and lock in your daily streak. Install the app on Google Play or join our WhatsApp study group today.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            {/* Play Store Button */}
             <a
-              href={APP_LOOP_URL}
+              href={OFFICIAL_PLAYSTORE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full sm:w-auto relative inline-flex items-center justify-center p-[2px] overflow-hidden rounded-2xl font-black group shadow-[0_0_40px_rgba(168,85,247,0.5)] hover:shadow-[0_0_60px_rgba(52,211,153,0.7)] transition-all duration-300"
+              className="w-full sm:w-auto relative inline-flex items-center justify-center p-[2px] overflow-hidden rounded-2xl font-black group shadow-[0_0_40px_rgba(168,85,247,0.5)] hover:shadow-[0_0_60px_rgba(168,85,247,0.8)] transition-all duration-300"
             >
-              <span className="absolute inset-0 bg-gradient-to-r from-purple-500 via-emerald-400 to-indigo-500 rounded-2xl animate-border-shimmer" />
+              <span className="absolute inset-0 bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-400 rounded-2xl animate-border-shimmer" />
               <span className="w-full sm:w-auto relative px-9 py-4 transition-all ease-out bg-[#07090e] rounded-2xl group-hover:bg-[#05060b] flex items-center justify-center gap-3 text-base text-white">
-                <span>Launch Qz Loop Now</span>
+                <Download className="w-5 h-5 text-purple-400" />
+                <span>Install on Google Play</span>
                 <ArrowRight className="w-5 h-5 text-emerald-400 group-hover:translate-x-1.5 transition-transform" />
               </span>
+            </a>
+
+            {/* WhatsApp Group Button */}
+            <a
+              href={OFFICIAL_WHATSAPP_GROUP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#25D366] font-bold text-sm flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-[#25D366]/10"
+            >
+              <MessageCircle className="w-5 h-5 fill-[#25D366]/20" />
+              <span>Join WhatsApp Group</span>
             </a>
           </div>
 
@@ -51,11 +64,11 @@ export function LandingCtaBanner() {
             </span>
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              No App Installation Required
+              Google Play Verified
             </span>
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              Instant Browser Play
+              DPDP Act 2023 Data Protected
             </span>
           </div>
         </div>
