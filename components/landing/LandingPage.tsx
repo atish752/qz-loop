@@ -4,12 +4,11 @@ import React from "react";
 import { ScrollProgress } from "./ScrollProgress";
 import { LandingNavbar } from "./LandingNavbar";
 import { LandingHero } from "./LandingHero";
-import { ScrollStorySection } from "./ScrollStorySection";
-import { LandingStats } from "./LandingStats";
+import { LandingContrast } from "./LandingContrast";
 import { LandingHabitEngine } from "./LandingHabitEngine";
+import { LandingStats } from "./LandingStats";
 import { ExamRow } from "./ExamRow";
-import { LandingBentoFeatures } from "./LandingBentoFeatures";
-import { LandingComparison } from "./LandingComparison";
+import { LandingDuels } from "./LandingDuels";
 import { LandingTestimonials } from "./LandingTestimonials";
 import { LandingFaq } from "./LandingFaq";
 import { LandingCtaBanner } from "./LandingCtaBanner";
@@ -18,44 +17,42 @@ import { LandingFooter } from "./LandingFooter";
 export function LandingPage() {
   return (
     <div className="w-full min-h-screen bg-[#07090e] text-slate-100 flex flex-col selection:bg-purple-500/30 selection:text-white">
-      {/* Scroll Progress Bar at top edge */}
+      {/* 1. Scroll Progress Indicator */}
       <ScrollProgress />
 
+      {/* 2. Glassmorphic Navigation */}
       <LandingNavbar />
 
       <main className="flex-1 w-full flex flex-col">
-        {/* 1. Flagship Hero with Interactive Device Mockup */}
+        {/* 3. Apple-Grade Hero with Interactive Device Reel */}
         <LandingHero />
 
-        {/* 2. Holy Scroll-Style Narrative Scroll Story Section */}
-        <ScrollStorySection />
+        {/* 4. The Reality Check: 2-Card Visual Contrast (Reels vs Qz-Loop) */}
+        <LandingContrast />
 
-        {/* 3. 4-Pillar Stat Impact Cards */}
-        <LandingStats />
-
-        {/* 4. The 3-Pillar Habit Engine (/goal, /plan, /boost) */}
+        {/* 5. The Habit Engine: /goal · /plan · /boost */}
         <LandingHabitEngine />
 
-        {/* 5. 10 Indian Competitive Examinations Showcase */}
+        {/* 6. Apple-Style Big Numbers */}
+        <LandingStats />
+
+        {/* 7. Curated 10 Competitive Exams */}
         <ExamRow />
 
-        {/* 6. Apple-Grade Bento Grid with Interactive Negative Marking Simulator */}
-        <LandingBentoFeatures />
+        {/* 8. 1-Tap WhatsApp Duels */}
+        <LandingDuels />
 
-        {/* 7. High-Contrast Paradigm Comparison Matrix */}
-        <LandingComparison />
-
-        {/* 8. App Store Verified Aspirant Community Reviews */}
+        {/* 9. Punchy Verified Aspirant Quotes */}
         <LandingTestimonials />
 
-        {/* 9. Frequently Asked Questions */}
+        {/* 10. Direct FAQ */}
         <LandingFaq />
 
-        {/* 10. Radiant Final Conversion Call-To-Action */}
+        {/* 11. Final Conversion CTA */}
         <LandingCtaBanner />
       </main>
 
-      {/* 11. Comprehensive Brand & Compliance Footer */}
+      {/* 12. Minimalist Compliance Footer */}
       <LandingFooter />
     </div>
   );

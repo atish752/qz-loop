@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Menu, X, ArrowRight, ShieldCheck, Download, MessageCircle } from "lucide-react";
+import { Menu, X, ArrowRight, ShieldCheck, Download, MessageCircle, Sparkles } from "lucide-react";
 
 export const OFFICIAL_PLAYSTORE_URL = "https://play.google.com/store/apps/details?id=app.qzloop.qz_loop_app";
 export const OFFICIAL_WHATSAPP_GROUP_URL = "https://chat.whatsapp.com/JaluiYU8C6nKGrr3YXBn6L";
@@ -24,100 +24,63 @@ export function LandingNavbar() {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
-          ? "bg-[#07090e]/85 backdrop-blur-xl border-b border-white/[0.08] shadow-[0_4px_30px_rgba(0,0,0,0.6)]"
+          ? "bg-[#07090e]/80 backdrop-blur-2xl border-b border-white/[0.08] shadow-[0_4px_30px_rgba(0,0,0,0.6)]"
           : "bg-transparent border-b border-transparent"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 sm:h-20 flex items-center justify-between">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-emerald-400 p-[1.5px] shadow-[0_0_20px_rgba(168,85,247,0.35)] group-hover:shadow-[0_0_28px_rgba(168,85,247,0.6)] transition-all">
-            <div className="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center font-black text-white text-base">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-emerald-400 p-[1.5px] shadow-[0_0_20px_rgba(168,85,247,0.35)] group-hover:shadow-[0_0_30px_rgba(168,85,247,0.6)] transition-all">
+            <div className="w-full h-full bg-[#090d16] rounded-[9px] flex items-center justify-center font-black text-white text-sm">
               QZ
             </div>
           </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-xl tracking-tight text-white group-hover:text-purple-200 transition-colors">
-                Qz<span className="text-purple-400">-</span>loop
-              </span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 uppercase tracking-wider">
-                Official App
-              </span>
-            </div>
-            <span className="text-[11px] text-slate-400 font-medium tracking-wide">
-              15-Second MCQ Reels
-            </span>
-          </div>
+          <span className="font-extrabold text-lg sm:text-xl tracking-tight text-white group-hover:text-purple-200 transition-colors">
+            Qz<span className="text-purple-400">-</span>loop
+          </span>
         </Link>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-7">
-          <Link
-            href="/#the-loop"
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
-          >
-            Interactive Demo
+        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold text-slate-300">
+          <Link href="/#habit-engine" className="hover:text-white transition-colors">
+            /goal · /plan · /boost
           </Link>
-          <Link
-            href="/#features"
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
-          >
-            Features
+          <Link href="/#contrast" className="hover:text-white transition-colors">
+            Why It Works
           </Link>
-          <Link
-            href="/#exams"
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
-          >
+          <Link href="/#exams" className="hover:text-white transition-colors">
             10 Exams
           </Link>
-          <Link
-            href="/data-safety"
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors flex items-center gap-1"
-          >
+          <Link href="/#faq" className="hover:text-white transition-colors">
+            FAQ
+          </Link>
+          <Link href="/data-safety" className="text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Data Safety & DPDP</span>
-          </Link>
-          <Link
-            href="/privacy"
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
-          >
-            Privacy
-          </Link>
-          <Link
-            href="/contact"
-            className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
-          >
-            Contact
+            <span>DPDP Safety</span>
           </Link>
         </nav>
 
         {/* Action Buttons: WhatsApp & Play Store */}
         <div className="hidden sm:flex items-center gap-3">
-          {/* Powerful WhatsApp Group Button */}
           <a
             href={OFFICIAL_WHATSAPP_GROUP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2.5 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#25D366] text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-[#25D366]/10"
+            className="px-3.5 py-2 rounded-xl bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 text-[#25D366] text-xs font-bold flex items-center gap-1.5 transition-all"
           >
-            <MessageCircle className="w-4 h-4 fill-[#25D366]/20" />
-            <span>Join WhatsApp Group</span>
+            <MessageCircle className="w-3.5 h-3.5" />
+            <span>WhatsApp</span>
           </a>
 
-          {/* Powerful Install Google Play Button */}
           <a
             href={OFFICIAL_PLAYSTORE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="relative inline-flex items-center justify-center p-[1px] overflow-hidden rounded-xl font-bold group shadow-[0_0_25px_rgba(168,85,247,0.4)] hover:shadow-[0_0_35px_rgba(168,85,247,0.7)] transition-all duration-300"
+            className="px-4 py-2 rounded-xl bg-white text-slate-950 hover:bg-slate-200 text-xs font-black flex items-center gap-1.5 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:scale-102"
           >
-            <span className="absolute inset-0 bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-400 rounded-xl" />
-            <span className="relative px-5 py-2.5 bg-[#0e121e] rounded-[11px] group-hover:bg-[#090d16] flex items-center gap-2 text-xs text-white">
-              <Download className="w-4 h-4 text-purple-400" />
-              <span>Install on Play Store</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-300 group-hover:translate-x-0.5 transition-transform" />
-            </span>
+            <Download className="w-3.5 h-3.5" />
+            <span>Get App</span>
           </a>
         </div>
 
@@ -127,15 +90,15 @@ export function LandingNavbar() {
             href={OFFICIAL_PLAYSTORE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-purple-600/30"
+            className="px-3 py-1.5 rounded-lg bg-white text-slate-950 text-xs font-bold flex items-center gap-1"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Install</span>
+            <span>Get App</span>
           </a>
 
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white"
+            className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-300"
             aria-label="Toggle Navigation Menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -145,74 +108,59 @@ export function LandingNavbar() {
 
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
-        <div className="sm:hidden bg-[#07090e]/95 backdrop-blur-2xl border-b border-white/10 px-6 py-6 flex flex-col gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="sm:hidden bg-[#07090e]/95 backdrop-blur-2xl border-b border-white/10 px-6 py-6 flex flex-col gap-4 animate-in fade-in duration-200">
           <Link
-            href="/#the-loop"
+            href="/#habit-engine"
             onClick={() => setMobileMenuOpen(false)}
-            className="text-sm font-medium text-slate-200 hover:text-purple-400 py-1"
+            className="text-sm font-semibold text-slate-200 hover:text-purple-400 py-1"
           >
-            Interactive Demo
+            /goal · /plan · /boost
           </Link>
           <Link
-            href="/#features"
+            href="/#contrast"
             onClick={() => setMobileMenuOpen(false)}
-            className="text-sm font-medium text-slate-200 hover:text-purple-400 py-1"
+            className="text-sm font-semibold text-slate-200 hover:text-purple-400 py-1"
           >
-            Features & Streaks
+            Why It Works
           </Link>
           <Link
             href="/#exams"
             onClick={() => setMobileMenuOpen(false)}
-            className="text-sm font-medium text-slate-200 hover:text-purple-400 py-1"
+            className="text-sm font-semibold text-slate-200 hover:text-purple-400 py-1"
           >
-            Exams Covered
+            10 Exams Covered
           </Link>
           <Link
             href="/data-safety"
             onClick={() => setMobileMenuOpen(false)}
-            className="text-sm font-medium text-emerald-400 py-1 flex items-center gap-2"
+            className="text-sm font-semibold text-emerald-400 py-1 flex items-center gap-2"
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Play Store Data Safety & DPDP</span>
+            <span>Play Store Data Safety</span>
           </Link>
           <Link
             href="/privacy"
             onClick={() => setMobileMenuOpen(false)}
-            className="text-sm font-medium text-slate-200 hover:text-purple-400 py-1"
+            className="text-sm font-semibold text-slate-400 hover:text-white py-1"
           >
             Privacy Policy
           </Link>
-          <Link
-            href="/terms"
-            onClick={() => setMobileMenuOpen(false)}
-            className="text-sm font-medium text-slate-200 hover:text-purple-400 py-1"
-          >
-            Terms & Conditions
-          </Link>
-          <Link
-            href="/contact"
-            onClick={() => setMobileMenuOpen(false)}
-            className="text-sm font-medium text-slate-200 hover:text-purple-400 py-1"
-          >
-            Contact Us & Data Deletion
-          </Link>
 
-          <div className="pt-4 border-t border-white/10 flex flex-col gap-3">
+          <div className="pt-3 border-t border-white/10 flex flex-col gap-2.5">
             <a
               href={OFFICIAL_WHATSAPP_GROUP_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-3 rounded-xl bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] font-bold text-center flex items-center justify-center gap-2 text-sm"
+              className="w-full py-2.5 rounded-xl bg-[#25D366]/20 border border-[#25D366]/40 text-[#25D366] font-bold text-center flex items-center justify-center gap-2 text-xs"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>Join Official WhatsApp Group</span>
+              <span>Join WhatsApp Group</span>
             </a>
-
             <a
               href={OFFICIAL_PLAYSTORE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 text-white font-bold text-center flex items-center justify-center gap-2 shadow-lg shadow-purple-600/40 text-sm"
+              className="w-full py-2.5 rounded-xl bg-white text-slate-950 font-black text-center flex items-center justify-center gap-2 text-xs"
             >
               <Download className="w-4 h-4" />
               <span>Install Qz-loop on Google Play</span>
