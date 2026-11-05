@@ -12,9 +12,19 @@ interface AppLayoutWrapperProps {
 }
 
 export function AppLayoutWrapper({ children }: AppLayoutWrapperProps) {
+  const pathname = usePathname();
+  const isLoop = pathname === "/loop" || pathname === "/qzloop";
+
   return (
-    <div className="w-full min-h-screen flex flex-col relative bg-[#07090e] text-slate-100 selection:bg-purple-500/30 selection:text-white overflow-x-hidden">
+    <div
+      className={`w-full flex flex-col relative bg-[#07090e] text-slate-100 selection:bg-purple-500/30 selection:text-white overflow-x-hidden ${
+        isLoop ? "h-[100dvh] max-h-[100dvh] overflow-hidden" : "min-h-screen"
+      }`}
+    >
       {children}
+      <AuthModal />
+      <UsernameOnboardingModal />
+      <InteractiveOnboardingModal />
     </div>
   );
 }
