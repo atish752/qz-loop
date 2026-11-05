@@ -4,8 +4,8 @@ import { AppLayoutWrapper } from "@/components/layout/AppLayoutWrapper";
 import { AuthSync } from "@/components/auth/AuthSync";
 
 export const metadata: Metadata = {
-  title: "Qz Loop — Scroll. Solve. Improve. Repeat.",
-  description: "India's first mobile-first vertical-scroll micro-practice app for NEET UG medical aspirants (Biology, Physics, Chemistry). 15-second active recall questions. Zero guilt.",
+  title: "Qz-loop — 15-Second MCQ Reels for Top Indian Competitive Exams",
+  description: "India's first vertical-scroll micro-practice app for competitive exams (NEET, JEE, UPSC, SSC, Banking, Railways). 15-second active recall reels. Zero guilt. Available on Google Play Store.",
   manifest: "/manifest.json",
   icons: {
     icon: "/logo.jpg",
@@ -13,21 +13,21 @@ export const metadata: Metadata = {
     apple: "/logo.jpg",
   },
   openGraph: {
-    title: "Qz Loop — Don't Fight The Doomscroll. Weaponize It for NEET.",
-    description: "Replace mindless social media scrolling with 15-second NCERT syllabus-accurate exam questions. Real NTA negative marking, spaced repetition, and 1v1 challenges.",
-    url: "https://qz-loop.vercel.app/landing",
-    siteName: "Qz Loop",
+    title: "Qz-loop — Don't Fight The Doomscroll. Weaponize It for Your Exam.",
+    description: "Replace mindless social media scrolling with 15-second exam-accurate MCQs. Negative marking, spaced repetition, mistake vault, and study partner challenges.",
+    url: "https://qz-loop.vercel.app/",
+    siteName: "Qz-loop",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Qz Loop — India's 1st Reels-Style NEET UG Quiz App",
-    description: "Scroll. Solve. Improve. Repeat. 25 NCERT PYQs solved in 10 minutes.",
+    title: "Qz-loop — India's 1st Reels-Style Exam Quiz App",
+    description: "Scroll. Solve. Improve. Repeat. 25 PYQs solved in 10 minutes.",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Qz Loop",
+    title: "Qz-loop",
   },
 };
 
@@ -74,7 +74,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-[#07090e] font-sans text-slate-100 antialiased min-h-screen flex flex-col justify-between items-center selection:bg-purple-500/30 selection:text-white">
+      <body className="bg-[#07090e] font-sans text-slate-100 antialiased min-h-screen flex flex-col w-full selection:bg-purple-500/30 selection:text-white">
         <AuthSync />
         <AppLayoutWrapper>{children}</AppLayoutWrapper>
       </body>
