@@ -1,100 +1,81 @@
 "use client";
 
 import React, { useState } from "react";
-import { ShieldCheck, ArrowUpRight, Users } from "lucide-react";
-import { APP_LOOP_URL } from "./LandingNavbar";
+import { ArrowUpRight, Download } from "lucide-react";
+import Link from "next/link";
+import { OFFICIAL_PLAYSTORE_URL } from "./LandingNavbar";
 
 interface ExamInfo {
   id: string;
-  name: string;
   shortName: string;
-  subtitle: string;
-  volume: string;
-  subjects: string[];
+  name: string;
   scoring: string;
+  subjects: string[];
 }
 
 const ALL_EXAMS: ExamInfo[] = [
   {
     id: "neet",
-    name: "NEET UG Medical",
     shortName: "NEET UG",
-    subtitle: "NCERT Biology, Chemistry & Physics",
-    volume: "2.4M Aspirants",
-    subjects: ["NCERT Bio", "Organic Chem", "Physics"],
-    scoring: "+4 / -1 NTA",
+    name: "National Eligibility cum Entrance Test",
+    scoring: "+4.00 / -1.00 NTA",
+    subjects: ["NCERT Biology", "Organic Chemistry", "Physics"],
   },
   {
     id: "jee",
-    name: "JEE Main Engineering",
     shortName: "JEE Main",
-    subtitle: "NTA Engineering Entrance",
-    volume: "1.4M Aspirants",
+    name: "Joint Entrance Examination",
+    scoring: "+4.00 / -1.00 NTA",
     subjects: ["Physics", "Chemistry", "Mathematics"],
-    scoring: "+4 / -1 NTA",
   },
   {
     id: "upsc",
-    name: "UPSC Civil Services",
     shortName: "UPSC Prelims",
-    subtitle: "GS Paper 1 & CSAT",
-    volume: "1.1M Aspirants",
+    name: "Civil Services Preliminary Examination",
+    scoring: "+2.00 / -0.66 UPSC",
     subjects: ["Polity", "Modern History", "Geography", "CSAT"],
-    scoring: "+2 / -0.66 UPSC",
   },
   {
     id: "ssc",
-    name: "SSC CGL / CHSL",
     shortName: "SSC CGL",
-    subtitle: "Staff Selection Commission",
-    volume: "3.2M Aspirants",
-    subjects: ["Quant", "Reasoning", "English", "Static GK"],
-    scoring: "+2 / -0.50 SSC",
+    name: "Combined Graduate Level",
+    scoring: "+2.00 / -0.50 SSC",
+    subjects: ["Quantitative Aptitude", "Reasoning", "English", "General Awareness"],
   },
   {
     id: "rrb",
-    name: "Railways RRB NTPC",
     shortName: "RRB NTPC",
-    subtitle: "Mega Recruitment Board",
-    volume: "10M+ Applicants",
+    name: "Non-Technical Popular Categories",
+    scoring: "+1.00 / -0.33 RRB",
     subjects: ["General Science", "Maths", "Current Affairs"],
-    scoring: "+1 / -0.33 RRB",
   },
   {
     id: "banking",
-    name: "Banking IBPS / SBI PO",
     shortName: "IBPS / SBI",
-    subtitle: "PO & Clerk Speed Rounds",
-    volume: "1.5M Aspirants",
-    subjects: ["Quant DI", "Reasoning", "English"],
-    scoring: "+1 / -0.25 IBPS",
+    name: "Bank PO & Clerk Examination",
+    scoring: "+1.00 / -0.25 IBPS",
+    subjects: ["Data Interpretation", "Reasoning", "English"],
   },
   {
     id: "nda",
-    name: "NDA & CDS Defence",
     shortName: "NDA / CDS",
-    subtitle: "UPSC Defence Academy",
-    volume: "800K Aspirants",
-    subjects: ["Mathematics", "GAT", "English"],
-    scoring: "+2.5 / -0.83 NDA",
+    name: "National Defence Academy",
+    scoring: "+2.50 / -0.83 UPSC",
+    subjects: ["Mathematics", "General Ability Test", "English"],
   },
   {
     id: "gate",
-    name: "GATE Engineering",
     shortName: "GATE",
-    subtitle: "Graduate Aptitude Test",
-    volume: "700K Aspirants",
-    subjects: ["Core Branches", "Engineering Maths", "Aptitude"],
-    scoring: "+1 / -0.33 GATE",
+    name: "Graduate Aptitude Test in Engineering",
+    scoring: "+1.00 / -0.33 GATE",
+    subjects: ["Core Engineering", "Engineering Maths", "General Aptitude"],
   },
   {
     id: "cuet",
-    name: "CUET UG Central Univ",
     shortName: "CUET UG",
-    subtitle: "Class 12 Domain Entrance",
-    volume: "1.9M Aspirants",
-    subjects: ["Domain Bio/Chem/Phys/Math", "General Test"],
-    scoring: "+5 / -1 NTA",
+    name: "Common University Entrance Test",
+    scoring: "+5.00 / -1.00 NTA",
+    subjects: ["Domain Sciences", "General Aptitude"],
   },
 ];
 
@@ -103,33 +84,26 @@ export function ExamRow() {
   const activeExam = ALL_EXAMS.find((e) => e.id === selectedId) || ALL_EXAMS[0];
 
   return (
-    <section id="exams" className="py-24 border-y border-white/[0.06] bg-[#07090e] relative overflow-hidden">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold uppercase tracking-wider mb-4">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Pan-India Coverage</span>
-          </div>
-
-          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-[1.08]">
-            Curated for your syllabus.
+    <section id="exams" className="py-20 md:py-24 border-y border-white/[0.06] bg-[#05070c] relative overflow-hidden">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-xl mx-auto mb-10">
+          <span className="text-[11px] font-mono font-bold text-emerald-400 uppercase tracking-widest block mb-2">
+            Verified PYQ Banks
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+            Curated for India's toughest exams.
           </h2>
-
-          <p className="text-sm sm:text-base text-slate-400 mt-3 font-normal">
-            Exact negative penalty rules and verified PYQ banks.
-          </p>
         </div>
 
         {/* Minimal Pill Selector */}
-        <div className="flex items-center gap-2 mb-8 overflow-x-auto no-scrollbar pb-2 justify-start md:justify-center">
+        <div className="flex items-center gap-1.5 mb-8 overflow-x-auto no-scrollbar pb-2 justify-start md:justify-center">
           {ALL_EXAMS.map((exam) => (
             <button
               key={exam.id}
               onClick={() => setSelectedId(exam.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 ${
                 selectedId === exam.id
-                  ? "bg-white text-slate-950 shadow-md shadow-white/10 scale-102"
+                  ? "bg-white text-slate-950 shadow-md shadow-white/10"
                   : "bg-white/[0.03] text-slate-400 hover:text-white border border-white/5"
               }`}
             >
@@ -138,31 +112,20 @@ export function ExamRow() {
           ))}
         </div>
 
-        {/* Selected Exam Apple-Style Showcase Card */}
-        <div className="max-w-3xl mx-auto p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        {/* Selected Exam Minimalist Showcase Card */}
+        <div className="p-6 sm:p-8 rounded-3xl bg-white/[0.02] border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">
-                {activeExam.volume}
-              </span>
+            <div className="flex items-center gap-2 mb-2 font-mono text-xs">
+              <span className="text-white font-bold">{activeExam.name}</span>
               <span className="text-slate-600">·</span>
-              <span className="text-[10px] font-mono text-purple-300">
-                {activeExam.scoring}
-              </span>
+              <span className="text-purple-300 font-bold">{activeExam.scoring}</span>
             </div>
-
-            <h3 className="text-xl sm:text-2xl font-black text-white mb-1">
-              {activeExam.name}
-            </h3>
-            <p className="text-xs text-slate-400 mb-3">
-              {activeExam.subtitle}
-            </p>
 
             <div className="flex flex-wrap gap-1.5">
               {activeExam.subjects.map((s, idx) => (
                 <span
                   key={idx}
-                  className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/5 text-slate-300 text-[11px] font-medium"
+                  className="px-2.5 py-0.5 rounded-md bg-white/5 border border-white/5 text-slate-300 text-[11px]"
                 >
                   {s}
                 </span>
@@ -171,12 +134,13 @@ export function ExamRow() {
           </div>
 
           <a
-            href={APP_LOOP_URL}
+            href={OFFICIAL_PLAYSTORE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full md:w-auto px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shrink-0 shadow-md shadow-purple-600/30"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-full bg-white text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-all hover:bg-slate-200 shrink-0 shadow-[0_0_15px_rgba(255,255,255,0.15)]"
           >
-            <span>Practice {activeExam.shortName}</span>
+            <Download className="w-3.5 h-3.5 text-purple-700" />
+            <span>Practice {activeExam.shortName} on App</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </a>
         </div>
